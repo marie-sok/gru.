@@ -16,7 +16,7 @@ public class JwtUtil {
     public String generateToken(User user) {
         long expiration = 1000 * 60 * 60 * 24;
         return Jwts.builder()
-                .setSubject(user.getPhone())
+                .setSubject((String) user.getPhone())
                 .claim("userId", user.getId())
                 .claim("nickname", user.getNickname())
                 .setIssuedAt(new Date())

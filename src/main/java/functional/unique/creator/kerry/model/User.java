@@ -2,15 +2,15 @@ package functional.unique.creator.kerry.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.jspecify.annotations.Nullable;
+
+import java.util.Set;
 
 @Entity
-@Getter
-@Setter
+@Table(name = "users")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "users")
 public class User {
 
     @Id
@@ -20,28 +20,16 @@ public class User {
     @Column(unique = true, nullable = false)
     private String phone;
 
+    @Column(nullable = false)
     private String nickname;
 
+    @Column(nullable = false)
     private String passwordHash;
 
-    private String avatarUrl;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "role")
+    private Set<String> roles;
 
-    public @Nullable String getPasswordHash() {
-        return "password";
-    }
-
-    public String getPhone() {
-        return "79000000000";
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setAvatarUrl(String filePath) {
-    }
-
-    public Object getNickname() {
-        return nickname;
-    }
+    private boolean active;
 }

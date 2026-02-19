@@ -1,8 +1,8 @@
 package functional.unique.creator.kerry.repository;
 
 import functional.unique.creator.kerry.model.User;
-import functional.unique.creator.kerry.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {

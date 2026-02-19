@@ -2,7 +2,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/messenger
     username: marie_sok
-    password: ma_bird_171210
+    password:  ma_bird_171210
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -14,5 +14,4 @@ spring:
         format_sql: true
 
 server:
-  port: 8080
-
+  port: 8081

@@ -2,7 +2,7 @@ package functional.unique.creator.kerry.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import functional.unique.creator.kerry.model.Message;
-import functional.unique.creator.kerry.model.Users;
+import functional.unique.creator.kerry.model.User;
 import functional.unique.creator.kerry.repository.MessageRepository;
 import functional.unique.creator.kerry.repository.UserRepository;
 import functional.unique.creator.kerry.security.JwtUtil;
@@ -37,7 +37,7 @@ public class ChatHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String token = getTokenFromSession(session);
-        Users user = validateAndGetUser(token);
+        User user = validateAndGetUser(token);
         if (user == null) {
             session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Invalid or missing JWT token"));
             return;
@@ -48,17 +48,17 @@ public class ChatHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws Exception {
-        Users sender = validateAndGetUser(getTokenFromSession(session));
+        User sender = validateAndGetUser(getTokenFromSession(session));
         if (sender == null) {
             session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Invalid JWT token"));
             return;
         }
 
         Message msg = mapper.readValue(textMessage.getPayload(), Message.class);
-        msg.setSenderId(sender.getId());
+        msg.setSenderId((Long) sender.getId());
         msg.setTimestamp(LocalDateTime.now());
 
-        Users receiver = userRepo.findById(msg.getReceiverId()).orElse(null);
+        User receiver = userRepo.findById(msg.getReceiverId()).orElse(null);
         if (receiver == null) return;
 
         messageRepo.save(msg);
@@ -67,10 +67,11 @@ public class ChatHandler extends TextWebSocketHandler {
 
         for (WebSocketSession s : sessions) {
             if (s.isOpen()) {
-                Users u = validateAndGetUser(getTokenFromSession(s));
-                if (u != null && (u.getId().equals(msg.getReceiverId()) || u.getId().equals(sender.getId()))) {
-                    s.sendMessage(new TextMessage(json));
-                }
+                User u = validateAndGetUser(getTokenFromSession(s));
+                if (u.getId().equals(msg.getReceiverId()) || u.getId().equals(sender.getId()))
+                    if (u != null) {
+                        s.sendMessage(new TextMessage(json));
+                    }
             }
         }
     }
@@ -94,12 +95,12 @@ public class ChatHandler extends TextWebSocketHandler {
         return null;
     }
 
-    private Users validateAndGetUser(String token) {
+    private User validateAndGetUser(String token) {
         try {
             if (token == null) return null;
             Jws<Claims> claims = jwtUtil.validateToken(token);
             String phone = claims.getBody().getSubject();
-            return userRepo.findByPhone(phone).orElse(null);
+            return (User) userRepo.findByPhone(phone).orElse(null);
         } catch (JwtException e) {
             return null;
         }
