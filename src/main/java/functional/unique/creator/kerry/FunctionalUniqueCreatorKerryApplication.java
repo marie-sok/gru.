@@ -1,0 +1,15 @@
+package functional.unique.creator.kerry;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class FunctionalUniqueCreatorKerryApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(
+                FunctionalUniqueCreatorKerryApplication.class,
+                args
+        );
+    }
+}
