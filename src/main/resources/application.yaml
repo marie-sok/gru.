@@ -15,3 +15,7 @@ spring:
 
 server:
   port: 8081
+
+jwt:
+  secret: ${JWT_SECRET:my_super_secret_key_123456789012345678901234567890}
+  expiration: 86400000

@@ -2,29 +2,34 @@ package functional.unique.creator.kerry.service;
 
 import functional.unique.creator.kerry.model.Message;
 import functional.unique.creator.kerry.repository.MessageRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class MessageService {
 
     private final MessageRepository repo;
 
-    public Message sendMessage(String sender, String receiver, String content) {
-        Message message = Message.builder()
-                .senderPhone(sender)
-                .receiverPhone(receiver)
-                .content(content)
-                .timestamp(LocalDateTime.now())
-                .build();
-        return repo.save(message);
+    public MessageService(MessageRepository repo) {
+        this.repo = repo;
     }
 
-    public List<Message> getHistory(String sender, String receiver) {
-        return repo.findBySenderPhoneAndReceiverPhoneOrderByTimestampAsc(sender, receiver);
+    public Message save(Long sender, Long receiver, String content) {
+        Message m = new Message();
+        m.setSenderId(sender);
+        m.setReceiverId(receiver);
+        m.setContent(content);
+        return repo.save(m);
+    }
+
+    public List<Message> history(Long u1, Long u2) {
+        return repo.findTop50BySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByTimestampAsc(
+                u1, u2, u2, u1
+        );
+    }
+
+    public Message send(Long senderId, Long receiverId, String text) {
+        return null;
     }
 }

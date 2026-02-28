@@ -2,28 +2,48 @@ package functional.unique.creator.kerry.controller;
 
 import functional.unique.creator.kerry.model.Message;
 import functional.unique.creator.kerry.service.MessageService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/messages")
-@RequiredArgsConstructor
+@CrossOrigin
 public class MessageController {
 
     private final MessageService service;
 
-    @PostMapping("/send")
-    public Message send(@RequestParam String sender,
-                        @RequestParam String receiver,
-                        @RequestParam String content) {
-        return service.sendMessage(sender, receiver, content);
+    public MessageController(MessageService service) {
+        this.service = service;
     }
 
+    public static class SendRequest {
+        public Long receiverId;
+        public String text;
+    }
+
+
+    @PostMapping("/send")
+    public Message send(@RequestBody SendRequest req) {
+
+        Long senderId = (Long) SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        return service.send(senderId, req.receiverId, req.text);
+    }
+
+
     @GetMapping("/history")
-    public List<Message> history(@RequestParam String sender,
-                                 @RequestParam String receiver) {
-        return service.getHistory(sender, receiver);
+    public List<Message> history(@RequestParam Long otherUserId) {
+
+        Long currentUser = (Long) SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        return service.history(currentUser, otherUserId);
     }
 }

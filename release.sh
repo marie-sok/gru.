@@ -1,39 +1,55 @@
 #!/bin/bash
 
+# ---------------------------
+# release.sh
+# ---------------------------
+
+# Путь к проекту
+PROJECT_DIR="/Users/mariamorozova/Downloads/functional-unique-creator-kerry"
+
+# Порт, на котором будет запускаться приложение
+PORT=8081
+
 echo "Сборка проекта..."
+cd "$PROJECT_DIR" || exit 1
+
+# Сборка проекта
 mvn clean package -DskipTests
 
-JAR_FILE=$(ls target/*.jar | head -n 1)
+# Проверка JAR
+JAR_FILE="$PROJECT_DIR/target/kerry-0.0.1-SNAPSHOT.jar"
 if [ ! -f "$JAR_FILE" ]; then
-  echo "Ошибка: JAR не найден!"
-  exit 1
+    echo "Ошибка: JAR не найден!"
+    exit 1
 fi
 
 echo "JAR успешно создан: $JAR_FILE"
 
-echo "Запуск приложения для теста..."
-java -jar "$JAR_FILE" &
-APP_PID=$!
-
-sleep 10
-
-HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8081/actuator/health)
-
-if [ "$HTTP_STATUS" == "200" ]; then
-  echo "Приложение успешно стартовало. Готово к релизу!"
-else
-  echo "Ошибка: приложение не отвечает. HTTP статус: $HTTP_STATUS"
-  kill $APP_PID
-  exit 1
+# Завершение активных процессов
+PID=$(lsof -ti tcp:"$PORT")
+if [ -n "$PID" ]; then
+    echo "Завершаем старый процесс на порту $PORT (PID: $PID)"
+    kill -9 "$PID"
 fi
 
-kill $APP_PID
-echo "Тестовое приложение остановлено."
+# Запуск Spring Boot
+echo "Запуск приложения на порту $PORT..."
+nohup java -jar "$JAR_FILE" --server.port="$PORT" > "$PROJECT_DIR/nohup.log" 2>&1 &
 
-echo "Создание релизного тега..."
-git add .
-git commit -m "Release version $(date +%Y.%m.%d)"
-git tag -a "v$(date +%Y.%m.%d)" -m "Release version $(date +%Y.%m.%d)"
-git push origin main --tags
+# Загрузка запуска
+sleep 5
 
-echo "Релиз завершен!"
+# Проверяека запуска приложения
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:"$PORT")
+if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "401" ]; then
+    echo "Ошибка: приложение не отвечает. HTTP статус: $HTTP_STATUS"
+    exit 1
+fi
+
+# Запуск ngrok
+echo "Запуск ngrok туннеля..."
+ngrok http "$PORT" --log=stdout &
+sleep 3
+
+echo "Приложение запущено и доступно через ngrok!"
+echo "Проверяйте URL на экране ngrok или в http://127.0.0.1:4040"
