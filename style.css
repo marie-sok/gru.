@@ -27,18 +27,15 @@ body.dark #login-container, body.dark #chat-container {
     background: #2c2c2c;
 }
 
-input {
+input, button {
     width: 100%;
     padding: 10px;
     margin: 5px 0;
     border-radius: 4px;
-    border: 1px solid #ccc;
 }
 
 button {
-    padding: 10px 15px;
     border: none;
-    border-radius: 4px;
     cursor: pointer;
     background-color: #007bff;
     color: #fff;
@@ -56,6 +53,8 @@ button {
     overflow-y: auto;
     border: 1px solid #ccc;
     padding: 10px;
+    display: flex;
+    flex-direction: column;
 }
 
 .message {
@@ -81,4 +80,9 @@ body.dark .message.self {
 
 body.dark .message.other {
     background-color: #444;
+}
+
+.message img, .message video, .message audio {
+    max-width: 200px;
+    border-radius: 5px;
 }

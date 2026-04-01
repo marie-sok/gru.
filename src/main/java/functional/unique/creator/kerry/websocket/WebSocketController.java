@@ -12,7 +12,11 @@ public class WebSocketController extends TextWebSocketHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<Long, WebSocketSession> sessions = new ConcurrentHashMap<>();
-    private final MessageService messageService = new MessageService(); // TODO: inject repo
+    private final MessageService messageService; // TODO: inject repo
+
+    public WebSocketController() {
+        messageService = new MessageService();
+    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {

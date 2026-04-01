@@ -3,33 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kerry Messenger</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Minimalist Messenger</title>
+    <style>
+        :root {
+          --bg-light: #f5f5f5;
+          --bg-dark: #1e1e1e;
+          --text-light: #000;
+          --text-dark: #fff;
+          --primary: #2d88ff;
+          --secondary: #d3d3d3;
+        }
+
+        body.light {
+          background-color: var(--bg-light);
+          color: var(--text-light);
+        }
+
+        body.dark {
+          background-color: var(--bg-dark);
+          color: var(--text-dark);
+        }
+
+        .container {
+          display: flex;
+          height: 100vh;
+          font-family: Arial, sans-serif;
+        }
+
+        .sidebar {
+          width: 250px;
+          border-right: 1px solid var(--secondary);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .sidebar h2 {
+          text-align: center;
+          margin: 10px 0;
+        }
+
+        .chat-list {
+          flex-grow: 1;
+          overflow-y: auto;
+        }
+
+        .chat-item {
+          padding: 10px;
+          cursor: pointer;
+          border-bottom: 1px solid var(--secondary);
+        }
+
+        .chat-item:hover {
+          background-color: var(--primary);
+          color: #fff;
+        }
+
+        .chat-window {
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        .messages {
+          padding: 10px;
+          overflow-y: auto;
+          flex-grow: 1;
+        }
+
+        .message {
+          margin: 5px 0;
+          max-width: 60%;
+          padding: 8px 12px;
+          border-radius: 15px;
+          display: inline-block;
+          word-wrap: break-word;
+        }
+
+        .message.sent {
+          background-color: var(--primary);
+          color: #fff;
+          align-self: flex-end;
+        }
+
+        .message.received {
+          background-color: var(--secondary);
+          color: #000;
+          align-self: flex-start;
+        }
+
+        .input-area {
+          display: flex;
+          padding: 10px;
+          border-top: 1px solid var(--secondary);
+        }
+
+        .input-area input[type="text"] {
+          flex-grow: 1;
+          padding: 8px;
+          border-radius: 20px;
+          border: 1px solid var(--secondary);
+          outline: none;
+        }
+
+        .input-area button {
+          margin-left: 10px;
+          padding: 8px 12px;
+          border-radius: 50%;
+          border: none;
+          background-color: var(--primary);
+          color: #fff;
+          cursor: pointer;
+        }
+
+        .input-area button:hover {
+          background-color: #1b5fdd;
+        }
+
+        .theme-toggle {
+          text-align: center;
+          padding: 5px;
+          cursor: pointer;
+        }
+
+        .typing-status {
+          font-size: 12px;
+          color: #888;
+          margin-left: 10px;
+        }
+
+        img.attach-preview {
+          max-width: 200px;
+          border-radius: 10px;
+          margin-top: 5px;
+        }
+
+    </style>
 </head>
 <body class="light">
-
-<div id="login-container">
-    <h2>Login</h2>
-    <input type="text" id="phone" placeholder="Phone">
-    <input type="password" id="password" placeholder="Password">
-    <button id="login-btn">Login</button>
-</div>
-
-<div id="chat-container" class="hidden">
-    <header>
+<div class="container">
+    <div class="sidebar">
         <h2>Chats</h2>
-        <button id="toggle-theme">🌙</button>
-    </header>
-    <div id="chat-list"></div>
-    <div id="chat-window" class="hidden">
-        <div id="messages"></div>
-        <div id="typing-status"></div>
-        <input type="file" id="file-input">
-        <input type="text" id="message-input" placeholder="Type a message...">
-        <button id="send-btn">Send</button>
+        <div class="chat-list" id="chatList">
+            <!-- Список чатов будет добавляться сюда -->
+        </div>
+        <div class="theme-toggle" id="themeToggle">Toggle Dark/Light</div>
+    </div>
+    <div class="chat-window">
+        <div class="messages" id="messages"></div>
+        <div class="typing-status" id="typingStatus"></div>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type a message...">
+            <input type="file" id="fileInput">
+            <button id="sendBtn">Send</button>
+        </div>
     </div>
 </div>
 
-<script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+    const token = "PUT_YOUR_JWT_HERE";
+    const ws = new WebSocket("ws://localhost:8081/ws?token=" + token);
+
+    let currentChatUserId = 2; // пример ID собеседника
+
+    // WebSocket события
+    ws.onopen = () => console.log("WebSocket connected");
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "MESSAGE") addMessage(data, data.senderId === currentChatUserId ? 'received' : 'sent');
+      if (data.type === "TYPING") document.getElementById('typingStatus').innerText = "Typing...";
+      if (data.type === "READ") console.log("Message read:", data.messageId);
+    };
+
+    function addMessage(msg, type) {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = "message " + type;
+      if (msg.contentType.startsWith("IMAGE")) {
+        const img = document.createElement("img");
+        img.src = msg.content;
+        img.className = "attach-preview";
+        msgDiv.appendChild(img);
+      } else {
+        msgDiv.textContent = msg.content;
+      }
+      document.getElementById("messages").appendChild(msgDiv);
+      document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+    }
+
+    // Send message
+    document.getElementById("sendBtn").onclick = () => {
+      const input = document.getElementById("messageInput");
+      const fileInput = document.getElementById("fileInput");
+      if (fileInput.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = () => sendMessage(reader.result, "IMAGE");
+        reader.readAsDataURL(fileInput.files[0]);
+        fileInput.value = "";
+      } else if (input.value.trim() !== "") {
+        sendMessage(input.value, "TEXT");
+        input.value = "";
+      }
+    };
+
+    function sendMessage(content, contentType) {
+      ws.send(JSON.stringify({
+        type: "MESSAGE",
+        senderId: 1, // ID текущего пользователя
+        receiverId: currentChatUserId,
+        content: content,
+        contentType: contentType
+      }));
+    }
+
+    // Typing indicator
+    const msgInput = document.getElementById("messageInput");
+    msgInput.addEventListener("input", () => {
+      ws.send(JSON.stringify({
+        type: "TYPING",
+        senderId: 1,
+        receiverId: currentChatUserId
+      }));
+    });
+
+    // Toggle theme
+    document.getElementById("themeToggle").onclick = () => {
+      document.body.classList.toggle("dark");
+      document.body.classList.toggle("light");
+    };
+
+</script>
 </body>
 </html>

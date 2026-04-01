@@ -38,5 +38,9 @@ public class JwtUtil {
     public String parse(String token) {
         return token;
     }
+
+    public boolean isTokenExpired(String token) {
+        return false;
+    }
 }
 

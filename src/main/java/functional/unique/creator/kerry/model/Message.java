@@ -2,37 +2,33 @@ package functional.unique.creator.kerry.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.nio.file.attribute.AclEntry;
-import java.time.Instant;
-import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Table(name = "messages")
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@RequiredArgsConstructor
 public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NonNull
     private Long senderId;
+
+    @NonNull
     private Long receiverId;
 
+    @NonNull
+    @Lob
     private String content;
-    private String type;
 
+    @NonNull
+    private String contentType;
     private boolean read;
 
-    private Instant timestamp;
-
-    public void setDeleted(boolean b) {
-    }
-
-    public AclEntry.Builder createdAt(LocalDateTime now) {
-        return null;
-    }
+    private Date timestamp;
 }
