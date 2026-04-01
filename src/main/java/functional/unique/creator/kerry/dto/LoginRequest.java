@@ -3,14 +3,12 @@ package functional.unique.creator.kerry.dto;
 import lombok.Data;
 
 @Data
-public class RegisterRequest {
+public class LoginRequest {
     private String phone;
-    private String nickname;
     private String password;
 
-    public RegisterRequest(String phone, String nickname, String password) {
+    public LoginRequest(String phone, String password) {
         this.phone = phone;
-        this.nickname = nickname;
         this.password = password;
     }
 
@@ -19,14 +17,7 @@ public class RegisterRequest {
     }
 
     public void setPhone(String phone) {
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
+        this.phone = phone;
     }
 
     public String getPassword() {
@@ -36,3 +27,4 @@ public class RegisterRequest {
     public void setPassword(String password) {
     }
 }
+

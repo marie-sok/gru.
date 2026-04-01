@@ -17,5 +17,5 @@ server:
   port: 8081
 
 jwt:
-  secret: ${JWT_SECRET:my_super_secret_key_123456789012345678901234567890}
+  secret: ${JWT_SECRET:functional_unique_create_kerry_wtf_its_a_rofl??}
   expiration: 86400000

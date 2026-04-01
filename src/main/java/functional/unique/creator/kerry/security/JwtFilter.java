@@ -1,56 +1,55 @@
 package functional.unique.creator.kerry.security;
 
-import functional.unique.creator.kerry.service.UserService;
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
-public class JwtFilter extends GenericFilter {
+@Setter
+@RequiredArgsConstructor
+public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
-    private final UserService userService;
+    private JwtUtil jwtUtil;
 
-    public JwtFilter(JwtUtil jwtUtil, UserService userService) {
-        this.jwtUtil = jwtUtil;
-        this.userService = userService;
+    public JwtFilter(JwtUtil jwtUtil) {
+
     }
 
     @Override
-    public void doFilter(
-            ServletRequest request,
-            ServletResponse response,
-            FilterChain chain
-    ) throws IOException, ServletException {
+    protected void doFilterInternal(HttpServletRequest req,
+                                    HttpServletResponse res,
+                                    FilterChain chain)
+            throws ServletException, IOException {
 
-        HttpServletRequest req = (HttpServletRequest) request;
         String header = req.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
 
-            String token = header.substring(7);
-
             try {
-                Claims claims = jwtUtil.validateToken(token);
+                String token = header.substring(7);
+                String claims = jwtUtil.parse(token);
 
-                Long userId = claims.get("userId", Long.class);
+                String phone = Arrays.toString(claims.getBytes());
 
-                UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(
-                                userId,
-                                null,
-                                List.of()
-                        );
+                var auth = new UsernamePasswordAuthenticationToken(
+                        phone,
+                        null,
+                        List.of()
+                );
 
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
             } catch (Exception ignored) {}
         }
 
-        chain.doFilter(request, response);
+        chain.doFilter(req, res);
     }
+
 }

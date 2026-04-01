@@ -5,7 +5,6 @@ import functional.unique.creator.kerry.repository.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
-import java.util.Set;
 
 @Service
 public class UserService {
@@ -24,11 +23,6 @@ public class UserService {
         String hash = BCrypt.hashpw(password, BCrypt.gensalt());
 
         User user = new User(
-                phone,
-                nickname,
-                hash,
-                Set.of("USER"),
-                true
         );
 
         return repo.save(user);

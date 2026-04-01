@@ -2,34 +2,121 @@ package functional.unique.creator.kerry.service;
 
 import functional.unique.creator.kerry.model.Message;
 import functional.unique.creator.kerry.repository.MessageRepository;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class MessageService {
 
-    private final MessageRepository repo;
+    private  MessageRepository messageRepository;
+    @Getter
+    private Long currentUser;
 
-    public MessageService(MessageRepository repo) {
-        this.repo = repo;
+    /**
+     * send message
+     */
+    public Message send(Long senderId, Long receiverId, String content) {
+
+        if (senderId == null || receiverId == null) {
+            throw new RuntimeException("Sender or receiver is null");
+        }
+
+        if (content == null || content.isBlank()) {
+            throw new RuntimeException("Message is empty");
+        }
+
+        Message message = Message.builder()
+                .senderId(senderId)
+                .receiverId(receiverId)
+                .content(content)
+                .read(false)
+                .build();
+
+        return messageRepository.save(message);
     }
 
-    public Message save(Long sender, Long receiver, String content) {
-        Message m = new Message();
-        m.setSenderId(sender);
-        m.setReceiverId(receiver);
-        m.setContent(content);
-        return repo.save(m);
+    /**
+     * history
+     */
+    public List<Message> getHistory(Long user1Id, Long user2Id) {
+
+        if (user1Id == null || user2Id == null) {
+            throw new RuntimeException("Users cannot be null");
+        }
+
+        return messageRepository
+                .findTop50BySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByCreatedAtAsc(
+                        user1Id, user2Id,
+                        user2Id, user1Id
+                );
     }
 
-    public List<Message> history(Long u1, Long u2) {
-        return repo.findTop50BySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByTimestampAsc(
-                u1, u2, u2, u1
-        );
+    /**
+     * view
+     */
+    public void markAsRead(Long senderId, Long receiverId) {
+
+        List<Message> messages = messageRepository
+                .findTop50BySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByCreatedAtAsc(
+                        senderId, receiverId,
+                        receiverId, senderId
+                );
+
+        messages.stream()
+                .filter(m -> !m.isRead() && m.getReceiverId().equals(receiverId))
+                .forEach(m -> {
+                    m.setRead(true);
+                    messageRepository.save(m);
+                });
     }
 
-    public Message send(Long senderId, Long receiverId, String text) {
-        return null;
+    public MessageRepository getMessageRepository() {
+        return messageRepository;
+    }
+
+    /**
+     * soft delete
+     */
+    public void delete(Long messageId) {
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        message.setDeleted(true);
+        messageRepository.save(message);
+    }
+
+    /**
+     * redaction
+     */
+    public Message edit(Long messageId, String newContent) {
+
+        if (newContent == null || newContent.isBlank()) {
+            throw new RuntimeException("New content is empty");
+        }
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        message.setContent(newContent);
+        return messageRepository.save(message);
+    }
+
+    public List<Message> history(Long currentUser, Long otherUserId) {
+        return List.of();
+    }
+
+    public void setCurrentUser(Long currentUser) {
+    }
+
+    public void setMessageRepository(MessageRepository messageRepository) {
+    }
+
+    public void save(Message msg) {
     }
 }

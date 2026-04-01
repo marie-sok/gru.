@@ -1,10 +1,18 @@
 package functional.unique.creator.kerry.model;
 
 import jakarta.persistence.*;
+import lombok.*;
+
+import java.nio.file.attribute.AclEntry;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "messages")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Message {
 
     @Id
@@ -15,15 +23,16 @@ public class Message {
     private Long receiverId;
 
     private String content;
+    private String type;
 
-    private LocalDateTime timestamp = LocalDateTime.now();
+    private boolean read;
 
-    public Long getId() { return id; }
-    public Long getSenderId() { return senderId; }
-    public void setSenderId(Long senderId) { this.senderId = senderId; }
-    public Long getReceiverId() { return receiverId; }
-    public void setReceiverId(Long receiverId) { this.receiverId = receiverId; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-    public LocalDateTime getTimestamp() { return timestamp; }
+    private Instant timestamp;
+
+    public void setDeleted(boolean b) {
+    }
+
+    public AclEntry.Builder createdAt(LocalDateTime now) {
+        return null;
+    }
 }
