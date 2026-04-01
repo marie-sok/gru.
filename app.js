@@ -3,7 +3,8 @@ let ws = null;
 let currentChatId = null;
 let typingTimeout = null;
 
-document.getElementById("login-btn").addEventListener("click", async () => {
+document.getElementById("login-btn").addEventListener("click", asy
+nc () => {
     const phone = document.getElementById("phone").value;
     const password = document.getElementById("password").value;
 

@@ -1,0 +1,5 @@
+<root>
+    <item name='org.hibernate.engine.jdbc.spi.SqlExceptionHelper'>
+        <annotation name='java.lang.Deprecated'/>
+    </item>
+</root>
