@@ -1,37 +1,26 @@
 package functional.unique.creator.kerry.model;
 
-import jakarta.persistence.*;
 import lombok.*;
-import java.util.Set;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
-@Table(name = "users")
+import java.time.LocalDate;
+
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "users")
 public class User {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(unique = true, nullable = false)
+    private String id;
     private String phone;
-
-    @Column(nullable = false)
+    private String name;
     private String nickname;
-
-    @Column(nullable = false)
+    private boolean showNickname; // true если ник виден другим
+    private String email;
     private String passwordHash;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    private Set<String> roles;
-
-    private boolean active;
-
-    private boolean invisibleMode; // Режим видимости
-
-    @ElementCollection
-    private Set<Long> blacklist; // Черный список
+    private String avatarUrl;
+    private LocalDate birthday;
+    private boolean verified;
 }

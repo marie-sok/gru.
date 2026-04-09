@@ -1,26 +1,27 @@
 package functional.unique.creator.kerry.controller;
 
-import functional.unique.creator.kerry.dto.*;
+import functional.unique.creator.kerry.dto.AuthResponse;
+import functional.unique.creator.kerry.dto.LoginRequest;
+import functional.unique.creator.kerry.dto.RegisterRequest;
 import functional.unique.creator.kerry.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private AuthService service;
+    private final AuthService authService;
 
     @PostMapping("/register")
-    public Map<String, String> register(@RequestBody RegisterRequest req) {
-        return (Map<String, String>) service.register(req);
+    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
+        return authService.register(request);
     }
 
     @PostMapping("/login")
-    public Map<String, String> login(@RequestBody LoginRequest req) {
-        return (Map<String, String>) service.login(req);
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+        return authService.login(request);
     }
 }

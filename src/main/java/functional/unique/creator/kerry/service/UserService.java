@@ -2,33 +2,47 @@ package functional.unique.creator.kerry.service;
 
 import functional.unique.creator.kerry.model.User;
 import functional.unique.creator.kerry.repository.UserRepository;
-import org.springframework.security.crypto.bcrypt.BCrypt;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository repo;
+    private final UserRepository repository;
 
-    public UserService(UserRepository repo) {
-        this.repo = repo;
-    }
-
-    public User register(String phone, String nickname, String password) {
-
-        if (repo.findByPhone(phone).isPresent())
-            throw new RuntimeException("Phone already exists");
-
-        String hash = BCrypt.hashpw(password, BCrypt.gensalt());
-
-        User user = new User(
-        );
-
-        return repo.save(user);
-    }
-
+    @Cacheable(value = "users", key = "#phone")
     public User findByPhone(String phone) {
-        return repo.findByPhone(phone).orElse(null);
+        return repository.findByPhone(phone).orElse(null);
+    }
+
+    public User save(User user) {
+        return repository.save(user);
+    }
+
+    public User UserService(String token) {
+        return null;
+    }
+
+    public List<User> search(String query) {
+        return List.of();
+    }
+
+    public void block(String token, String id) {
+    }
+
+    public void unblock(String token, String id) {
+    }
+
+    public void setOnline(String token) {
+    }
+
+    public void setOffline(String token) {
+    }
+
+    public void setVisibility(String token, boolean visible) {
     }
 }

@@ -14,8 +14,8 @@ public class WebSocketController extends TextWebSocketHandler {
     private final Map<Long, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final MessageService messageService; // TODO: inject repo
 
-    public WebSocketController() {
-        messageService = new MessageService();
+    public WebSocketController(MessageService messageService) {
+        this.messageService = messageService;
     }
 
     @Override

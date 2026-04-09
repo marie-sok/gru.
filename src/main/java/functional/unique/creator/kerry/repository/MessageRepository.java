@@ -1,12 +1,15 @@
 package functional.unique.creator.kerry.repository;
 
 import functional.unique.creator.kerry.model.Message;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
 import java.util.List;
 
-public interface MessageRepository extends JpaRepository<Message, Long> {
+public interface MessageRepository extends MongoRepository<Message, String> {
 
-    List<Message> findTop50BySenderIdAndReceiverIdOrSenderIdAndReceiverIdOrderByTimestampAsc(
-            Long sender1, Long receiver1, Long sender2, Long receiver2
-    );
+    List<Message> findByChatIdOrderByCreatedAtDesc(String chatId);
+
+    List<Message> findByChatIdAndDeletedFalseOrderByCreatedAtDesc(String chatId);
+
+    List<Message> findByChatId(String chatId);
 }

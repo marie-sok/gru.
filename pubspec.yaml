@@ -1,5 +1,5 @@
 name: functional_unique_creator_kerry
-description: A new Flutter project
+description: gru app project
 publish_to: "none"
 version: 1.0.0+1
 
@@ -10,6 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.1.0
+  image_picker: ^1.0.7
+  flutter_svg: ^2.0.7
+  provider: ^6.0.7
+  shared_preferences: ^2.2.0
+  flutter_secure_storage: ^9.0.0
 
 dev_dependencies:
   flutter_test:

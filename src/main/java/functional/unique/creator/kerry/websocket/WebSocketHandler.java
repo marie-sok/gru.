@@ -42,7 +42,7 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
             return;
         }
 
-        sessions.put(user.getId(), session);
+        sessions.put(Long.valueOf(user.getId()), session);
     }
 
     @Override

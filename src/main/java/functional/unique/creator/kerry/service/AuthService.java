@@ -1,44 +1,67 @@
 package functional.unique.creator.kerry.service;
 
+import functional.unique.creator.kerry.dto.AuthResponse;
 import functional.unique.creator.kerry.dto.LoginRequest;
 import functional.unique.creator.kerry.dto.RegisterRequest;
 import functional.unique.creator.kerry.model.User;
 import functional.unique.creator.kerry.repository.UserRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import java.util.Set;
+
+import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public User register(String phone, String nickname, String password) {
-        String hash = BCrypt.hashpw(password, BCrypt.gensalt());
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    @Value("${jwt.expiration}")
+    private long jwtExpirationMs;
+
+    public AuthResponse register(RegisterRequest request) {
         User user = User.builder()
-                .phone(phone)
-                .nickname(nickname)
-                .passwordHash(hash)
-                .roles(Set.of("USER"))
-                .active(true)
-                .invisibleMode(false)
+                .phone(request.getPhone())
+                .name(request.getName())
+                .nickname(request.getNickname())
+                .showNickname(request.isShowNickname())
+                .email(request.getEmail())
+                .avatarUrl(request.getAvatarUrl())
+                .birthday(request.getBirthday())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .verified(false)
                 .build();
-        return userRepository.save(user);
+
+        User saved = userRepository.save(user);
+        return new AuthResponse(); // Можно вернуть токен сразу после верификации
     }
 
-    public User login(String phone, String password) {
-        User user = userRepository.findByPhone(phone).orElseThrow(() -> new RuntimeException("User not found"));
-        if (!BCrypt.checkpw(password, user.getPasswordHash())) throw new RuntimeException("Invalid password");
-        return user;
-    }
+    public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByPhone(request.getPhone())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-    public Object register(RegisterRequest req) {
-        return register(req);
-    }
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Invalid credentials");
+        }
 
-    public Object login(LoginRequest req) {
-        return login(req);
+        String token = Jwts.builder()
+                .setSubject(user.getId())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(SignatureAlgorithm.HS256, jwtSecret)
+                .compact();
+
+        AuthResponse response = new AuthResponse();
+        response.setToken(token);
+        response.setUserId(user.getId());
+        return response;
     }
 }

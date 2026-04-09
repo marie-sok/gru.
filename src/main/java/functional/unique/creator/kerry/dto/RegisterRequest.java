@@ -1,38 +1,23 @@
 package functional.unique.creator.kerry.dto;
 
+import functional.unique.creator.kerry.model.MessageType;
 import lombok.Data;
+
+
+import java.time.LocalDate;
 
 @Data
 public class RegisterRequest {
+    @NotBlank
     private String phone;
+    private String name;
     private String nickname;
+    private boolean showNickname;
+    @Email
+    private String email;
+    private LocalDate birthday;
+    private String avatarUrl;
+    @NotBlank
     private String password;
-
-    public RegisterRequest(String phone, String nickname, String password) {
-        this.phone = phone;
-        this.nickname = nickname;
-        this.password = password;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-    }
 }
+

@@ -1,34 +1,35 @@
 package functional.unique.creator.kerry.model;
 
-import jakarta.persistence.*;
 import lombok.*;
-import java.util.Date;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-@Entity
-@Table(name = "messages")
+import java.time.Instant;
+
+@Document(collection = "messages")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@RequiredArgsConstructor
 public class Message {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @NonNull
-    private Long senderId;
+    private String chatId;
+    private String senderId;
 
-    @NonNull
-    private Long receiverId;
-
-    @NonNull
-    @Lob
     private String content;
+    private MessageType type;
 
-    @NonNull
-    private String contentType;
-    private boolean read;
+    private boolean edited;
+    private boolean deleted;
 
-    private Date timestamp;
+    private Instant createdAt;
+    private Instant updatedAt;
+
+    public Long getReceiverId() {
+        return 0L;
+    }
 }
+
