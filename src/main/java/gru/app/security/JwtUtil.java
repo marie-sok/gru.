@@ -1,46 +1,52 @@
 package gru.app.security;
 
-import gru.app.model.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
+
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    private static final String SECRET ="functional_unique_create_kerry_wtf_its_a_rofl??";
-    ;
-    private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
+    private final String secret = "super-super-secret-key-super-super-secret-key";
 
-    public String generateToken(User user) {
-        long expirationMillis = 1000 * 60 * 60 * 24;
+    private final Key key = Keys.hmacShaKeyFor(secret.getBytes());
+
+    public String generateAccessToken(String userId) {
         return Jwts.builder()
-                .setSubject(user.getPhone())
-                .claim("userId", user.getId())
-                .claim("nickname", user.getNickname())
+                .setSubject(userId)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expirationMillis))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 1h
                 .signWith(key)
                 .compact();
     }
 
-    public Jws<Claims> validateToken(String token) throws JwtException {
-        return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+    public String generateRefreshToken(String userId) {
+        return Jwts.builder()
+                .setSubject(userId)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 30)) // 30d
+                .signWith(key)
+                .compact();
     }
 
-    public String getPhoneFromToken(String token) {
-        try { return validateToken(token).getBody().getSubject(); }
-        catch (JwtException e) { return null; }
+    public String extractUserId(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
     }
 
-    public String parse(String token) {
-        return token;
-    }
-
-    public boolean isTokenExpired(String token) {
-        return false;
+    public boolean isValid(String token) {
+        try {
+            extractUserId(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
-

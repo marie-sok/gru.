@@ -1,15 +1,16 @@
-spring:
-  data:
-    mongodb:
-      uri: mongodb+srv://gru_db_user:ma_bird_171210@gru.tqjyqox.mongodb.net/messenger?retryWrites=true&w=majority
-  redis:
-    host: localhost
-    port: 6379
-server:
-  port: 8081
-jwt:
-  secret: forest_river_sunset_ocean_birds_sky_palms_seaside_171210
-  expiration: 86400000
 
+  server:
+    port: 8081
 
-  sdk: flutter
+  spring:
+    data:
+      mongodb:
+        uri: mongodb://localhost:27017/gru_db
+
+    redis:
+      host: localhost
+      port: 6379
+
+  jwt:
+    secret: "forest_river_sunset_ocean_birds_sky_palms_seaside_171210"
+    expiration: 86400000

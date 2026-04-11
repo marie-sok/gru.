@@ -12,17 +12,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatCacheService {
 
-    private final RedisTemplate<String, List<Message>> redisTemplate;
+    private final RedisTemplate<String, List<Message<?>>> redisTemplate;
 
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
 
-    public void cacheChat(String chatId, List<Message> messages) {
+    public void cacheChat(String chatId, List<Message<?>> messages) {
         redisTemplate.opsForValue().set(chatId, messages, CACHE_TTL);
     }
 
 
-    public List<Message> getCachedChat(String chatId) {
+    public List<Message<?>> getCachedChat(String chatId) {
         return redisTemplate.opsForValue().get(chatId);
     }
 

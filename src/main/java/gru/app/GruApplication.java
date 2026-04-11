@@ -7,9 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
-public class FunctionalUniqueCreatorKerryApplication {
+public class GruApplication {
     public static void main(String[] args) {
-        SpringApplication.run(FunctionalUniqueCreatorKerryApplication.class, args);
+        SpringApplication.run(GruApplication.class, args);
     }
 
     @Bean

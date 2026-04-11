@@ -3,8 +3,7 @@ package gru.app.websocket;
 import gru.app.model.Message;
 import gru.app.service.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.web.socket.*;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,19 +18,24 @@ public class WebSocketController extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    public void afterConnectionEstablished(WebSocketSession session) {
         Long userId = Long.parseLong(session.getUri().getQuery().split("=")[1]);
         sessions.put(userId, session);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        Message msg = mapper.readValue(message.getPayload(), Message.class);
+        Message<?> msg = mapper.readValue(message.getPayload(), Message.class);
         messageService.save(msg);
 
         WebSocketSession receiverSession = sessions.get(msg.getReceiverId());
         if (receiverSession != null) {
             receiverSession.sendMessage(new TextMessage(mapper.writeValueAsString(msg)));
         }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+
     }
 }

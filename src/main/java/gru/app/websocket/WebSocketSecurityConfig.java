@@ -3,8 +3,6 @@ package gru.app.websocket;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.config.ChannelRegistration;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 @Setter
 @Configuration
@@ -12,6 +10,16 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer {
 
     private JwtChannelInterceptor interceptor;
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+
+    }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {

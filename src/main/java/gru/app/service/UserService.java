@@ -3,24 +3,28 @@ package gru.app.service;
 import gru.app.model.User;
 import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository repository;
+    private final UserRepository userRepository;
 
-    @Cacheable(value = "users", key = "#phone")
-    public User findByPhone(String phone) {
-        return repository.findByPhone(phone).orElse(null);
-    }
+    public User findOrCreate(String phone) {
 
-    public User save(User user) {
-        return repository.save(user);
+        return userRepository.findByPhone(phone)
+                .orElseGet(() -> {
+                    User u = new User();
+                    u.setPhone(phone);
+                    u.setName("New User");
+                    u.setNickname("user_" + phone.substring(phone.length() - 4));
+                    u.setBirthDate(LocalDate.now());
+                    return userRepository.save(u);
+                });
     }
 
     public User UserService(String token) {
@@ -31,12 +35,6 @@ public class UserService {
         return List.of();
     }
 
-    public void block(String token, String id) {
-    }
-
-    public void unblock(String token, String id) {
-    }
-
     public void setOnline(String token) {
     }
 
@@ -44,5 +42,12 @@ public class UserService {
     }
 
     public void setVisibility(String token, boolean visible) {
+    }
+
+    public void unblock(String token, String id) {
+    }
+
+    public void block(String token, String id) {
+
     }
 }

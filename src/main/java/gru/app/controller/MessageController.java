@@ -2,6 +2,7 @@ package gru.app.controller;
 
 import gru.app.dto.MessageRequest;
 import gru.app.dto.MessageResponse;
+import gru.app.model.Message;
 import gru.app.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +34,7 @@ public class MessageController {
     }
 
     @GetMapping("/chat/{chatId}")
-    public List<MessageResponse> getChatMessages(@PathVariable String chatId) {
+    public List<Message<?>> getChatMessages(@PathVariable String chatId) {
         return messageService.getChatMessages(chatId);
     }
 }

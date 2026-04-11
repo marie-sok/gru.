@@ -1,27 +1,28 @@
 package gru.app.controller;
 
-import gru.app.dto.AuthResponse;
-import gru.app.dto.LoginRequest;
-import gru.app.dto.RegisterRequest;
 import gru.app.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/register")
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request);
+    @PostMapping("/send-code")
+    public void sendCode(@RequestParam String phone) {
+        authService.sendCode(phone);
     }
 
-    @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    @PostMapping("/verify-code")
+    public Map<String, String> verify(
+            @RequestParam String phone,
+            @RequestParam String code
+    ) {
+        return authService.verifyCode(phone, code);
     }
 }

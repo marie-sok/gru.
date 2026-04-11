@@ -1,55 +1,38 @@
 package gru.app.security;
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
-@Setter
+@Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private JwtUtil jwtUtil;
-
-    public JwtFilter(JwtUtil jwtUtil) {
-
-    }
+    private final JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest req,
-                                    HttpServletResponse res,
-                                    FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String header = req.getHeader("Authorization");
+        String header = request.getHeader("Authorization");
 
         if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
 
-            try {
-                String token = header.substring(7);
-                String claims = jwtUtil.parse(token);
-
-                String phone = Arrays.toString(claims.getBytes());
-
-                var auth = new UsernamePasswordAuthenticationToken(
-                        phone,
-                        null,
-                        List.of()
-                );
-
-                SecurityContextHolder.getContext().setAuthentication(auth);
-
-            } catch (Exception ignored) {}
+            if (jwtUtil.isValid(token)) {
+                request.setAttribute("userId", jwtUtil.extractUserId(token));
+            }
         }
 
-        chain.doFilter(req, res);
+        filterChain.doFilter(request, response);
     }
-
 }

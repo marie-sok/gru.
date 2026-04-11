@@ -10,86 +10,73 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class MessageService {
 
-    private final MessageRepository messageRepository;
+    private final MessageRepository repo;
 
+    // ===== SEND MESSAGE =====
+    public Message<?> sendMessage(String senderId, String chatId, String content) {
 
-    public MessageResponse sendMessage(String senderId, MessageRequest request) {
-        Message message = Message.builder()
-                .chatId(request.getChatId())
+        Message<?> msg = Message.builder()
+                .chatId(chatId)
                 .senderId(senderId)
-                .content(request.getContent())
-                .type(request.getType() != null ? request.getType() : MessageType.TEXT)
-                .edited(false)
+                .content(content)
+                .type(MessageType.TEXT)
+                .read(false)
                 .deleted(false)
                 .createdAt(Instant.now())
-                .updatedAt(Instant.now())
                 .build();
 
-        Message saved = messageRepository.save(message);
-        return mapToResponse(saved);
+        return repo.save(msg);
     }
 
-
-    public MessageResponse editMessage(String messageId, String newContent) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
-
-        message.setContent(newContent);
-        message.setEdited(true);
-        message.setUpdatedAt(Instant.now());
-
-        Message updated = messageRepository.save(message);
-        return mapToResponse(updated);
+    // ===== GET CHAT HISTORY =====
+    public List<Message<?>> getChatMessages(String chatId) {
+        return repo.findByChatIdOrderByCreatedAtAsc(chatId);
     }
 
-
-    public void deleteMessage(String messageId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
-
-        message.setDeleted(true);
-        message.setUpdatedAt(Instant.now());
-        messageRepository.save(message);
+    // ===== MARK READ =====
+    public void markRead(String messageId) {
+        repo.findById(messageId).ifPresent(msg -> {
+            msg.setRead(true);
+            repo.save(msg);
+        });
     }
 
-
-    public List<MessageResponse> getChatMessages(String chatId) {
-        return messageRepository.findByChatIdAndDeletedFalseOrderByCreatedAtDesc(chatId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    // ===== DELETE MESSAGE =====
+    public void delete(String messageId) {
+        repo.findById(messageId).ifPresent(msg -> {
+            msg.setDeleted(true);
+            repo.save(msg);
+        });
     }
 
-    private MessageResponse mapToResponse(Message message) {
-        MessageResponse response = new MessageResponse();
-        response.setId(message.getId());
-        response.setChatId(message.getChatId());
-        response.setSenderId(message.getSenderId());
-        response.setContent(message.getContent());
-        response.setType(message.getType());
-        response.setEdited(message.isEdited());
-        response.setDeleted(message.isDeleted());
-        response.setCreatedAt(message.getCreatedAt().toEpochMilli());
-        response.setUpdatedAt(message.getUpdatedAt().toEpochMilli());
-        return response;
-    }
-
-    public void save(Message msg) {
-    }
-
-    public Message send(Long senderId, Long receiverId, String content) {
+    public Message<?> send(Long senderId, Long receiverId, String content) {
         return null;
     }
 
-    public void saveMessage(Message msg) {
+    public void save(Message<?> msg) {
     }
 
-    public void markRead(Long msgId) {
+    public Message<?> sendInternal(String senderId, String receiverId, String content) {
+        return null;
+    }
+
+
+    public void markAsRead(String messageId) {
+    }
+
+    public MessageResponse sendMessage(String senderId, MessageRequest request) {
+        return null;
+    }
+
+    public MessageResponse editMessage(String id, String newContent) {
+        return null;
+    }
+
+    public void deleteMessage(String id) {
     }
 }

@@ -2,112 +2,118 @@ package gru.app.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gru.app.model.Message;
-import gru.app.model.User;
 import gru.app.security.JwtUtil;
 import gru.app.service.MessageService;
 import gru.app.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.*;
+import org.springframework.web.socket.WebSocketMessage;
 
-import java.util.*;
+
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
-public class WebSocketHandler implements org.springframework.web.socket.WebSocketHandler {
+public abstract class WebSocketHandler extends TextWebSocketHandler {
 
     private final JwtUtil jwtUtil;
     private final UserService userService;
     private final MessageService messageService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final Map<Long, WebSocketSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    public void afterConnectionEstablished(WebSocketSession session) {
+
         String query = session.getUri().getQuery();
-        Map<String, String> params = parseQuery(query);
-        String token = params.get("token");
+        String token = parseQuery(query).get("token");
 
-        if (token == null || jwtUtil.isTokenExpired(token)) {
+        if (token == null || !jwtUtil.isValid(token)) {
             session.close(CloseStatus.NOT_ACCEPTABLE);
             return;
         }
 
-        String phone = jwtUtil.getPhoneFromToken(token);
-        User user = userService.findByPhone(phone);
-        if (user == null) {
-            session.close(CloseStatus.NOT_ACCEPTABLE);
-            return;
-        }
+        String userId = jwtUtil.extractUserId(token);
 
-        sessions.put(Long.valueOf(user.getId()), session);
+        sessions.put(userId, session);
     }
 
     @Override
-    public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
-        Map<String, Object> payload = objectMapper.readValue(message.getPayload().toString(), Map.class);
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+
+        Map<String, Object> payload =
+                objectMapper.readValue(message.getPayload(), Map.class);
+
         String type = (String) payload.get("type");
-        Long senderId = ((Number) payload.get("senderId")).longValue();
-        Long receiverId = ((Number) payload.get("receiverId")).longValue();
+        String senderId = (String) payload.get("senderId");
+        String receiverId = (String) payload.get("receiverId");
 
         switch (type) {
+
             case "MESSAGE" -> {
+
                 String content = (String) payload.get("content");
-                String contentType = (String) payload.get("contentType");
-                Message msg = new Message();
-                messageService.saveMessage(msg);
+
+                Message<?> msg = messageService.sendInternal(
+                        senderId,
+                        receiverId,
+                        content
+                );
+
                 sendToUser(receiverId, msg);
-                sendToUser(senderId, msg); // показать себе
+                sendToUser(senderId, msg);
             }
-            case "TYPING" -> sendTyping(receiverId, senderId);
+
+            case "TYPING" -> {
+                sendToUser(receiverId,
+                        Map.of("type", "TYPING", "senderId", senderId));
+            }
+
             case "READ" -> {
-                Long msgId = ((Number) payload.get("messageId")).longValue();
-                messageService.markRead(msgId);
-                sendRead(receiverId, msgId, senderId);
+                String messageId = (String) payload.get("messageId");
+
+                messageService.markAsRead(messageId);
+
+                sendToUser(receiverId,
+                        Map.of("type", "READ", "messageId", messageId));
             }
         }
     }
 
-    private void sendToUser(Long userId, Object msg) throws Exception {
-        WebSocketSession s = sessions.get(userId);
-        if (s != null && s.isOpen()) {
-            s.sendMessage(new TextMessage(objectMapper.writeValueAsString(msg)));
+    // ===== HANDLE MESSAGE =====
+    public abstract void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception;
+
+    private void sendToUser(String userId, Object data) throws Exception {
+
+        WebSocketSession session = sessions.get(userId);
+
+        if (session != null && session.isOpen()) {
+            session.sendMessage(
+                    new TextMessage(objectMapper.writeValueAsString(data))
+            );
         }
     }
 
-    private void sendTyping(Long receiverId, Long senderId) throws Exception {
-        Map<String, Object> typing = Map.of("type", "TYPING", "senderId", senderId);
-        sendToUser(receiverId, typing);
-    }
-
-    private void sendRead(Long receiverId, Long messageId, Long senderId) throws Exception {
-        Map<String, Object> read = Map.of("type", "READ", "messageId", messageId, "senderId", senderId);
-        sendToUser(receiverId, read);
-    }
-
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        session.close(CloseStatus.SERVER_ERROR);
-    }
-
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         sessions.values().remove(session);
     }
 
-    @Override
-    public boolean supportsPartialMessages() { return false; }
-
     private Map<String, String> parseQuery(String query) {
-        Map<String, String> map = new HashMap<>();
-        if (query != null) {
-            for (String param : query.split("&")) {
-                String[] kv = param.split("=");
-                if (kv.length == 2) map.put(kv[0], kv[1]);
+
+        Map<String, String> map = new ConcurrentHashMap<>();
+
+        if (query == null) return map;
+
+        for (String param : query.split("&")) {
+            String[] kv = param.split("=");
+            if (kv.length == 2) {
+                map.put(kv[0], kv[1]);
             }
         }
+
         return map;
     }
 }

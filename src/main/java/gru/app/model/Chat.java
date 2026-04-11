@@ -7,18 +7,22 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
 
-@Document(collection = "chats")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "chats")
 public class Chat {
 
     @Id
     private String id;
 
-    private List<String> participants;
+    private ChatType type;
 
-    private String lastMessage;
-    private Instant lastMessageTime;
+    private String title;
+
+    private List<ChatMember> members;
+
+    private Instant createdAt;
 }

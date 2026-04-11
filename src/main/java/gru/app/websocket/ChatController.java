@@ -5,8 +5,7 @@ import gru.app.model.Message;
 import gru.app.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import org.springframework.messaging.handler.annotation.*;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import org.springframework.stereotype.Controller;
 
 @Setter
@@ -15,12 +14,12 @@ import org.springframework.stereotype.Controller;
 public class ChatController {
 
     private  MessageService messageService;
-    private  SimpMessagingTemplate template;
+    private SimMessagingTemplate template;
 
     @MessageMapping("/chat.send")
     public void send(@Payload ChatMessage msg) {
 
-        Message saved = messageService.send(
+        Message<?> saved = messageService.send(
                 msg.getSenderId(),
                 msg.getReceiverId(),
                 msg.getContent()

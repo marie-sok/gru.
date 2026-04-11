@@ -1,67 +1,53 @@
 package gru.app.service;
 
-import gru.app.dto.AuthResponse;
-import gru.app.dto.LoginRequest;
-import gru.app.dto.RegisterRequest;
 import gru.app.model.User;
-import gru.app.repository.UserRepository;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import gru.app.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final JwtUtil jwtUtil;
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
+    private final Map<String, String> otpStore = new HashMap<>();
 
-    @Value("${jwt.expiration}")
-    private long jwtExpirationMs;
+    public void sendCode(String phone) {
+        String code = String.valueOf(1000 + new Random().nextInt(9000));
+        otpStore.put(phone, code);
 
-    public AuthResponse register(RegisterRequest request) {
-        User user = User.builder()
-                .phone(request.getPhone())
-                .name(request.getName())
-                .nickname(request.getNickname())
-                .showNickname(request.isShowNickname())
-                .email(request.getEmail())
-                .avatarUrl(request.getAvatarUrl())
-                .birthday(request.getBirthday())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .verified(false)
-                .build();
-
-        User saved = userRepository.save(user);
-        return new AuthResponse(); // Можно вернуть токен сразу после верификации
+        System.out.println("OTP for " + phone + " = " + code);
     }
 
-    public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByPhone(request.getPhone())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public Map<String, String> verifyCode(String phone, String code) {
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid credentials");
+        String saved = otpStore.get(phone);
+
+        if (saved == null || !saved.equals(code)) {
+            throw new RuntimeException("Invalid OTP");
         }
 
-        String token = Jwts.builder()
-                .setSubject(user.getId())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(SignatureAlgorithm.HS256, jwtSecret)
-                .compact();
+        User user = User.builder()
+                .phone(phone)
+                .verified(true)
+                .createdAt(Instant.now())
+                .build();
 
-        AuthResponse response = new AuthResponse();
-        response.setToken(token);
-        response.setUserId(user.getId());
-        return response;
+        String access = jwtUtil.generateAccessToken(phone);
+        String refresh = jwtUtil.generateRefreshToken(phone);
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", access);
+        tokens.put("refreshToken", refresh);
+
+        otpStore.remove(phone);
+
+        return tokens;
     }
 }
