@@ -557,7 +557,7 @@
       "name": "functional_unique_creator_kerry",
       "rootUri": "../",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.11"
     }
   ],
   "generator": "pub",

@@ -59,7 +59,7 @@ org.springframework.beans.factory.BeanCreationException: Error creating bean wit
 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334) ~[spring-boot-3.2.5.jar!/:3.2.5]
 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354) ~[spring-boot-3.2.5.jar!/:3.2.5]
 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343) ~[spring-boot-3.2.5.jar!/:3.2.5]
-	at functional.unique.creator.kerry.FunctionalUniqueCreatorKerryApplication.main(FunctionalUniqueCreatorKerryApplication.java:12) ~[!/:0.0.1-SNAPSHOT]
+	at gru.app.FunctionalUniqueCreatorKerryApplication.main(FunctionalUniqueCreatorKerryApplication.java:12) ~[!/:0.0.1-SNAPSHOT]
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
 	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
 	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91) ~[kerry-0.0.1-SNAPSHOT.jar:0.0.1-SNAPSHOT]
