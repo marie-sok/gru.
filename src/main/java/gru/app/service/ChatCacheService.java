@@ -5,29 +5,21 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ChatCacheService {
 
-    private final RedisTemplate<String, List<Message<?>>> redisTemplate;
+    private final RedisTemplate<String, Object> redis;
 
-    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+    private static final String KEY = "chat:";
 
-
-    public void cacheChat(String chatId, List<Message<?>> messages) {
-        redisTemplate.opsForValue().set(chatId, messages, CACHE_TTL);
+    public void saveMessages(String chatId, List<Message> messages) {
+        redis.opsForValue().set(KEY + chatId, messages);
     }
 
-
-    public List<Message<?>> getCachedChat(String chatId) {
-        return redisTemplate.opsForValue().get(chatId);
-    }
-
-
-    public void evictChatCache(String chatId) {
-        redisTemplate.delete(chatId);
+    public List<Message> getMessages(String chatId) {
+        return (List<Message>) redis.opsForValue().get(KEY + chatId);
     }
 }
