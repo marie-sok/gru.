@@ -3,6 +3,7 @@ package gru.app.dto;
 import lombok.Data;
 
 @Data
-public class LoginRequest {
+public class VerifyRequest {
     private String phone;
+    private String code;
 }

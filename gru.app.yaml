@@ -1,0 +1,114 @@
+openapi: 3.0.3
+info:
+  title: GRU APP API
+  version: 1.0.0
+  description: Next-gen messaging API (real-time, delivery-aware, extensible)
+
+servers:
+  - url: http://localhost:8081
+
+paths:
+
+  # ================= AUTH =================
+  /auth/login:
+    post:
+      summary: Login via phone (Telegram-style)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  # ================= CHAT =================
+  /chats:
+    post:
+      summary: Create chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                members:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Chat created
+
+  /chats/{chatId}/messages:
+    get:
+      summary: Get messages
+      parameters:
+        - in: path
+          name: chatId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of messages
+
+  # ================= MESSAGE =================
+  /messages/send:
+    post:
+      summary: Send message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chatId, content]
+              properties:
+                chatId:
+                  type: string
+                content:
+                  type: string
+                type:
+                  type: string
+                  enum: [TEXT, IMAGE, VIDEO]
+      responses:
+        "200":
+          description: Message sent
+
+  /messages/{id}/read:
+    post:
+      summary: Mark message as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message read
+
+  # ================= PRESENCE =================
+  /users/{id}/presence:
+    get:
+      summary: Get online status
+      responses:
+        "200":
+          description: Presence
+
+  # ================= TYPING =================
+  /typing:
+    post:
+      summary: Typing indicator

@@ -1,6 +1,7 @@
 package gru.app.websocket;
 
 import java.net.URI;
+import java.security.Principal;
 
 public class WebSocketSession {
     public String getId() {
@@ -20,5 +21,9 @@ public class WebSocketSession {
     }
 
     public void close(Object notAcceptable) {
+    }
+
+    public Principal getPrincipal() {
+        return null;
     }
 }

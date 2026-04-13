@@ -15,11 +15,11 @@ public class ChatCacheService {
 
     private static final String KEY = "chat:";
 
-    public void saveMessages(String chatId, List<Message> messages) {
+    public void saveMessages(String chatId, List<Message<?>> messages) {
         redis.opsForValue().set(KEY + chatId, messages);
     }
 
-    public List<Message> getMessages(String chatId) {
-        return (List<Message>) redis.opsForValue().get(KEY + chatId);
+    public List<Message<?>> getMessages(String chatId) {
+        return (List<Message<?>>) redis.opsForValue().get(KEY + chatId);
     }
 }

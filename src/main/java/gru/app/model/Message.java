@@ -6,32 +6,26 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-@Getter
-@Setter
+@Document("messages")
+@Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "messages")
-public class Message<T> {
+@NoArgsConstructor
+public class Message {
 
     @Id
     private String id;
 
     private String chatId;
-
     private String senderId;
+    private String receiverId;
 
     private String content;
 
     private MessageType type;
 
     private boolean read;
-
     private boolean deleted;
 
     private Instant createdAt;
-
-    public T getReceiverId() {
-        return null;
-    }
 }

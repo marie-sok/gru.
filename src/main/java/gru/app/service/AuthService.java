@@ -1,53 +1,38 @@
 package gru.app.service;
 
-import gru.app.model.User;
+import gru.app.dto.AuthResponse;
+import gru.app.dto.VerifyRequest;
 import gru.app.security.JwtUtil;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final JwtUtil jwtUtil;
 
-    private final Map<String, String> otpStore = new HashMap<>();
+    private final Map<String, String> codes = new ConcurrentHashMap<>();
 
-    public void sendCode(String phone) {
-        String code = String.valueOf(1000 + new Random().nextInt(9000));
-        otpStore.put(phone, code);
-
-        System.out.println("OTP for " + phone + " = " + code);
+    public AuthService(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
     }
 
-    public Map<String, String> verifyCode(String phone, String code) {
+    public void sendCode(String phone) {
+        String code = "1234";
+        codes.put(phone, code);
+    }
 
-        String saved = otpStore.get(phone);
+    public AuthResponse verify(VerifyRequest req) {
 
-        if (saved == null || !saved.equals(code)) {
-            throw new RuntimeException("Invalid OTP");
+        String saved = codes.get(req.getPhone());
+
+        if (saved == null || !saved.equals(req.getCode())) {
+            throw new RuntimeException("Invalid code");
         }
 
-        User user = User.builder()
-                .phone(phone)
-                .verified(true)
-                .createdAt(Instant.now())
-                .build();
-
-        String access = jwtUtil.generateAccessToken(phone);
-        String refresh = jwtUtil.generateRefreshToken(phone);
-
-        Map<String, String> tokens = new HashMap<>();
-        tokens.put("accessToken", access);
-        tokens.put("refreshToken", refresh);
-
-        otpStore.remove(phone);
-
-        return tokens;
+        String token = jwtUtil.generateToken(req.getPhone());
+        return new AuthResponse(token);
     }
 }

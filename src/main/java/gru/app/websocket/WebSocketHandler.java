@@ -17,12 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public abstract class WebSocketHandler extends TextWebSocketHandler {
 
-    private final JwtUtil jwtUtil;
-    private final UserService userService;
-    private final MessageService messageService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private JwtUtil jwtUtil;
+    private UserService userService;
+    private MessageService messageService;
+    private ObjectMapper objectMapper = new ObjectMapper();
 
-    private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+    private Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -56,7 +56,7 @@ public abstract class WebSocketHandler extends TextWebSocketHandler {
 
                 String content = (String) payload.get("content");
 
-                Message<?> msg = messageService.sendInternal(
+                Message msg = messageService.sendInternal(
                         senderId,
                         receiverId,
                         content
@@ -82,7 +82,6 @@ public abstract class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // ===== HANDLE MESSAGE =====
     public abstract void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception;
 
     private void sendToUser(String userId, Object data) throws Exception {
@@ -116,4 +115,8 @@ public abstract class WebSocketHandler extends TextWebSocketHandler {
 
         return map;
     }
+
+    public abstract void handleTransportError(WebSocketSession session, Throwable exception);
+
+    public abstract boolean supportsPartialMessages();
 }

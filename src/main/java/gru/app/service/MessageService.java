@@ -1,9 +1,6 @@
 package gru.app.service;
 
-import gru.app.dto.MessageRequest;
-import gru.app.dto.MessageResponse;
 import gru.app.model.Message;
-import gru.app.model.MessageType;
 import gru.app.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,14 +14,14 @@ public class MessageService {
 
     private final MessageRepository repo;
 
-    // ===== SEND MESSAGE =====
-    public Message<?> sendMessage(String senderId, String chatId, String content) {
+    public Message save(String chatId, String senderId, String receiverId, String content) {
 
-        Message<?> msg = Message.builder()
+        Message msg = Message.builder()
                 .chatId(chatId)
                 .senderId(senderId)
+                .receiverId(receiverId)
                 .content(content)
-                .type(MessageType.TEXT)
+                .type(gru.app.model.MessageType.TEXT)
                 .read(false)
                 .deleted(false)
                 .createdAt(Instant.now())
@@ -33,50 +30,14 @@ public class MessageService {
         return repo.save(msg);
     }
 
-    // ===== GET CHAT HISTORY =====
-    public List<Message<?>> getChatMessages(String chatId) {
+    public List<Message> getChat(String chatId) {
         return repo.findByChatIdOrderByCreatedAtAsc(chatId);
     }
 
-    // ===== MARK READ =====
     public void markRead(String messageId) {
-        repo.findById(messageId).ifPresent(msg -> {
-            msg.setRead(true);
-            repo.save(msg);
+        repo.findById(messageId).ifPresent(m -> {
+            m.setRead(true);
+            repo.save(m);
         });
-    }
-
-    // ===== DELETE MESSAGE =====
-    public void delete(String messageId) {
-        repo.findById(messageId).ifPresent(msg -> {
-            msg.setDeleted(true);
-            repo.save(msg);
-        });
-    }
-
-    public Message<?> send(Long senderId, Long receiverId, String content) {
-        return null;
-    }
-
-    public void save(Message<?> msg) {
-    }
-
-    public Message<?> sendInternal(String senderId, String receiverId, String content) {
-        return null;
-    }
-
-
-    public void markAsRead(String messageId) {
-    }
-
-    public MessageResponse sendMessage(String senderId, MessageRequest request) {
-        return null;
-    }
-
-    public MessageResponse editMessage(String id, String newContent) {
-        return null;
-    }
-
-    public void deleteMessage(String id) {
     }
 }

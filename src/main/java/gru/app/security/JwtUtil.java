@@ -10,43 +10,25 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    private final String secret = "super-super-secret-key-super-super-secret-key";
+    private final Key key = Keys.hmacShaKeyFor(
+            "forest_river_sunset_ocean_birds_sky_palms_seaside_171210".getBytes()
+    );
 
-    private final Key key = Keys.hmacShaKeyFor(secret.getBytes());
-
-    public String generateAccessToken(String userId) {
+    public String generateToken(String phone) {
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(phone)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 1h
-                .signWith(key)
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String generateRefreshToken(String userId) {
-        return Jwts.builder()
-                .setSubject(userId)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 30)) // 30d
-                .signWith(key)
-                .compact();
-    }
-
-    public String extractUserId(String token) {
+    public String getPhone(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
-    }
-
-    public boolean isValid(String token) {
-        try {
-            extractUserId(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 }

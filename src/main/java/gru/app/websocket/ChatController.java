@@ -19,7 +19,7 @@ public class ChatController {
     @MessageMapping("/chat.send")
     public void send(@Payload ChatMessage msg) {
 
-        Message<?> saved = messageService.send(
+        Message saved = messageService.send(
                 msg.getSenderId(),
                 msg.getReceiverId(),
                 msg.getContent()

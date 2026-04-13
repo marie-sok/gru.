@@ -1,14 +1,15 @@
-FROM eclipse-temurin:17-jdk-alpine
+# ================= BUILD STAGE =================
+FROM eclipse-temurin:17-jdk-jammy
+WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
+
+# ================= RUNTIME =================
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
-
-COPY pom.xml .
-RUN ./mvnw dependency:go-offline -B || mvn dependency:go-offline -B
-
-COPY src ./src
-
-RUN ./mvnw clean package -DskipTests || mvn clean package -DskipTests
+COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8081
 
-CMD ["java", "-jar", "target/messenger-backend-1.0.0.jar"]
+ENTRYPOINT ["java","-jar","app.jar"]
