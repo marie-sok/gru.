@@ -9,7 +9,7 @@ services:
 
   redis:
     image: redis
-    command: ["redis-server", "--requirepass", "ma_bird_171210"]
+    command: ["redis-server", "--require pass", "ma_bird_171210"]
 
 
 

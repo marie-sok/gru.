@@ -1,4 +1,4 @@
-package com.example.functional_unique_creator_kerry
+package com.example.gru.app
 
 import io.flutter.embedding.android.FlutterActivity
 

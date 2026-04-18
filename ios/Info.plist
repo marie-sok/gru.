@@ -1,73 +1,84 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-
-    <key>CFBundleDisplayName</key>
-    <string>Gru App</string>
-
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-
-    <key>CFBundleName</key>
-    <string>gru_app</string>
-
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-
-    <key>CFBundleShortVersionString</key>
-    <string>$(FLUTTER_BUILD_NAME)</string>
-
-    <key>CFBundleVersion</key>
-    <string>$(FLUTTER_BUILD_NUMBER)</string>
-
-    <key>LSRequiresIPhoneOS</key>
-    <true/>
-
-    <key>UILaunchStoryboardName</key>
-    <string>LaunchScreen</string>
-
-    <key>UIMainStoryboardFile</key>
-    <string>Main</string>
-
-    <key>UISupportedInterfaceOrientations</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-
-    <!-- Разрешение на интернет -->
-    <key>NSAppTransportSecurity</key>
     <dict>
-        <key>NSAllowsArbitraryLoads</key>
+
+        <!-- APP -->
+        <key>CFBundleName</key>
+        <string>gru.</string>
+
+        <key>CFBundleDisplayName</key>
+        <string>gru.</string>
+
+        <key>CFBundleIdentifier</key>
+        <string>com.gru.app</string>
+
+        <key>CFBundleVersion</key>
+        <string>1</string>
+
+        <key>CFBundleShortVersionString</key>
+        <string>1.0</string>
+
+        <!-- iOS SETTINGS -->
+        <key>LSRequiresIPhoneOS</key>
         <true/>
+
+        <key>UILaunchStoryboardName</key>
+        <string>LaunchScreen</string>
+
+        <key>UIMainStoryboardFile</key>
+        <string>Main</string>
+
+        <!-- ORIENTATION -->
+        <key>UISupportedInterfaceOrientations</key>
+        <array>
+            <string>UIInterfaceOrientationPortrait</string>
+        </array>
+
+        <!-- NETWORK -->
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsArbitraryLoads</key>
+            <true/>
+        </dict>
+
+        <!--  MICROPHONE (VOICE MESSAGES) -->
+        <key>NSMicrophoneUsageDescription</key>
+        <string>gru. uses microphone for voice messages</string>
+
+        <!--  CAMERA (VIDEO CIRCLES) -->
+        <key>NSCameraUsageDescription</key>
+        <string>gru. uses camera for video messages</string>
+
+        <!--  PHOTO LIBRARY -->
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>gru. needs access to photos</string>
+
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>gru. saves media to your gallery</string>
+
+        <!--  MEDIA / AUDIO -->
+        <key>NSAppleMusicUsageDescription</key>
+        <string>gru. allows sending music</string>
+
+        <!--  NOTIFICATIONS -->
+        <key>NSUserNotificationUsageDescription</key>
+        <string>gru. sends notifications</string>
+
+        <!-- BACKGROUND MODES  -->
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>audio</string>
+            <string>fetch</string>
+            <string>remote-notification</string>
+        </array>
+
+        <!-- STATUS BAR -->
+        <key>UIStatusBarHidden</key>
+        <false/>
+
+        <key>UIViewControllerBasedStatusBarAppearance</key>
+        <false/>
+
     </dict>
-
-    <!-- Камера -->
-    <key>NSCameraUsageDescription</key>
-    <string>Нужно для загрузки фото</string>
-
-    <!-- Галерея -->
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Нужно для выбора аватара</string>
-
-</dict>
 </plist>
