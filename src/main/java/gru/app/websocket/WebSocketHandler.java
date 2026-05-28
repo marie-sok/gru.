@@ -6,6 +6,7 @@ import gru.app.model.User;
 import gru.app.security.JwtUtil;
 import gru.app.service.MessageService;
 import gru.app.service.UserService;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
@@ -26,7 +27,7 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String query = session.getUri().getQuery();
+        String query = Objects.requireNonNull(session.getUri()).getQuery();
         Map<String, String> params = parseQuery(query);
         String token = params.get("token");
 
@@ -46,8 +47,8 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
     }
 
     @Override
-    public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
-        Map<String, Object> payload = objectMapper.readValue(message.getPayload().toString(), Map.class);
+    public void handleMessage(@NonNull WebSocketSession session, WebSocketMessage<?> message) throws Exception {
+        Map payload = objectMapper.readValue(message.getPayload().toString(), Map.class);
         String type = (String) payload.get("type");
         Long senderId = ((Number) payload.get("senderId")).longValue();
         Long receiverId = ((Number) payload.get("receiverId")).longValue();
@@ -57,7 +58,7 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
                 String content = (String) payload.get("content");
                 String contentType = (String) payload.get("contentType");
                 Message msg = new Message();
-                messageService.saveMessage(msg);
+                messageService.editMessage(msg);
                 sendToUser(receiverId, msg);
                 sendToUser(senderId, msg); // показать себе
             }

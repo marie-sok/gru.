@@ -1,55 +1,57 @@
 package gru.app.security;
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
+import gru.app.service.JwtService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
-@Setter
+@Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private JwtUtil jwtUtil;
-
-    public JwtFilter(JwtUtil jwtUtil) {
-
-    }
+    private final JwtService jwtService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest req,
-                                    HttpServletResponse res,
-                                    FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String header = req.getHeader("Authorization");
+        String auth =
+                request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
+        if (auth != null &&
+                auth.startsWith("Bearer ")) {
 
-            try {
-                String token = header.substring(7);
-                String claims = jwtUtil.parse(token);
+            String token =
+                    auth.substring(7);
 
-                String phone = Arrays.toString(claims.getBytes());
+            String userId =
+                    jwtService.extractUserId(token);
 
-                var auth = new UsernamePasswordAuthenticationToken(
-                        phone,
-                        null,
-                        List.of()
-                );
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userId,
+                            null,
+                            List.of()
+                    );
 
-                SecurityContextHolder.getContext().setAuthentication(auth);
-
-            } catch (Exception ignored) {}
+            SecurityContextHolder
+                    .getContext()
+                    .setAuthentication(authentication);
         }
 
-        chain.doFilter(req, res);
+        filterChain.doFilter(request, response);
     }
-
 }

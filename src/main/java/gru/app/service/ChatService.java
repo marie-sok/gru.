@@ -1,6 +1,7 @@
 package gru.app.service;
 
 import gru.app.dto.MessageRequest;
+import gru.app.dto.MessageResponse;
 import gru.app.model.Message;
 import gru.app.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,5 +52,12 @@ public class ChatService {
     }
 
     public void markAsRead(String token, String chatId) {
+    }
+
+    public void typing(String token, String chatId) {
+    }
+
+    public List<MessageResponse> getMessages(String chatId) {
+        return List.of();
     }
 }

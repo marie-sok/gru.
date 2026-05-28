@@ -2,6 +2,7 @@ package gru.app.service;
 
 import gru.app.model.Message;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -12,22 +13,43 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatCacheService {
 
-    private final RedisTemplate<String, List<Message>> redisTemplate;
+    private static final String CACHE_PREFIX =
+            "chat:";
 
-    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+    private final RedisTemplate<String, List<Message>>
+            redisTemplate;
 
+    @Value("${chat.cache.ttl-minutes}")
+    private long ttlMinutes;
 
-    public void cacheChat(String chatId, List<Message> messages) {
-        redisTemplate.opsForValue().set(chatId, messages, CACHE_TTL);
+    public void saveMessages(
+            String chatId,
+            List<Message> messages
+    ) {
+
+        redisTemplate.opsForValue().set(
+                CACHE_PREFIX + chatId,
+                messages,
+                Duration.ofMinutes(ttlMinutes)
+        );
     }
 
+    public List<Message> getMessages(
+            String chatId
+    ) {
+
+        return redisTemplate.opsForValue().get(
+                CACHE_PREFIX + chatId
+        );
+    }
 
     public List<Message> getCachedChat(String chatId) {
-        return redisTemplate.opsForValue().get(chatId);
+        return List.of();
     }
 
+    public void cacheChat(String chatId, List<Message> messages) {
+    }
 
     public void evictChatCache(String chatId) {
-        redisTemplate.delete(chatId);
     }
 }

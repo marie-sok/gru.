@@ -1,95 +1,67 @@
 package gru.app.service;
 
-import gru.app.dto.MessageRequest;
 import gru.app.dto.MessageResponse;
+import gru.app.mapper.MessageMapper;
 import gru.app.model.Message;
-import gru.app.model.MessageType;
 import gru.app.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
 public class MessageService {
 
-    private final MessageRepository messageRepository;
+    private final MessageRepository repository;
 
+    private final MessageMapper mapper;
 
-    public MessageResponse sendMessage(String senderId, MessageRequest request) {
-        Message message = Message.builder()
-                .chatId(request.getChatId())
-                .senderId(senderId)
-                .content(request.getContent())
-                .type(request.getType() != null ? request.getType() : MessageType.TEXT)
-                .edited(false)
-                .deleted(false)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+    public List<MessageResponse> getMessages() {
 
-        Message saved = messageRepository.save(message);
-        return mapToResponse(saved);
+        List<MessageResponse> list = new ArrayList<>();
+        Function<? super Message, ? extends MessageResponse> mapper1 = (Function<? super Message, ? extends MessageResponse>) mapper::toResponse;
+        for (Message message : repository.findAll()) {
+            MessageResponse messageResponse = mapper1.apply(message);
+            list.add(messageResponse);
+        }
+        return list;
     }
 
+    public MessageResponse editMessage(
+            String id,
+            String newContent
+    ) {
 
-    public MessageResponse editMessage(String messageId, String newContent) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
+        Message message =
+                repository.findById(id)
+                        .orElseThrow();
 
         message.setContent(newContent);
-        message.setEdited(true);
-        message.setUpdatedAt(Instant.now());
 
-        Message updated = messageRepository.save(message);
-        return mapToResponse(updated);
+        repository.save(message);
+
+        return (MessageResponse) mapper.toResponse(message);
     }
 
+    public void deleteMessage(String id) {
 
-    public void deleteMessage(String messageId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
-
-        message.setDeleted(true);
-        message.setUpdatedAt(Instant.now());
-        messageRepository.save(message);
-    }
-
-
-    public List<MessageResponse> getChatMessages(String chatId) {
-        return messageRepository.findByChatIdAndDeletedFalseOrderByCreatedAtDesc(chatId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    private MessageResponse mapToResponse(Message message) {
-        MessageResponse response = new MessageResponse();
-        response.setId(message.getId());
-        response.setChatId(message.getChatId());
-        response.setSenderId(message.getSenderId());
-        response.setContent(message.getContent());
-        response.setType(message.getType());
-        response.setEdited(message.isEdited());
-        response.setDeleted(message.isDeleted());
-        response.setCreatedAt(message.getCreatedAt().toEpochMilli());
-        response.setUpdatedAt(message.getUpdatedAt().toEpochMilli());
-        return response;
-    }
-
-    public void save(Message msg) {
+        repository.deleteById(id);
     }
 
     public Message send(Long senderId, Long receiverId, String content) {
         return null;
     }
 
-    public void saveMessage(Message msg) {
-    }
 
     public void markRead(Long msgId) {
+    }
+
+    public void save(Message msg) {
+    }
+
+    public void editMessage(Message msg) {
     }
 }

@@ -1,6 +1,7 @@
 package gru.app.websocket;
 
 import gru.app.security.JwtUtil;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.messaging.*;
@@ -19,7 +20,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
     private JwtUtil jwtUtil;
 
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
 
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
