@@ -4,10 +4,8 @@ import lombok.Data;
 
 @Data
 public class LoginRequest {
-    private String phone;
-    private String password;
 
-    public String getId() {
-        return "id";
-    }
+    private String phone;
+
+    private String password;
 }

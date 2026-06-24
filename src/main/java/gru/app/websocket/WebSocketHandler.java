@@ -57,7 +57,7 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
             case "MESSAGE" -> {
                 String content = (String) payload.get("content");
                 String contentType = (String) payload.get("contentType");
-                Message msg = new Message();
+                Message<?> msg = new Message<>();
                 messageService.editMessage(msg);
                 sendToUser(receiverId, msg);
                 sendToUser(senderId, msg); // показать себе
@@ -89,12 +89,12 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+    public void handleTransportError(WebSocketSession session, @NonNull Throwable exception) throws Exception {
         session.close(CloseStatus.SERVER_ERROR);
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus closeStatus) throws Exception {
         sessions.values().remove(session);
     }
 

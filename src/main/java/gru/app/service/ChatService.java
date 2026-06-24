@@ -16,20 +16,20 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final ChatCacheService chatCacheService;
 
-    public List<Message> getChat(String chatId) {
-        List<Message> cached = chatCacheService.getCachedChat(chatId);
+    public List<Message<?>> getChat(String chatId) {
+        List<Message<?>> cached = chatCacheService.getCachedChat(chatId);
         if (cached != null) {
             return cached;
         }
 
-        List<Message> messages = messageRepository.findByChatId(chatId);
+        List<Message<?>> messages = messageRepository.findByChatId(chatId);
 
         chatCacheService.cacheChat(chatId, messages);
         return messages;
     }
 
-    public Message sendMessage(Message message) {
-        Message saved = messageRepository.save(message);
+    public Message<?> sendMessage(Message<?> message) {
+        Message<?> saved = messageRepository.save(message);
         chatCacheService.evictChatCache(message.getChatId());
         return saved;
     }

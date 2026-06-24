@@ -1,53 +1,68 @@
 package gru.app.service;
 
+import gru.app.model.Chat;
 import gru.app.model.Message;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class ChatCacheService {
 
-    private static final String CACHE_PREFIX =
-            "chat:";
+    private static final String PREFIX = "chat:";
+    private static final Duration TTL = Duration.ofHours(12);
 
-    private final RedisTemplate<String, List<Message>>
-            redisTemplate;
+    private final RedisTemplate<String, Chat> redisTemplate;
 
-    @Value("${chat.cache.ttl-minutes}")
-    private long ttlMinutes;
+    public Optional<Chat> getById(String chatId) {
 
-    public void saveMessages(
-            String chatId,
-            List<Message> messages
-    ) {
+        Chat chat = redisTemplate
+                .opsForValue()
+                .get(PREFIX + chatId);
 
-        redisTemplate.opsForValue().set(
-                CACHE_PREFIX + chatId,
-                messages,
-                Duration.ofMinutes(ttlMinutes)
-        );
+        return Optional.ofNullable(chat);
     }
 
-    public List<Message> getMessages(
-            String chatId
-    ) {
+    public void put(Chat chat) {
 
-        return redisTemplate.opsForValue().get(
-                CACHE_PREFIX + chatId
-        );
+        if (chat == null || chat.getId() == null) {
+            return;
+        }
+
+        redisTemplate
+                .opsForValue()
+                .set(
+                        PREFIX + chat.getId(),
+                        chat,
+                        TTL
+                );
     }
 
-    public List<Message> getCachedChat(String chatId) {
+    public void evict(String chatId) {
+
+        redisTemplate.delete(PREFIX + chatId);
+    }
+
+    public boolean exists(String chatId) {
+
+        return redisTemplate.hasKey(PREFIX + chatId);
+    }
+
+    public void refresh(Chat chat) {
+
+        put(chat);
+    }
+
+    public void cacheChat(String chatId, List<Message<?>> messages) {
+    }
+
+    public List<Message<?>> getCachedChat(String chatId) {
         return List.of();
-    }
-
-    public void cacheChat(String chatId, List<Message> messages) {
     }
 
     public void evictChatCache(String chatId) {

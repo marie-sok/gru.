@@ -28,7 +28,7 @@ public class WebSocketController extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(@NonNull WebSocketSession session, TextMessage message) throws Exception {
-        Message msg = mapper.readValue(message.getPayload(), Message.class);
+        Message<?> msg = mapper.readValue(message.getPayload(), Message.class);
         messageService.save(msg);
 
         WebSocketSession receiverSession = sessions.get(msg.getReceiverId());

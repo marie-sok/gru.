@@ -1,17 +1,22 @@
 package gru.app.model;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.List;
 
-@Document(collection = "chats")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
+@Document(collection = "chats")
 public class Chat {
 
     @Id
@@ -19,6 +24,5 @@ public class Chat {
 
     private List<String> participants;
 
-    private String lastMessage;
-    private Instant lastMessageTime;
+    private Instant createdAt;
 }

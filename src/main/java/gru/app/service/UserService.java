@@ -23,10 +23,6 @@ public class UserService {
         return repository.save(user);
     }
 
-    public User UserService(String token) {
-        return null;
-    }
-
     public List<User> search(String query) {
         return List.of();
     }

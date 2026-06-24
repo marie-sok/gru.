@@ -3,7 +3,7 @@ version: "3.8"
 services:
 
   app:
-    build: .
+    build: src/main/java
     container_name: kerry-app
     ports:
       - "8081:8081"

@@ -22,8 +22,8 @@ public class MessageService {
     public List<MessageResponse> getMessages() {
 
         List<MessageResponse> list = new ArrayList<>();
-        Function<? super Message, ? extends MessageResponse> mapper1 = (Function<? super Message, ? extends MessageResponse>) mapper::toResponse;
-        for (Message message : repository.findAll()) {
+        Function<? super Message<?>, ? extends MessageResponse> mapper1 = (Function<? super Message<?>, ? extends MessageResponse>) mapper::toResponse;
+        for (Message<?> message : repository.findAll()) {
             MessageResponse messageResponse = mapper1.apply(message);
             list.add(messageResponse);
         }
@@ -35,7 +35,7 @@ public class MessageService {
             String newContent
     ) {
 
-        Message message =
+        Message<?> message =
                 repository.findById(id)
                         .orElseThrow();
 
@@ -51,7 +51,7 @@ public class MessageService {
         repository.deleteById(id);
     }
 
-    public Message send(Long senderId, Long receiverId, String content) {
+    public Message<?> send(Long senderId, Long receiverId, String content) {
         return null;
     }
 
@@ -59,9 +59,9 @@ public class MessageService {
     public void markRead(Long msgId) {
     }
 
-    public void save(Message msg) {
+    public void save(Message<?> msg) {
     }
 
-    public void editMessage(Message msg) {
+    public void editMessage(Message<?> msg) {
     }
 }
