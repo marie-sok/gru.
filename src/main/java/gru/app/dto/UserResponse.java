@@ -9,7 +9,7 @@ public class UserResponse {
 
     private String id;
 
-    private String phone;
-
     private String nickname;
+
+    private String phone;
 }

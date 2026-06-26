@@ -57,15 +57,15 @@ public class WebSocketHandler implements org.springframework.web.socket.WebSocke
             case "MESSAGE" -> {
                 String content = (String) payload.get("content");
                 String contentType = (String) payload.get("contentType");
-                Message<?> msg = new Message<>();
+                Message msg = new Message();
                 messageService.editMessage(msg);
                 sendToUser(receiverId, msg);
-                sendToUser(senderId, msg); // показать себе
+                sendToUser(senderId, msg);
             }
             case "TYPING" -> sendTyping(receiverId, senderId);
             case "READ" -> {
                 Long msgId = ((Number) payload.get("messageId")).longValue();
-                messageService.markRead(msgId);
+                messageService.markRead(String.valueOf(msgId));
                 sendRead(receiverId, msgId, senderId);
             }
         }

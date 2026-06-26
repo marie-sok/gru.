@@ -1,9 +1,9 @@
 package gru.app.service;
 
+import gru.app.dto.UserResponse;
 import gru.app.model.User;
 import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,33 +12,34 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository repository;
+    private final UserRepository userRepository;
 
-    @Cacheable(value = "users", key = "#phone")
+    public UserResponse getMe(String userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return new UserResponse(
+                user.getId(),
+                user.getNickname(),
+                user.getPhone()
+        );
+    }
+
+    public List<UserResponse> search(String query) {
+
+        return userRepository
+                .findByNicknameContainingIgnoreCase(query)
+                .stream()
+                .map(user -> new UserResponse(
+                        user.getId(),
+                        user.getNickname(),
+                        user.getPhone()
+                ))
+                .toList();
+    }
+
     public User findByPhone(String phone) {
-        return repository.findByPhone(phone).orElse(null);
-    }
-
-    public User save(User user) {
-        return repository.save(user);
-    }
-
-    public List<User> search(String query) {
-        return List.of();
-    }
-
-    public void block(String token, String id) {
-    }
-
-    public void unblock(String token, String id) {
-    }
-
-    public void setOnline(String token) {
-    }
-
-    public void setOffline(String token) {
-    }
-
-    public void setVisibility(String token, boolean visible) {
+        return null;
     }
 }

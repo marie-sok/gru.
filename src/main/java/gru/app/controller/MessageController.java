@@ -1,37 +1,36 @@
 package gru.app.controller;
 
-import gru.app.dto.EditMessageRequest;
-import gru.app.dto.MessageResponse;
+import gru.app.dto.SendMessageRequest;
+import gru.app.model.Message;
 import gru.app.service.MessageService;
-
 import lombok.RequiredArgsConstructor;
-
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/messages")
 @RequiredArgsConstructor
+@RequestMapping
 public class MessageController {
 
     private final MessageService messageService;
 
-    @PutMapping("/{id}")
-    public MessageResponse edit(
-            @PathVariable String id,
-            @RequestBody EditMessageRequest request
+    @PostMapping("/messages")
+    public Message send(
+            Authentication auth,
+            @RequestBody SendMessageRequest request
     ) {
-
-        return messageService.editMessage(
-                id,
-                request.getContent()
+        return messageService.send(
+                auth.getName(),
+                request
         );
     }
 
-    @DeleteMapping("/{id}")
-    public void delete(
-            @PathVariable String id
+    @GetMapping("/chats/{chatId}/messages")
+    public List<Message> messages(
+            @PathVariable String chatId
     ) {
-
-        messageService.deleteMessage(id);
+        return messageService.findByChatId(chatId);
     }
 }

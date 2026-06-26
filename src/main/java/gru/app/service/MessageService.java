@@ -1,67 +1,52 @@
 package gru.app.service;
 
-import gru.app.dto.MessageResponse;
-import gru.app.mapper.MessageMapper;
+import gru.app.dto.SendMessageRequest;
 import gru.app.model.Message;
 import gru.app.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
-import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
 public class MessageService {
 
-    private final MessageRepository repository;
+    private final MessageRepository messageRepository;
 
-    private final MessageMapper mapper;
-
-    public List<MessageResponse> getMessages() {
-
-        List<MessageResponse> list = new ArrayList<>();
-        Function<? super Message<?>, ? extends MessageResponse> mapper1 = (Function<? super Message<?>, ? extends MessageResponse>) mapper::toResponse;
-        for (Message<?> message : repository.findAll()) {
-            MessageResponse messageResponse = mapper1.apply(message);
-            list.add(messageResponse);
-        }
-        return list;
-    }
-
-    public MessageResponse editMessage(
-            String id,
-            String newContent
+    public Message send(
+            String senderId,
+            SendMessageRequest request
     ) {
 
-        Message<?> message =
-                repository.findById(id)
-                        .orElseThrow();
+        Message message = new Message();
 
-        message.setContent(newContent);
+        message.setChatId(request.getChatId());
+        message.setSenderId(senderId);
+        message.setText(request.getText());
+        message.setCreatedAt(Instant.now());
 
-        repository.save(message);
-
-        return (MessageResponse) mapper.toResponse(message);
+        return messageRepository.save(message);
     }
 
-    public void deleteMessage(String id) {
-
-        repository.deleteById(id);
+    public List<Message> findByChatId(String chatId) {
+        return messageRepository.findByChatIdOrderByCreatedAtAsc(chatId);
     }
 
-    public Message<?> send(Long senderId, Long receiverId, String content) {
-        return null;
+    public Message save(Message message) {
+        return messageRepository.save(message);
     }
 
-
-    public void markRead(Long msgId) {
+    public void editMessage(Message message) {
+        messageRepository.save(message);
     }
 
-    public void save(Message<?> msg) {
-    }
+    public void markRead(String messageId) {
 
-    public void editMessage(Message<?> msg) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        messageRepository.save(message);
     }
 }

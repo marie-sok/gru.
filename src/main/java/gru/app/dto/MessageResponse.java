@@ -6,8 +6,11 @@ import lombok.Data;
 public class MessageResponse {
 
     private String id;
+
     private String chatId;
+
     private String senderId;
+
     private String content;
 
     private Long createdAt;

@@ -6,18 +6,21 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import java.time.Instant;
+
 @Mapper(componentModel = "spring")
 public interface MessageMapper {
 
+    @Mapping(target = "content", source = "text")
     @Mapping(
             target = "createdAt",
             source = "createdAt",
             qualifiedByName = "toMillis"
     )
-    MessageResponse toResponse(Message<?> message);
+    MessageResponse toResponse(Message message);
 
     @Named("toMillis")
-    static Long toMillis(java.time.Instant instant) {
+    static Long toMillis(Instant instant) {
         return instant == null ? null : instant.toEpochMilli();
     }
 }

@@ -58,10 +58,10 @@ public class ChatCacheService {
         put(chat);
     }
 
-    public void cacheChat(String chatId, List<Message<?>> messages) {
+    public void cacheChat(String chatId, List<Message> messages) {
     }
 
-    public List<Message<?>> getCachedChat(String chatId) {
+    public List<Message> getCachedChat(String chatId) {
         return List.of();
     }
 

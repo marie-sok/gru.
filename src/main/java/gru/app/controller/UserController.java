@@ -1,35 +1,35 @@
 package gru.app.controller;
 
 import gru.app.dto.UserResponse;
-import gru.app.model.User;
-import gru.app.repository.UserRepository;
+import gru.app.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping("/me")
     public UserResponse me(
             Authentication authentication
     ) {
 
-        String userId =
-                authentication.getName();
+        String userId = authentication.getName();
 
-        User user =
-                userRepository.findById(userId)
-                        .orElseThrow();
+        return userService.getMe(userId);
+    }
 
-        return new UserResponse(
-                user.getId(),
-                user.getPhone(),
-                user.getNickname()
-        );
+    @GetMapping("/search")
+    public List<UserResponse> search(
+            @RequestParam String query
+    ) {
+
+        return userService.search(query);
     }
 }

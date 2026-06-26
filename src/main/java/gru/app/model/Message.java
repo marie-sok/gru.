@@ -1,18 +1,14 @@
 package gru.app.model;
 
-import lombok.*;
+import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Document(collection = "messages")
-public class Message<T> {
+@Data
+public class Message {
 
     @Id
     private String id;
@@ -25,12 +21,7 @@ public class Message<T> {
 
     private Instant createdAt;
 
-    private boolean deleted;
-
-    public void setContent(String newContent) {
-    }
-
-    public T getReceiverId() {
-        return null;
+    public Long getReceiverId() {
+        return 0L;
     }
 }

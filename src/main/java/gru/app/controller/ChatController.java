@@ -1,23 +1,40 @@
 package gru.app.controller;
 
-import gru.app.dto.MessageResponse;
+import gru.app.dto.CreateChatRequest;
+import gru.app.model.Chat;
 import gru.app.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/chats")
 @RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chatService;
 
-    @GetMapping("/{chatId}/messages")
-    public List<MessageResponse> getMessages(
-            @PathVariable String chatId
+    @PostMapping
+    public Chat create(
+            Authentication auth,
+            @RequestBody CreateChatRequest request
     ) {
-        return chatService.getMessages(chatId);
+
+        return chatService.createChat(
+                auth.getName(),
+                request
+        );
+    }
+
+    @GetMapping
+    public List<Chat> myChats(
+            Authentication auth
+    ) {
+
+        return chatService.getMyChats(
+                auth.getName()
+        );
     }
 }
