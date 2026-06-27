@@ -18,19 +18,21 @@ public class MessageController {
 
     @PostMapping("/messages")
     public Message send(
-            Authentication auth,
+            Authentication authentication,
             @RequestBody SendMessageRequest request
     ) {
+
         return messageService.send(
-                auth.getName(),
+                authentication.getName(),
                 request
         );
     }
 
     @GetMapping("/chats/{chatId}/messages")
-    public List<Message> messages(
+    public List<Message> getMessages(
             @PathVariable String chatId
     ) {
-        return messageService.findByChatId(chatId);
+
+        return messageService.getMessages(chatId);
     }
 }

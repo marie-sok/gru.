@@ -30,7 +30,7 @@ public class MessageService {
         return messageRepository.save(message);
     }
 
-    public List<Message> findByChatId(String chatId) {
+    public List<Message> getMessages(String chatId) {
         return messageRepository.findByChatIdOrderByCreatedAtAsc(chatId);
     }
 
@@ -38,15 +38,14 @@ public class MessageService {
         return messageRepository.save(message);
     }
 
+    public void markRead(String messageId) {
+    }
+
     public void editMessage(Message message) {
         messageRepository.save(message);
     }
 
-    public void markRead(String messageId) {
-
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
-
-        messageRepository.save(message);
+    public List<Message> findByChatId(String chatId) {
+        return List.of();
     }
 }
