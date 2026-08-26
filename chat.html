@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Messenger</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial,serif;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* THEMES */
+        body.light { background: #f5f5f5; color: black; }
+        body.dark { background: #1e1e1e; color: white; }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 300px;
+            border-right: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chat-item {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .chat-item:hover {
+            background: #ddd;
+        }
+
+        /* CHAT */
+        .chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .msg {
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 60%;
+        }
+
+        .me {
+            background: #4caf50;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .them {
+            background: #ccc;
+            align-self: flex-start;
+        }
+
+        /* INPUT */
+        .input {
+            display: flex;
+            padding: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+        }
+
+        button {
+            margin-left: 5px;
+        }
+
+        /* HEADER */
+        .header {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* SETTINGS */
+        .settings {
+            display: none;
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            background: white;
+            padding: 20px;
+            border: 1px solid black;
+        }
+    </style>
+
+</head>
+
+<body class="light">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+    <div class="header">
+        <b>Chats</b>
+        <button onclick="toggleTheme()">🌓</button>
+    </div>
+
+    <div class="chat-list" id="chatList">
+        <div class="chat-item" onclick="openChat(1)">Marie</div>
+        <div class="chat-item" onclick="openChat(2)">Alex</div>
+    </div>
+
+    <button onclick="openSettings()">⚙ Settings</button>
+</div>
+
+<!-- CHAT -->
+<div class="chat">
+
+    <div class="header">
+        <span id="chatName">Select chat</span>
+        <span id="status"> 🟢 online</span>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input">
+        <label for="msg"></label><label for="msg"></label><input id="msg" placeholder="Message...">
+        <input type="file" id="fileInput">
+        <button onclick="send()">Send</button>
+    </div>
+
+</div>
+
+<!-- SETTINGS -->
+<div class="settings" id="settings">
+    <h3>Settings</h3>
+
+    <label>
+        Invisible mode
+        <input type="checkbox" id="invisible">
+    </label><br><br>
+
+    <label>
+        Read receipts
+        <input type="checkbox" checked>
+    </label><br><br>
+
+    <button onclick="addToBlacklist()">Add to blacklist</button><br><br>
+
+    <button onclick="closeSettings()">Close</button>
+</div>
+
+<script>
+
+    let currentChat = null;
+    let messages = [];
+
+    function openChat(id) {
+        currentChat = id;
+        document.getElementById("chatName").innerText = "Chat " + id;
+        loadMessages();
+    }
+
+    function loadMessages() {
+        let container = document.getElementById("messages");
+        container.innerHTML = "";
+
+        messages.forEach(m => {
+            if (m.chat === currentChat) {
+                let div = document.createElement("div");
+                div.className = "msg " + (m.me ? "me" : "them");
+                div.innerText = m.text + (m.read ? " ✔✔" : " ✔");
+
+                div.onclick = () => deleteMsg(m.id);
+
+                container.appendChild(div);
+            }
+        });
+    }
+
+    function send() {
+        let text = document.getElementById("msg").value;
+        let file = document.getElementById("fileInput").files[0];
+
+        let msg = {
+            id: Date.now(),
+            chat: currentChat,
+            text: text || (file ? "📎 " + file.name : ""),
+            me: true,
+            read: false
+        };
+
+        messages.push(msg);
+        document.getElementById("msg").value = "";
+
+        loadMessages();
+
+        // имитация ответа
+        setTimeout(() => {
+            messages.push({
+                id: Date.now()+1,
+                chat: currentChat,
+                text: "Ответ",
+                me: false,
+                read: true
+            });
+            loadMessages();
+        }, 1000);
+    }
+
+    function deleteMsg(id) {
+        messages = messages.filter(m => m.id !== id);
+        loadMessages();
+    }
+
+    /* THEME */
+    function toggleTheme() {
+        let body = document.body;
+        body.className = body.className === "light" ? "dark" : "light";
+    }
+
+    /* SETTINGS */
+    function openSettings() {
+        document.getElementById("settings").style.display = "block";
+    }
+
+    function closeSettings() {
+        document.getElementById("settings").style.display = "none";
+    }
+
+    function addToBlacklist() {
+        alert("User added to blacklist");
+    }
+
+</script>
+
+</body>
+</html>

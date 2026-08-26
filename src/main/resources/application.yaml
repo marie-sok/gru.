@@ -1,18 +1,15 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/messenger
-    username: marie_sok
-    password: ma_bird_171210
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
 server:
-  port: 8080
+  port: 8081
 
+spring:
+  docker:
+    compose:
+      enabled: false
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/gru
+
+    redis:
+      host: localhost
+      port: 6379
