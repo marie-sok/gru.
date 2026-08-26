@@ -17,11 +17,15 @@ public class Message {
 
     private String senderId;
 
+    private String receiverId;
+
     private String text;
 
     private Instant createdAt;
 
-    public Long getReceiverId() {
-        return 0L;
-    }
+    private Instant deliveredAt;
+
+    private Instant readAt;
+
+    private ReplyReference replyTo;
 }

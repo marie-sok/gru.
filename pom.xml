@@ -1,9 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="
+            http://maven.apache.org/POM/4.0.0
+            https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
+
+    <!-- ========================= -->
+    <!-- SPRING BOOT -->
+    <!-- ========================= -->
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -12,61 +19,106 @@
         <relativePath/>
     </parent>
 
+    <!-- ========================= -->
+    <!-- PROJECT -->
+    <!-- ========================= -->
+
     <groupId>gru.app</groupId>
-    <artifactId>functional-unique-creator-kerry</artifactId>
+    <artifactId>gru</artifactId>
     <version>1.0.0</version>
 
+    <name>GRU Messenger</name>
+    <description>GRU secure messenger backend</description>
+
+    <!-- ========================= -->
+    <!-- VERSIONS -->
+    <!-- ========================= -->
+
     <properties>
-        <java.version>23</java.version>
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
+
+        <java.version>21</java.version>
+
         <jjwt.version>0.12.6</jjwt.version>
+
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+
+        <lombok.version>1.18.38</lombok.version>
+
     </properties>
+
+    <!-- ========================= -->
+    <!-- DEPENDENCIES -->
+    <!-- ========================= -->
 
     <dependencies>
 
-        <!-- WEB -->
+        <!-- ===================== -->
+        <!-- WEB / REST API -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- SECURITY -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- VALIDATION -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- WEBSOCKET -->
+        <!-- ===================== -->
+        <!-- WEBSOCKET / STOMP -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- MONGODB -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- REDIS -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- CACHE -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
+        <!-- ===================== -->
         <!-- JWT -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -87,42 +139,50 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- ===================== -->
+        <!-- LOMBOK -->
+        <!-- ===================== -->
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ===================== -->
         <!-- MAPSTRUCT -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
         </dependency>
 
-        <!-- LOMBOK -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-
+        <!-- ===================== -->
         <!-- ACTUATOR -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- DEVTOOLS -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
+        <!-- ===================== -->
+        <!-- CONFIGURATION -->
+        <!-- ===================== -->
 
-        <!-- CONFIG PROCESSOR -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- TEST -->
+        <!-- ===================== -->
+        <!-- TESTS -->
+        <!-- ===================== -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -137,35 +197,92 @@
 
     </dependencies>
 
+    <!-- ========================= -->
+    <!-- BUILD -->
+    <!-- ========================= -->
+
     <build>
+
         <plugins>
 
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
+            <!-- Spring Boot -->
 
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+
+                <groupId>org.springframework.boot</groupId>
+
+                <artifactId>
+                    spring-boot-maven-plugin
+                </artifactId>
 
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+
+                    <excludeDevtools>
+                        true
+                    </excludeDevtools>
+
+                </configuration>
+
+            </plugin>
+
+            <!-- Java compiler -->
+
+            <plugin>
+
+                <groupId>
+                    org.apache.maven.plugins
+                </groupId>
+
+                <artifactId>
+                    maven-compiler-plugin
+                </artifactId>
+
+                <configuration>
+
+                    <release>
+                        ${java.version}
+                    </release>
+
+                    <parameters>
+                        true
+                    </parameters>
 
                     <annotationProcessorPaths>
 
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>1.18.38</version>
-                        </path>
+                        <!-- Lombok -->
 
                         <path>
-                            <groupId>org.mapstruct</groupId>
-                            <artifactId>mapstruct-processor</artifactId>
-                            <version>${mapstruct.version}</version>
+
+                            <groupId>
+                                org.projectlombok
+                            </groupId>
+
+                            <artifactId>
+                                lombok
+                            </artifactId>
+
+                            <version>
+                                ${lombok.version}
+                            </version>
+
+                        </path>
+
+                        <!-- MapStruct -->
+
+                        <path>
+
+                            <groupId>
+                                org.mapstruct
+                            </groupId>
+
+                            <artifactId>
+                                mapstruct-processor
+                            </artifactId>
+
+                            <version>
+                                ${mapstruct.version}
+                            </version>
+
                         </path>
 
                     </annotationProcessorPaths>
@@ -175,6 +292,7 @@
             </plugin>
 
         </plugins>
+
     </build>
 
 </project>

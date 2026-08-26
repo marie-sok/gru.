@@ -1,7 +1,8 @@
 package gru.app.controller;
 
-import gru.app.dto.UserResponse;
-import gru.app.service.UserService;
+import gru.app.dto.UserSearchResponse;
+import gru.app.model.User;
+import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -13,23 +14,44 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
-
-    @GetMapping("/me")
-    public UserResponse me(
-            Authentication authentication
-    ) {
-
-        String userId = authentication.getName();
-
-        return userService.getMe(userId);
-    }
+    private final UserRepository userRepository;
 
     @GetMapping("/search")
-    public List<UserResponse> search(
-            @RequestParam String query
+    public List<UserSearchResponse> search(
+            Authentication authentication,
+            @RequestParam String nickname
     ) {
 
-        return userService.search(query);
+        String currentUserId =
+                authentication.getName();
+
+        String query =
+                nickname == null
+                        ? ""
+                        : nickname.trim();
+
+        if (query.length() < 2) {
+            return List.of();
+        }
+
+        return userRepository
+                .findByNicknameContainingIgnoreCase(query)
+                .stream()
+                .filter(user ->
+                        !user.getId().equals(currentUserId)
+                )
+                .limit(20)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private UserSearchResponse toResponse(
+            User user
+    ) {
+
+        return new UserSearchResponse(
+                user.getId(),
+                user.getNickname()
+        );
     }
 }

@@ -1,7 +1,7 @@
 package gru.app.controller;
 
+import gru.app.dto.ChatResponse;
 import gru.app.dto.CreateChatRequest;
-import gru.app.model.Chat;
 import gru.app.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -16,8 +16,10 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    // MARK: - Create Chat
+
     @PostMapping
-    public Chat create(
+    public ChatResponse create(
             Authentication auth,
             @RequestBody CreateChatRequest request
     ) {
@@ -28,8 +30,10 @@ public class ChatController {
         );
     }
 
+    // MARK: - My Chats
+
     @GetMapping
-    public List<Chat> myChats(
+    public List<ChatResponse> myChats(
             Authentication auth
     ) {
 

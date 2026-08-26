@@ -8,4 +8,6 @@ public class SendMessageRequest {
     private String chatId;
 
     private String text;
+
+    private String replyToMessageId;
 }
