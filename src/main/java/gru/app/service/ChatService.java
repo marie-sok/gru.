@@ -1,13 +1,22 @@
 package gru.app.service;
 
+import gru.app.dto.ChatParticipantResponse;
+import gru.app.dto.ChatResponse;
 import gru.app.dto.CreateChatRequest;
 import gru.app.model.Chat;
+import gru.app.model.User;
 import gru.app.repository.ChatRepository;
+import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -15,27 +24,193 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
 
-    public Chat createChat(
+    private final UserRepository userRepository;
+
+    // MARK: - Create Chat
+
+    public ChatResponse createChat(
             String currentUserId,
             CreateChatRequest request
     ) {
 
-        Chat chat = new Chat();
+        String otherUserId =
+                request.getUserId();
+
+        if (otherUserId == null ||
+                otherUserId.isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "User ID is required"
+            );
+        }
+
+        if (currentUserId.equals(otherUserId)) {
+
+            throw new IllegalArgumentException(
+                    "Cannot create chat with yourself"
+            );
+        }
+
+        User currentUser =
+                userRepository.findById(
+                        currentUserId
+                ).orElseThrow(
+                        () ->
+                                new IllegalArgumentException(
+                                        "Current user not found"
+                                )
+                );
+
+        User otherUser =
+                userRepository.findById(
+                        otherUserId
+                ).orElseThrow(
+                        () ->
+                                new IllegalArgumentException(
+                                        "User not found"
+                                )
+                );
+
+        Chat chat =
+                new Chat();
 
         chat.setParticipants(
                 List.of(
                         currentUserId,
-                        request.getUserId()
+                        otherUserId
                 )
         );
 
-        chat.setCreatedAt(Instant.now());
+        chat.setCreatedAt(
+                Instant.now()
+        );
 
-        return chatRepository.save(chat);
+        Chat savedChat =
+                chatRepository.save(
+                        chat
+                );
+
+        return new ChatResponse(
+                savedChat.getId(),
+                List.of(
+                        toParticipant(
+                                currentUser
+                        ),
+                        toParticipant(
+                                otherUser
+                        )
+                ),
+                savedChat.getCreatedAt()
+        );
     }
 
-    public List<Chat> getMyChats(String userId) {
+    // MARK: - My Chats
 
-        return chatRepository.findByParticipantsContains(userId);
+    public List<ChatResponse> getMyChats(
+            String userId
+    ) {
+
+        List<Chat> chats =
+                chatRepository
+                        .findByParticipantsContains(
+                                userId
+                        );
+
+        if (chats.isEmpty()) {
+
+            return List.of();
+        }
+
+        Set<String> participantIds =
+                new HashSet<>();
+
+        for (Chat chat : chats) {
+
+            if (chat.getParticipants() != null) {
+
+                participantIds.addAll(
+                        chat.getParticipants()
+                );
+            }
+        }
+
+        Iterable<User> users =
+                userRepository.findAllById(
+                        participantIds
+                );
+
+        Map<String, User> usersById =
+                new HashMap<>();
+
+        for (User user : users) {
+
+            usersById.put(
+                    user.getId(),
+                    user
+            );
+        }
+
+        List<ChatResponse> result =
+                new ArrayList<>();
+
+        for (Chat chat : chats) {
+
+            List<ChatParticipantResponse>
+                    participants =
+                    new ArrayList<>();
+
+            if (chat.getParticipants() != null) {
+
+                for (String participantId :
+                        chat.getParticipants()) {
+
+                    User user =
+                            usersById.get(
+                                    participantId
+                            );
+
+                    if (user != null) {
+
+                        participants.add(
+                                toParticipant(
+                                        user
+                                )
+                        );
+                    }
+                }
+            }
+
+            result.add(
+                    new ChatResponse(
+                            chat.getId(),
+                            participants,
+                            chat.getCreatedAt()
+                    )
+            );
+        }
+
+        return result;
+    }
+
+    // MARK: - Participant DTO
+
+    private ChatParticipantResponse toParticipant(
+            User user
+    ) {
+
+        String nickname =
+                user.getNickname();
+
+        if (nickname == null ||
+                nickname.isBlank()) {
+
+            nickname =
+                    "Пользователь";
+        }
+
+        return new ChatParticipantResponse(
+                user.getId(),
+                nickname
+        );
     }
 }
