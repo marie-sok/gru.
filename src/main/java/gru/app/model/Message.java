@@ -27,5 +27,11 @@ public class Message {
 
     private Instant readAt;
 
+    private Instant deletedAt;
+
+    private String reaction;
+
+    private Attachment attachment;
+
     private ReplyReference replyTo;
 }

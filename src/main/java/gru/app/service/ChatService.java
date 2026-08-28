@@ -6,9 +6,12 @@ import gru.app.dto.CreateChatRequest;
 import gru.app.model.Chat;
 import gru.app.model.User;
 import gru.app.repository.ChatRepository;
+import gru.app.repository.MessageRepository;
 import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,6 +28,10 @@ public class ChatService {
     private final ChatRepository chatRepository;
 
     private final UserRepository userRepository;
+
+    private final MessageRepository messageRepository;
+
+    private final MediaStorageService mediaStorageService;
 
     // MARK: - Create Chat
 
@@ -70,6 +77,12 @@ public class ChatService {
                                         "User not found"
                                 )
                 );
+
+        if (isBlocked(currentUser, otherUserId) || isBlocked(otherUser, currentUserId)) {
+            throw new IllegalArgumentException(
+                    "Chat cannot be created because one participant has blocked the other"
+            );
+        }
 
         Chat chat =
                 new Chat();
@@ -190,6 +203,43 @@ public class ChatService {
         }
 
         return result;
+    }
+
+
+    // MARK: - Delete Chat For Everyone
+
+    public List<String> deleteChatForEveryone(
+            String userId,
+            String chatId
+    ) {
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat not found"));
+
+        if (chat.getParticipants() == null || !chat.getParticipants().contains(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a chat participant");
+        }
+
+        var messages = messageRepository.findByChatIdOrderByCreatedAtAsc(chatId);
+        for (var message : messages) {
+            if (message.getAttachment() != null) {
+                mediaStorageService.deleteByRemoteURL(message.getAttachment().getRemoteURL());
+            }
+        }
+
+        if (!messages.isEmpty()) {
+            messageRepository.deleteAll(messages);
+        }
+
+        List<String> participants = chat.getParticipants() == null
+                ? List.of()
+                : List.copyOf(chat.getParticipants());
+
+        chatRepository.delete(chat);
+        return participants;
+    }
+
+    private boolean isBlocked(User user, String targetUserId) {
+        return user.getBlockedUserIds() != null && user.getBlockedUserIds().contains(targetUserId);
     }
 
     // MARK: - Participant DTO
