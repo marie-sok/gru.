@@ -1,4 +1,4 @@
-# functional_unique_creator_kerry
+# gru messenger application
 
 A new Flutter project.
 
