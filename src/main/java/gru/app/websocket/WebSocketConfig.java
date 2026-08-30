@@ -1,4 +1,4 @@
-package gru.app.config;
+package gru.app.websocket;
 
 import gru.app.websocket.JwtChannelInterceptor;
 import lombok.RequiredArgsConstructor;

@@ -10,9 +10,9 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableMongoRepositories(basePackages = "gru.app.repository")
 
 @SpringBootApplication
-public class FunctionalUniqueCreatorKerryApplication {
+public class GruApplication {
     public static void main(String[] args) {
-        SpringApplication.run(FunctionalUniqueCreatorKerryApplication.class, args);
+        SpringApplication.run(GruApplication.class, args);
     }
 
     @Bean

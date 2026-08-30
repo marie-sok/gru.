@@ -1,0 +1,77 @@
+<html>
+<head>
+<title>release.sh</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #699856;}
+.s1 { color: #a1b6c4;}
+.s2 { color: #cd9069;}
+.s3 { color: #b4cda8;}
+.s4 { color: #8cd7ff;}
+.s5 { color: #47a2ed;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+release.sh</font>
+</center></td></tr></table>
+<pre><span class="s0">#!/bin/bash</span>
+
+<span class="s0"># ---------------------------</span>
+<span class="s0"># release.sh</span>
+<span class="s0"># ---------------------------</span>
+
+<span class="s0"># Путь к проекту</span>
+<span class="s1">PROJECT_DIR=</span><span class="s2">&quot;/Users/mariamorozova/Downloads/functional-unique-creator-kerry&quot;</span>
+
+<span class="s0"># Порт, на котором будет запускаться приложение</span>
+<span class="s1">PORT=</span><span class="s3">8081</span>
+
+<span class="s1">echo </span><span class="s2">&quot;Сборка проекта...&quot;</span>
+<span class="s1">cd </span><span class="s2">&quot;</span><span class="s4">$PROJECT_DIR</span><span class="s2">&quot; </span><span class="s5">|| </span><span class="s1">exit </span><span class="s3">1</span>
+
+<span class="s0"># Сборка проекта</span>
+<span class="s1">mvn clean package -DskipTests</span>
+
+<span class="s0"># Проверка JAR</span>
+<span class="s1">JAR_FILE=</span><span class="s2">&quot;</span><span class="s4">$PROJECT_DIR</span><span class="s2">/target/kerry-0.0.1-SNAPSHOT.jar&quot;</span>
+<span class="s5">if </span><span class="s1">[ </span><span class="s5">! </span><span class="s1">-f </span><span class="s2">&quot;</span><span class="s4">$JAR_FILE</span><span class="s2">&quot; </span><span class="s1">]; </span><span class="s5">then</span>
+    <span class="s1">echo </span><span class="s2">&quot;Ошибка: JAR не найден!&quot;</span>
+    <span class="s1">exit </span><span class="s3">1</span>
+<span class="s5">fi</span>
+
+<span class="s1">echo </span><span class="s2">&quot;JAR успешно создан: </span><span class="s4">$JAR_FILE</span><span class="s2">&quot;</span>
+
+<span class="s0"># Завершение активных процессов</span>
+<span class="s1">PID=</span><span class="s5">$</span><span class="s1">(lsof -ti tcp:</span><span class="s2">&quot;</span><span class="s4">$PORT</span><span class="s2">&quot;</span><span class="s1">)</span>
+<span class="s5">if </span><span class="s1">[ -n </span><span class="s2">&quot;</span><span class="s4">$PID</span><span class="s2">&quot; </span><span class="s1">]; </span><span class="s5">then</span>
+    <span class="s1">echo </span><span class="s2">&quot;Завершаем старый процесс на порту </span><span class="s4">$PORT </span><span class="s2">(PID: </span><span class="s4">$PID</span><span class="s2">)&quot;</span>
+    <span class="s1">kill -9 </span><span class="s2">&quot;</span><span class="s4">$PID</span><span class="s2">&quot;</span>
+<span class="s5">fi</span>
+
+<span class="s0"># Запуск Spring Boot</span>
+<span class="s1">echo </span><span class="s2">&quot;Запуск приложения на порту </span><span class="s4">$PORT</span><span class="s2">...&quot;</span>
+<span class="s1">nohup java -jar </span><span class="s2">&quot;</span><span class="s4">$JAR_FILE</span><span class="s2">&quot; </span><span class="s1">--server.port=</span><span class="s2">&quot;</span><span class="s4">$PORT</span><span class="s2">&quot; </span><span class="s5">&gt; </span><span class="s2">&quot;</span><span class="s4">$PROJECT_DIR</span><span class="s2">/nohup.log&quot; </span><span class="s3">2</span><span class="s1">&gt;&amp;</span><span class="s3">1 </span><span class="s1">&amp;</span>
+
+<span class="s0"># Загрузка запуска</span>
+<span class="s1">sleep </span><span class="s3">5</span>
+
+<span class="s0"># Проверяека запуска приложения</span>
+<span class="s1">HTTP_STATUS=</span><span class="s5">$</span><span class="s1">(curl -s -o /dev/null -w </span><span class="s2">&quot;%{http_code}&quot; </span><span class="s1">http://localhost:</span><span class="s2">&quot;</span><span class="s4">$PORT</span><span class="s2">&quot;</span><span class="s1">)</span>
+<span class="s5">if </span><span class="s1">[ </span><span class="s2">&quot;</span><span class="s4">$HTTP_STATUS</span><span class="s2">&quot; </span><span class="s1">!= </span><span class="s2">&quot;200&quot; </span><span class="s1">] </span><span class="s5">&amp;&amp; </span><span class="s1">[ </span><span class="s2">&quot;</span><span class="s4">$HTTP_STATUS</span><span class="s2">&quot; </span><span class="s1">!= </span><span class="s2">&quot;401&quot; </span><span class="s1">]; </span><span class="s5">then</span>
+    <span class="s1">echo </span><span class="s2">&quot;Ошибка: приложение не отвечает. HTTP статус: </span><span class="s4">$HTTP_STATUS</span><span class="s2">&quot;</span>
+    <span class="s1">exit </span><span class="s3">1</span>
+<span class="s5">fi</span>
+
+<span class="s0"># Запуск ngrok</span>
+<span class="s1">echo </span><span class="s2">&quot;Запуск ngrok туннеля...&quot;</span>
+<span class="s1">ngrok http </span><span class="s2">&quot;</span><span class="s4">$PORT</span><span class="s2">&quot; </span><span class="s1">--log=stdout &amp;</span>
+<span class="s1">sleep </span><span class="s3">3</span>
+
+<span class="s1">echo </span><span class="s2">&quot;Приложение запущено и доступно через ngrok!&quot;</span>
+<span class="s1">echo </span><span class="s2">&quot;Проверяйте URL на экране ngrok или в http://127.0.0.1:4040&quot;</span>
+</pre>
+</body>
+</html>
