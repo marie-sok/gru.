@@ -1,11 +1,13 @@
 package gru.app.service;
 
 import gru.app.dto.SendMessageRequest;
+import gru.app.model.Attachment;
 import gru.app.model.Chat;
 import gru.app.model.Message;
 import gru.app.model.ReplyReference;
 import gru.app.repository.ChatRepository;
 import gru.app.repository.MessageRepository;
+import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,9 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
+    private final MediaStorageService mediaStorageService;
+    private final UserRepository userRepository;
+    private final ContentSafetyService contentSafetyService;
 
     // MARK: - Send
 
@@ -55,6 +60,8 @@ public class MessageService {
                     "Message text is required"
             );
         }
+
+        contentSafetyService.validateText(text.trim());
 
         Chat chat = getChat(chatId);
 
@@ -95,6 +102,8 @@ public class MessageService {
                     "Group messages are not supported yet"
             );
         }
+
+        requireMessagingAllowed(senderId, receivers.getFirst());
 
         Message message =
                 new Message();
@@ -303,6 +312,139 @@ public class MessageService {
         return changed;
     }
 
+    // MARK: - Send Attachment
+
+    public Message sendAttachment(
+            String senderId,
+            String chatId,
+            Attachment attachment,
+            String replyToMessageId
+    ) {
+
+        requireUser(senderId);
+
+        if (chatId == null || chatId.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Chat ID is required"
+            );
+        }
+
+        if (attachment == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Attachment is required"
+            );
+        }
+
+        Chat chat = getChat(chatId);
+        requireParticipant(chat, senderId);
+
+        ReplyReference replyTo = buildReplyReference(chat, replyToMessageId);
+
+        List<String> receivers = chat.getParticipants()
+                .stream()
+                .filter(id -> id != null && !id.isBlank())
+                .filter(id -> !id.equals(senderId))
+                .distinct()
+                .toList();
+
+        if (receivers.size() != 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Attachment messages currently require a direct chat"
+            );
+        }
+
+        requireMessagingAllowed(senderId, receivers.getFirst());
+
+        Message message = new Message();
+        message.setChatId(chat.getId());
+        message.setSenderId(senderId);
+        message.setReceiverId(receivers.getFirst());
+        message.setText("");
+        message.setCreatedAt(Instant.now());
+        message.setDeliveredAt(null);
+        message.setReadAt(null);
+        message.setDeletedAt(null);
+        message.setReaction(null);
+        message.setAttachment(attachment);
+        message.setReplyTo(replyTo);
+
+        return messageRepository.save(message);
+    }
+
+    // MARK: - Reactions
+
+    public Message setReaction(
+            String userId,
+            String messageId,
+            String reaction
+    ) {
+        requireUser(userId);
+
+        if (reaction == null || reaction.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Reaction is required"
+            );
+        }
+
+        Message message = getMessage(messageId);
+        Chat chat = getChat(message.getChatId());
+        requireParticipant(chat, userId);
+        message.setReaction(reaction.trim());
+        return messageRepository.save(message);
+    }
+
+    public Message removeReaction(
+            String userId,
+            String messageId
+    ) {
+        requireUser(userId);
+        Message message = getMessage(messageId);
+        Chat chat = getChat(message.getChatId());
+        requireParticipant(chat, userId);
+        message.setReaction(null);
+        return messageRepository.save(message);
+    }
+
+    // MARK: - Delete For Everyone
+
+    public Message deleteForEveryone(
+            String userId,
+            String messageId
+    ) {
+
+        requireUser(userId);
+
+        Message message = getMessage(messageId);
+
+        if (message.getSenderId() == null || !message.getSenderId().equals(userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only the sender can delete this message for everyone"
+            );
+        }
+
+        message.setDeletedAt(Instant.now());
+        message.setText("");
+        message.setReplyTo(null);
+
+        // Remove the physical media as well, then hard-delete from MongoDB.
+        // The returned in-memory object is only a realtime tombstone so
+        // connected clients can remove the bubble without a placeholder.
+        if (message.getAttachment() != null) {
+            mediaStorageService.deleteByRemoteURL(
+                    message.getAttachment().getRemoteURL()
+            );
+        }
+
+        messageRepository.deleteById(message.getId());
+
+        return message;
+    }
+
     // MARK: - Save
 
     public Message save(
@@ -429,6 +571,20 @@ public class MessageService {
                                         "Message not found"
                                 )
                 );
+    }
+
+    private void requireMessagingAllowed(String senderId, String receiverId) {
+        var sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender not found"));
+        var receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Receiver not found"));
+
+        boolean senderBlockedReceiver = sender.getBlockedUserIds() != null && sender.getBlockedUserIds().contains(receiverId);
+        boolean receiverBlockedSender = receiver.getBlockedUserIds() != null && receiver.getBlockedUserIds().contains(senderId);
+
+        if (senderBlockedReceiver || receiverBlockedSender) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Messaging is blocked between these users");
+        }
     }
 
     private void requireUser(

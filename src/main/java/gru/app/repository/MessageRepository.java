@@ -8,8 +8,6 @@ import java.util.List;
 public interface MessageRepository
         extends MongoRepository<Message, String> {
 
-    List<Message>
-    findByChatIdOrderByCreatedAtAsc(
-            String chatId
-    );
+    List<Message> findByChatIdOrderByCreatedAtAsc(String chatId);
+    List<Message> findBySenderId(String senderId);
 }
