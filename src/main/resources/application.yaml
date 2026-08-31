@@ -1,21 +1,15 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/messenger
-    username: marie_sok
-    password:  ma_bird_171210
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
 server:
   port: 8081
 
-jwt:
-  secret: ${JWT_SECRET:functional_unique_create_kerry_wtf_its_a_rofl??}
-  expiration: 86400000
+spring:
+  docker:
+    compose:
+      enabled: false
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/gru
+
+    redis:
+      host: localhost
+      port: 6379
