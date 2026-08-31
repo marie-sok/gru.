@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C0FF3E51303F85C7005E1234 /* gru.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = gru.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0FF3E51303F85C7005E1234 /* gru.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gru.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0FF3E53303F85C7005E1234 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -26,16 +26,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		C06866303044A67C0048FF1C /* gru. */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = gru.;
-			sourceTree = "<group>";
-		};
-		C09B72583040314600FABB41 /* gru. */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = gru.;
-			sourceTree = "<group>";
-		};
 		C0A1CFA92F93C7A700D763FD /* gru. */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gru.;
@@ -80,8 +70,6 @@
 				C0A1CFBB2F93C7AC00D763FD /* gru.Tests */,
 				C0A1CFC52F93C7AC00D763FD /* gru.UITests */,
 				C0FF3E55303F85C7005E1234 /* gru */,
-				C09B72583040314600FABB41 /* gru. */,
-				C06866303044A67C0048FF1C /* gru. */,
 				C0FF3E52303F85C7005E1234 /* Frameworks */,
 				C0A1CFA82F93C7A700D763FD /* Products */,
 			);
@@ -90,7 +78,7 @@
 		C0A1CFA82F93C7A700D763FD /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C0FF3E51303F85C7005E1234 /* gru.appex */,
+				C0FF3E51303F85C7005E1234 /* gru.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,14 +107,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				C0FF3E55303F85C7005E1234 /* gru */,
+				C0A1CFA92F93C7A700D763FD /* gru. */,
 			);
 			name = gru;
 			packageProductDependencies = (
 			);
 			productName = gru;
-			productReference = C0FF3E51303F85C7005E1234 /* gru.appex */;
-			productType = "com.apple.product-type.app-extension";
+			productReference = C0FF3E51303F85C7005E1234 /* gru.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -306,12 +294,11 @@
 		C0FF3E5E303F85C8005E1234 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "gru./gru_.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = gru.;
 				DEVELOPMENT_TEAM = M3LJSC49RD;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = gru/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = gru;
 				INFOPLIST_KEY_NSCameraUsageDescription = "GRU uses the camera for avatars, videos and video notes.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "GRU uses contacts to show people and invite friends.";
@@ -320,7 +307,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "GRU uses the microphone for voice messages and video notes.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "GRU can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "GRU lets you choose avatars, photos and videos to send.";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -330,7 +317,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = sok.com.gru;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -348,12 +334,11 @@
 		C0FF3E5F303F85C8005E1234 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "gru./gru_.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = gru.;
 				DEVELOPMENT_TEAM = M3LJSC49RD;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = gru/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = gru;
 				INFOPLIST_KEY_NSCameraUsageDescription = "GRU uses the camera for avatars, videos and video notes.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "GRU uses contacts to show people and invite friends.";
@@ -362,7 +347,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "GRU uses the microphone for voice messages and video notes.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "GRU can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "GRU lets you choose avatars, photos and videos to send.";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -372,7 +357,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = sok.com.gru;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
