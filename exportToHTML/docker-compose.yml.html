@@ -1,0 +1,58 @@
+<html>
+<head>
+<title>docker-compose.yml</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #47a2ed;}
+.s1 { color: #a1b6c4;}
+.s2 { color: #cd9069;}
+.s3 { color: #a1b6c4;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+docker-compose.yml</font>
+</center></td></tr></table>
+<pre><span class="s0">version</span><span class="s1">: </span><span class="s2">&quot;3.8&quot;</span>
+
+<span class="s0">services</span><span class="s1">:</span>
+
+  <span class="s0">app</span><span class="s1">:</span>
+    <span class="s0">build</span><span class="s1">: </span><span class="s3">src/main/java</span>
+    <span class="s0">container_name</span><span class="s1">: </span><span class="s3">kerry-app</span>
+    <span class="s0">ports</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s2">&quot;8081:8081&quot;</span>
+    <span class="s0">depends_on</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s3">mongo</span>
+      <span class="s1">- </span><span class="s3">redis</span>
+    <span class="s0">environment</span><span class="s1">:</span>
+      <span class="s0">SPRING_DATA_MONGODB_URI</span><span class="s1">: </span><span class="s3">mongodb://mongo:27017/gru</span>
+      <span class="s0">SPRING_DATA_REDIS_HOST</span><span class="s1">: </span><span class="s3">redis</span>
+      <span class="s0">SPRING_DATA_REDIS_PORT</span><span class="s1">: </span><span class="s3">6379</span>
+      <span class="s0">SERVER_PORT</span><span class="s1">: </span><span class="s3">8081</span>
+
+  <span class="s0">mongo</span><span class="s1">:</span>
+    <span class="s0">image</span><span class="s1">: </span><span class="s3">mongo:7</span>
+    <span class="s0">container_name</span><span class="s1">: </span><span class="s3">mongo</span>
+    <span class="s0">restart</span><span class="s1">: </span><span class="s3">always</span>
+    <span class="s0">ports</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s2">&quot;27017:27017&quot;</span>
+    <span class="s0">volumes</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s3">mongo_data:/data/db</span>
+
+  <span class="s0">redis</span><span class="s1">:</span>
+    <span class="s0">image</span><span class="s1">: </span><span class="s3">redis:7-alpine</span>
+    <span class="s0">container_name</span><span class="s1">: </span><span class="s3">redis</span>
+    <span class="s0">restart</span><span class="s1">: </span><span class="s3">always</span>
+    <span class="s0">ports</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s2">&quot;6379:6379&quot;</span>
+    <span class="s0">volumes</span><span class="s1">:</span>
+      <span class="s1">- </span><span class="s3">redis_data:/data</span>
+
+<span class="s0">volumes</span><span class="s1">:</span>
+  <span class="s0">mongo_data</span><span class="s1">:</span>
+  <span class="s0">redis_data</span><span class="s1">:</span></pre>
+</body>
+</html>
