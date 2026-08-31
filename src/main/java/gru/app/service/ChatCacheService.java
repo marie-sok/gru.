@@ -2,60 +2,34 @@ package gru.app.service;
 
 import gru.app.model.Chat;
 import gru.app.model.Message;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Community release cache adapter.
+ * MongoDB is the source of truth and the zero-budget release does not require Redis.
+ * This API remains in place so the cache can be reintroduced later without changing callers.
+ */
 @Service
-@RequiredArgsConstructor
 public class ChatCacheService {
 
-    private static final String PREFIX = "chat:";
-    private static final Duration TTL = Duration.ofHours(12);
-
-    private final RedisTemplate<String, Chat> redisTemplate;
-
     public Optional<Chat> getById(String chatId) {
-
-        Chat chat = redisTemplate
-                .opsForValue()
-                .get(PREFIX + chatId);
-
-        return Optional.ofNullable(chat);
+        return Optional.empty();
     }
 
     public void put(Chat chat) {
-
-        if (chat == null || chat.getId() == null) {
-            return;
-        }
-
-        redisTemplate
-                .opsForValue()
-                .set(
-                        PREFIX + chat.getId(),
-                        chat,
-                        TTL
-                );
     }
 
     public void evict(String chatId) {
-
-        redisTemplate.delete(PREFIX + chatId);
     }
 
     public boolean exists(String chatId) {
-
-        return redisTemplate.hasKey(PREFIX + chatId);
+        return false;
     }
 
     public void refresh(Chat chat) {
-
-        put(chat);
     }
 
     public void cacheChat(String chatId, List<Message> messages) {
