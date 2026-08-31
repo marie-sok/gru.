@@ -69,6 +69,20 @@ struct AudioBubble: View {
         .task(id: loadIdentity) {
             await preparePlayerIfNeeded()
         }
+                .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+                return
+            }
+            if type == .began {
+                if isPlaying {
+                    player?.pause()
+                    isPlaying = false
+                    progressTask?.cancel()
+                }
+            }
+        }
         .onDisappear {
             progressTask?.cancel()
             audioSessionTask?.cancel()

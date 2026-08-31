@@ -301,6 +301,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = gru;
 				INFOPLIST_KEY_NSCameraUsageDescription = "GRU uses the camera for avatars, videos and video notes.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Используется для защиты входа в приложение GRU.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "GRU uses contacts to show people and invite friends.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "GRU connects to your development server on the local network.";
@@ -341,6 +342,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = gru;
 				INFOPLIST_KEY_NSCameraUsageDescription = "GRU uses the camera for avatars, videos and video notes.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Используется для защиты входа в приложение GRU.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "GRU uses contacts to show people and invite friends.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "GRU connects to your development server on the local network.";

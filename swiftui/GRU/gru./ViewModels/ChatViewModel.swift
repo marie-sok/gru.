@@ -24,6 +24,8 @@ final class ChatViewModel {
   private var otherTypingTimeoutTask: Task<Void, Never>?
   // **MARK: - Reply**
   var replyMessage: Message?
+  // **MARK: - Edit**
+  var editingMessage: Message?
   // **MARK: - Search**
   var searchText = ""
   var searchResults: [Message] = []
@@ -947,6 +949,10 @@ final class ChatViewModel {
   }
   // **MARK: - Send Message**
   func sendMessage() {
+    if editingMessage != nil {
+      saveEditedMessage()
+      return
+    }
     let text =
       messageText
       .trimmingCharacters(
@@ -2802,6 +2808,60 @@ final class ChatViewModel {
 
     return message
   }
+  
+  // **MARK: - Edit Message Actions**
+  func startEditing(_ message: Message) {
+    editingMessage = message
+    messageText = message.text
+    replyMessage = nil
+  }
+
+  func cancelEditing() {
+    editingMessage = nil
+    messageText = ""
+  }
+
+  func saveEditedMessage() {
+    guard let target = editingMessage,
+          let serverID = target.serverID,
+          !serverID.isEmpty else {
+      cancelEditing()
+      return
+    }
+
+    let updatedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !updatedText.isEmpty, updatedText != target.text else {
+      cancelEditing()
+      return
+    }
+
+    let token = TokenStorage.shared.token ?? ""
+    cancelEditing()
+
+    // Optimistic update locally
+    if let index = chat.messages.firstIndex(where: { $0.id == target.id || $0.serverID == serverID }) {
+      chat.messages[index].text = updatedText
+      chat.messages[index].isEdited = true
+      chat.messages[index].editedAt = Date()
+    }
+
+    Task {
+      do {
+        let serverDTO = try await MessageAPIService.shared.editMessage(
+          messageID: serverID,
+          text: updatedText,
+          token: token
+        )
+        if let index = chat.messages.firstIndex(where: { $0.id == target.id || $0.serverID == serverID }) {
+          chat.messages[index].applyServerState(serverDTO)
+        }
+      } catch {
+        print("❌ Failed to edit message: \(error)")
+        actionError = "Не удалось изменить сообщение"
+      }
+    }
+  }
+
   func cancelReply() {
     replyMessage =
       nil

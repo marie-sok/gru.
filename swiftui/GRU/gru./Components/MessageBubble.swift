@@ -123,9 +123,14 @@ struct MessageBubble: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Действия с сообщением")
 
-                    Text(
-                        timeString
-                    )
+                    HStack(spacing: 3) {
+                        if message.isEdited {
+                            Text("изм.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(timeString)
+                    }
                     .font(.caption2)
                     .foregroundStyle(
                         .secondary
@@ -229,6 +234,14 @@ struct MessageBubble: View {
                 isSelected ? "Снять выбор" : "Выбрать",
                 systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
             )
+        }
+
+                if isCurrentUser && !message.text.isEmpty && message.status != .sending && message.status != .failed {
+            Button {
+                onEdit(message)
+            } label: {
+                Label("Редактировать", systemImage: "pencil")
+            }
         }
 
         if !isSelectionMode {

@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Combine
+import LocalAuthentication
 
 @MainActor
 struct RootView: View {
@@ -16,6 +17,8 @@ struct RootView: View {
     @AppStorage("gru.settings.security.hideSwitcherPreview") private var hideSwitcherPreview = true
     @AppStorage("gru.settings.notifications.resetOnOpen") private var resetBadgeOnOpen = true
     @AppStorage("gru.release.onboarding.v11") private var didFinishOnboarding = false
+    @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
+    @State private var isBiometricLocked = false
 
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.obsidian.rawValue
@@ -56,6 +59,13 @@ struct RootView: View {
             } else if isAuthenticated {
 
                 MainView()
+                        .blur(radius: (isBiometricLocked && biometricsEnabled) ? 18 : 0)
+                        .disabled(isBiometricLocked && biometricsEnabled)
+                        .overlay {
+                            if isBiometricLocked && biometricsEnabled {
+                                biometricLockOverlay
+                            }
+                        }
 
             } else {
 
@@ -87,9 +97,18 @@ struct RootView: View {
 
             checkSession()
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active && resetBadgeOnOpen {
-                NotificationService.shared.clearBadge()
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active {
+                if resetBadgeOnOpen {
+                    NotificationService.shared.clearBadge()
+                }
+                if biometricsEnabled && isAuthenticated && didFinishOnboarding && isBiometricLocked {
+                    authenticateWithBiometrics()
+                }
+            } else if newPhase == .background {
+                if biometricsEnabled && isAuthenticated {
+                    isBiometricLocked = true
+                }
             }
         }
         .onReceive(
@@ -134,6 +153,10 @@ private extension RootView {
             applyLocalProfile()
 
             isAuthenticated = true
+            if biometricsEnabled {
+                isBiometricLocked = true
+                authenticateWithBiometrics()
+            }
 
         } else {
 
@@ -229,6 +252,10 @@ private extension RootView {
         ) {
 
             isAuthenticated = true
+            if biometricsEnabled {
+                isBiometricLocked = true
+                authenticateWithBiometrics()
+            }
         }
 
         print(
@@ -320,4 +347,75 @@ private struct GRUReleaseOnboardingView: View {
 #Preview {
 
     RootView()
+}
+
+// MARK: - Biometric Lock
+
+private extension RootView {
+
+    var biometricLockOverlay: some View {
+        ZStack {
+            GRUAppBackdrop()
+
+            VStack(spacing: 24) {
+                Image(systemName: "faceid")
+                    .font(.system(size: 64, weight: .light))
+                    .foregroundStyle(GRUColors.accent)
+
+                VStack(spacing: 8) {
+                    Text("gru заблокирован")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(GRUColors.text)
+
+                    Text("Для доступа требуется подтверждение личности")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                Button {
+                    authenticateWithBiometrics()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.open.fill")
+                        Text("Разблокировать")
+                    }
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(
+                        Capsule()
+                            .fill(GRUColors.accent)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+            }
+            .padding(32)
+        }
+        .transition(.opacity)
+    }
+
+    func authenticateWithBiometrics() {
+        guard biometricsEnabled && isAuthenticated else { return }
+
+        let context = LAContext()
+        var error: NSError?
+        let reason = "Разблокируйте доступ к приложению gru"
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
+                DispatchQueue.main.async {
+                    if success {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isBiometricLocked = false
+                        }
+                    }
+                }
+            }
+        } else {
+            isBiometricLocked = false
+        }
+    }
 }

@@ -37,6 +37,10 @@ struct ServerMessageDTO: Codable {
 
     let deletedAt: Date?
 
+    let isEdited: Bool?
+
+    let editedAt: Date?
+
     let reaction: ReactionType?
 
     let replyTo: ServerReplyReferenceDTO?

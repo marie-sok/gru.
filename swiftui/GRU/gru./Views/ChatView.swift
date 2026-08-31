@@ -112,6 +112,12 @@ struct ChatView: View {
 
                 messages
 
+                if let editing = vm.editingMessage {
+                    EditBar(message: editing) {
+                        vm.cancelEditing()
+                    }
+                }
+
                 if let reply = vm.replyMessage {
                     ReplyBar(message: reply) {
                         vm.cancelReply()

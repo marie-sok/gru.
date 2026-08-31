@@ -85,3 +85,49 @@ struct ReplyBar: View {
         onCancel: {}
     )
 }
+
+
+// MARK: - EditBar
+
+struct EditBar: View {
+
+    let message: Message
+
+    let onCancel: () -> Void
+
+    var body: some View {
+
+        HStack(spacing: 12) {
+
+            Rectangle()
+                .fill(GRUColors.accent)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+
+                Text("Редактирование")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(GRUColors.accent)
+
+                Text(message.text)
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                onCancel()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(GRUColors.card)
+    }
+}

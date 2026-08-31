@@ -501,6 +501,37 @@ final class MessageAPIService {
     }
 
     // MARK: ========================================
+    // MARK: EDIT MESSAGE
+    // MARK: ========================================
+
+    func editMessage(
+        messageID: String,
+        text: String,
+        token: String
+    ) async throws -> ServerMessageDTO {
+
+        struct EditMessageRequest: Codable {
+            let text: String
+        }
+
+        let body = try JSONCoding.encoder.encode(
+            EditMessageRequest(text: text)
+        )
+
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        return try JSONCoding.decoder.decode(
+            ServerMessageDTO.self,
+            from: data
+        )
+    }
+
+    // MARK: ========================================
     // MARK: DELETE MESSAGE
     // MARK: ========================================
 
@@ -526,6 +557,37 @@ final class MessageAPIService {
                 from:
                     data
             )
+    }
+
+    // MARK: ========================================
+    // MARK: EDIT MESSAGE
+    // MARK: ========================================
+
+    func editMessage(
+        messageID: String,
+        text: String,
+        token: String
+    ) async throws -> ServerMessageDTO {
+
+        struct EditMessageRequest: Codable {
+            let text: String
+        }
+
+        let body = try JSONCoding.encoder.encode(
+            EditMessageRequest(text: text)
+        )
+
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        return try JSONCoding.decoder.decode(
+            ServerMessageDTO.self,
+            from: data
+        )
     }
 
     // MARK: ========================================

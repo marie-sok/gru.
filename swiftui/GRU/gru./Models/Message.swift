@@ -32,6 +32,10 @@ struct Message: Identifiable, Codable {
 
     var reaction: ReactionType?
 
+    var isEdited: Bool = false
+
+    var editedAt: Date?
+
     // MARK: - Reply
 
     private var replyReference: MessageReference?
@@ -66,6 +70,8 @@ struct Message: Identifiable, Codable {
         deliveredAt: Date? = nil,
         readAt: Date? = nil,
         reaction: ReactionType? = nil,
+        isEdited: Bool = false,
+        editedAt: Date? = nil,
         replyTo: Message? = nil,
         attachment: Attachment? = nil
     ) {
@@ -78,7 +84,11 @@ struct Message: Identifiable, Codable {
         self.status = status
         self.deliveredAt = deliveredAt
         self.readAt = readAt
-        self.reaction = reaction
+        self.isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
+        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
+        reaction = reaction
+        self.isEdited = isEdited
+        self.editedAt = editedAt
         self.replyReference =
             replyTo.map {
                 MessageReference($0)
@@ -99,6 +109,8 @@ struct Message: Identifiable, Codable {
         case deliveredAt
         case readAt
         case reaction
+        case isEdited
+        case editedAt
         case replyTo
         case attachment
     }
@@ -160,6 +172,8 @@ struct Message: Identifiable, Codable {
                 forKey: .readAt
             )
 
+        isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
+        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
         reaction =
             try container.decodeIfPresent(
                 ReactionType.self,
@@ -236,6 +250,8 @@ struct Message: Identifiable, Codable {
             forKey: .readAt
         )
 
+        try container.encode(isEdited, forKey: .isEdited)
+        try container.encodeIfPresent(editedAt, forKey: .editedAt)
         try container.encodeIfPresent(
             reaction,
             forKey: .reaction
@@ -280,8 +296,16 @@ struct Message: Identifiable, Codable {
         readAt =
             serverMessage.readAt
 
+        isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
+        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
         reaction =
             serverMessage.reaction
+
+        isEdited =
+            serverMessage.isEdited ?? (serverMessage.editedAt != nil)
+
+        editedAt =
+            serverMessage.editedAt
 
         if var serverAttachment =
             serverMessage.attachment {

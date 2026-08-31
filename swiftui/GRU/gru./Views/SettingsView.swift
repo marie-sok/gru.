@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 import UIKit
 
@@ -361,28 +362,78 @@ private struct PrivacySettingsView: View {
 
 private struct SecuritySettingsView: View {
     @AppStorage("gru.settings.security.hideSwitcherPreview") private var hidePreview = true
+    @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
+    @State private var biometricType: String = "Face ID / Touch ID"
 
     var body: some View {
         Form {
             Section {
                 Toggle("Скрывать превью приложения", isOn: $hidePreview)
+                Toggle("Защита " + biometricType, isOn: Binding(
+                    get: { biometricsEnabled },
+                    set: { newValue in
+                        if newValue {
+                            requestBiometricAuth { success in
+                                biometricsEnabled = success
+                            }
+                        } else {
+                            biometricsEnabled = false
+                        }
+                    }
+                ))
             } header: {
-                Text("Работает сразу")
+                Text("Безопасность устройства")
             } footer: {
-                Text("Когда GRU уходит в фон/app switcher, содержимое закрывается privacy-shield.")
+                Text("При включении Face ID / Touch ID приложение запрашивает биометрию при каждом открытии.")
             }
 
             Section {
-                capability("Код-пароль GRU", "Secure lock")
-                capability("Face ID / Touch ID", "Secure lock")
+                capability("Защищённое хранилище (Keychain)", "Активно")
                 capability("Активные устройства", "Backend")
                 capability("Двухэтапная проверка", "Backend")
-                capability("Подозрительные входы", "Backend")
+                capability("Шифрование сессии", "TLS 1.3 / WSS")
             } header: {
-                Text("Следующий security-слой")
+                Text("Безопасность аккаунта")
             }
         }
         .navigationTitle("Безопасность")
+        .onAppear {
+            detectBiometricType()
+        }
+    }
+
+    private func detectBiometricType() {
+        let context = LAContext()
+        var error: NSError?
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            switch context.biometryType {
+            case .faceID:
+                biometricType = "Face ID"
+            case .touchID:
+                biometricType = "Touch ID"
+            case .opticID:
+                biometricType = "Optic ID"
+            default:
+                biometricType = "Биометрия"
+            }
+        } else {
+            biometricType = "Код-пароль / Биометрия"
+        }
+    }
+
+    private func requestBiometricAuth(completion: @escaping (Bool) -> Void) {
+        let context = LAContext()
+        var error: NSError?
+        let reason = "Подтвердите включение защиты для входа в GRU"
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
+                DispatchQueue.main.async {
+                    completion(success)
+                }
+            }
+        } else {
+            completion(false)
+        }
     }
 
     private func capability(_ title: String, _ state: String) -> some View {
