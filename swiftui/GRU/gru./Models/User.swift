@@ -23,6 +23,8 @@ struct User: Identifiable, Codable, Hashable {
 
     var isOnline: Bool
 
+    var avatarURL: String?
+
     // MARK: - Init
 
     init(
@@ -30,7 +32,8 @@ struct User: Identifiable, Codable, Hashable {
         serverID: String? = nil,
         username: String,
         displayName: String,
-        isOnline: Bool = false
+        isOnline: Bool = false,
+        avatarURL: String? = nil
     ) {
 
         self.id = id
@@ -38,5 +41,6 @@ struct User: Identifiable, Codable, Hashable {
         self.username = username
         self.displayName = displayName
         self.isOnline = isOnline
+        self.avatarURL = avatarURL
     }
 }

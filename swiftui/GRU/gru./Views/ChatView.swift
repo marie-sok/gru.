@@ -656,6 +656,7 @@ private extension ChatView {
                 .padding(.horizontal)
                 .padding(.vertical, 10)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onAppear {
                 scrollToLast(proxy: proxy, animated: false)
             }
