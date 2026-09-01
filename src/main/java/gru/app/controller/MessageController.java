@@ -1,6 +1,7 @@
 package gru.app.controller;
 
 import gru.app.dto.SendMessageRequest;
+import gru.app.dto.EditMessageRequest;
 import gru.app.model.Attachment;
 import gru.app.model.Message;
 import gru.app.service.MediaStorageService;
@@ -91,6 +92,23 @@ public class MessageController {
         );
         messages.forEach(this::broadcast);
         return messages;
+    }
+
+    // MARK: - Edit Message
+
+    @PatchMapping("/messages/{messageId}")
+    public Message editMessage(
+            Authentication authentication,
+            @PathVariable String messageId,
+            @RequestBody EditMessageRequest request
+    ) {
+        Message message = messageService.edit(
+                authentication.getName(),
+                messageId,
+                request != null ? request.resolveText() : ""
+        );
+        broadcast(message);
+        return message;
     }
 
     // MARK: - Media

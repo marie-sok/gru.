@@ -7,13 +7,19 @@ import lombok.Setter;
 @Getter
 public class EditMessageRequest {
 
+    private String text;
     private String content;
 
     public EditMessageRequest() {
     }
 
-    public EditMessageRequest(String content) {
-        this.content = content;
+    public EditMessageRequest(String text) {
+        this.text = text;
+        this.content = text;
     }
 
+    public String resolveText() {
+        if (text != null && !text.isBlank()) return text;
+        return content;
+    }
 }

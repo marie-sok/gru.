@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
 
-    @Bindable private var vm: ChatViewModel
+    @State private var vm: ChatViewModel
     @State private var socket = WebSocketService.shared
 
     @State private var showPhotoPicker = false
@@ -41,7 +41,7 @@ struct ChatView: View {
     @AppStorage private var chatBackgroundRaw: String
 
     init(chat: Chat) {
-        _vm = Bindable(wrappedValue: ChatViewModel(chat: chat))
+        _vm = State(initialValue: ChatViewModel(chat: chat))
 
         let key = chat.serverID ?? chat.id.uuidString
         _chatBackgroundRaw = AppStorage(

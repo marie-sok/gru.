@@ -2822,9 +2822,7 @@ final class ChatViewModel {
   }
 
   func saveEditedMessage() {
-    guard let target = editingMessage,
-          let serverID = target.serverID,
-          !serverID.isEmpty else {
+    guard let target = editingMessage else {
       cancelEditing()
       return
     }
@@ -2836,13 +2834,19 @@ final class ChatViewModel {
     }
 
     let token = TokenStorage.shared.token ?? ""
+    let serverID = target.serverID
     cancelEditing()
 
     // Optimistic update locally
-    if let index = chat.messages.firstIndex(where: { $0.id == target.id || $0.serverID == serverID }) {
+    if let index = chat.messages.firstIndex(where: { $0.id == target.id || ($0.serverID != nil && $0.serverID == serverID) }) {
       chat.messages[index].text = updatedText
       chat.messages[index].isEdited = true
       chat.messages[index].editedAt = Date()
+      service.update(chat)
+    }
+
+    guard let serverID = serverID, !serverID.isEmpty, !token.isEmpty else {
+      return
     }
 
     Task {
@@ -2854,10 +2858,10 @@ final class ChatViewModel {
         )
         if let index = chat.messages.firstIndex(where: { $0.id == target.id || $0.serverID == serverID }) {
           chat.messages[index].applyServerState(serverDTO)
+          service.update(chat)
         }
       } catch {
-        print("❌ Failed to edit message: \(error)")
-        actionError = "Не удалось изменить сообщение"
+        print("❌ Failed to edit message on server: \(error)")
       }
     }
   }

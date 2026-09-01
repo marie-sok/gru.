@@ -33,5 +33,9 @@ public class Message {
 
     private Attachment attachment;
 
+    private Boolean isEdited;
+
+    private Instant editedAt;
+
     private ReplyReference replyTo;
 }

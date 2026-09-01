@@ -458,24 +458,57 @@ public class MessageService {
 
     // MARK: - Edit
 
+    public Message edit(
+            String senderId,
+            String messageId,
+            String newText
+    ) {
+        requireUser(senderId);
+
+        if (messageId == null || messageId.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Message ID is required"
+            );
+        }
+
+        if (newText == null || newText.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Text is required"
+            );
+        }
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Message not found"
+                ));
+
+        if (!senderId.equals(message.getSenderId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Cannot edit someone else's message"
+            );
+        }
+
+        message.setText(newText.trim());
+        message.setIsEdited(true);
+        message.setEditedAt(Instant.now());
+
+        return messageRepository.save(message);
+    }
+
     public void editMessage(
             Message message
     ) {
-
-        if (
-                message == null ||
-                        message.getId() == null
-        ) {
-
+        if (message == null || message.getId() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Message is required"
             );
         }
-
-        messageRepository.save(
-                message
-        );
+        messageRepository.save(message);
     }
 
     // MARK: - Find By Chat
