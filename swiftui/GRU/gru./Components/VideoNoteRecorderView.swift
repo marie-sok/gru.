@@ -4,7 +4,6 @@ import Combine
 
 struct VideoNoteRecorderView: View {
     @StateObject private var recorder = VideoNoteRecorderModel()
-    @State private var didAutoStart = false
     @State private var glowPulse = false
     @State private var pendingRelease = false
     @State private var handledCancelSerial = 0
@@ -57,11 +56,6 @@ struct VideoNoteRecorderView: View {
         .onDisappear {
             recorder.shutdown()
         }
-        .onChange(of: recorder.isReady) { _, ready in
-            guard ready, !didAutoStart else { return }
-            didAutoStart = true
-            recorder.toggleRecording()
-        }
         .onChange(of: recorder.isRecording) { _, recording in
             guard recording, pendingRelease, !isLocked else { return }
 
@@ -69,7 +63,7 @@ struct VideoNoteRecorderView: View {
 
             // If camera preparation finished just after the user's release,
             // keep a tiny valid recording instead of creating a zero-byte file.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
                 guard recorder.isRecording, !isLocked else { return }
                 recorder.finishRecording()
             }
@@ -99,7 +93,7 @@ struct VideoNoteRecorderView: View {
                 recorder.cancelRecordingIfNeeded()
                 onCancel()
             } label: {
-                GRUNeonIcon(systemName: "xmark", size: 30, iconSize: 11)
+                VideoNoteRecorderNeonIcon(systemName: "xmark", size: 30, iconSize: 11)
             }
             .buttonStyle(.plain)
 
@@ -143,9 +137,9 @@ struct VideoNoteRecorderView: View {
                     isMirrored: recorder.isFrontCamera
                 )
                 .frame(width: 180, height: 194)
-                .clipShape(CatVideoNoteShape())
+                .clipShape(VideoNoteRecorderCatNoteShape())
             } else {
-                CatVideoNoteShape()
+                VideoNoteRecorderCatNoteShape()
                     .fill(.white.opacity(0.08))
                     .frame(width: 180, height: 194)
                     .overlay {
@@ -167,7 +161,7 @@ struct VideoNoteRecorderView: View {
                     }
             }
 
-            CatVideoNoteShape()
+            VideoNoteRecorderCatNoteShape()
                 .stroke(
                     GRUColors.accent.opacity(glowPulse ? 0.50 : 0.24),
                     lineWidth: 9
@@ -175,7 +169,7 @@ struct VideoNoteRecorderView: View {
                 .blur(radius: 8)
                 .frame(width: 182, height: 196)
 
-            CatVideoNoteShape()
+            VideoNoteRecorderCatNoteShape()
                 .stroke(
                     GRUColors.neonGradient,
                     lineWidth: recorder.isRecording ? 3.2 : 2.0
@@ -187,7 +181,7 @@ struct VideoNoteRecorderView: View {
                 )
 
             if recorder.isRecording {
-                CatVideoNoteShape()
+                VideoNoteRecorderCatNoteShape()
                     .trim(from: 0, to: min(max(recorder.elapsed / 60.0, 0.015), 1.0))
                     .stroke(
                         Color.red.opacity(0.92),
@@ -210,8 +204,6 @@ struct VideoNoteRecorderView: View {
                 }
                 .frame(width: 180, height: 194)
             }
-
-            CatVideoNoteEarDetails(width: 180)
 
             if isLocked {
                 VStack {
@@ -254,7 +246,7 @@ struct VideoNoteRecorderView: View {
                 recorder.cancelRecordingIfNeeded()
                 onCancel()
             } label: {
-                GRUNeonIcon(systemName: "trash.fill", size: 38, iconSize: 13)
+                VideoNoteRecorderNeonIcon(systemName: "trash.fill", size: 38, iconSize: 13)
             }
             .buttonStyle(.plain)
 
@@ -262,7 +254,29 @@ struct VideoNoteRecorderView: View {
                 pendingRelease = false
                 recorder.finishRecording()
             } label: {
-                GRUNeonIcon(systemName: "paperplane.fill", size: 52, iconSize: 21)
+                ZStack {
+                    Circle()
+                        .fill(GRUColors.card.opacity(0.92))
+                        .frame(width: 52, height: 52)
+
+                    Circle()
+                        .stroke(
+                            GRUColors.neonGradient,
+                            lineWidth: 1.6
+                        )
+                        .frame(width: 52, height: 52)
+
+                    VideoNoteRecorderEnvelopeShape()
+                        .stroke(
+                            GRUColors.accent,
+                            style: StrokeStyle(
+                                lineWidth: 2.0,
+                                lineCap: .round,
+                                lineJoin: .round
+                            )
+                        )
+                        .frame(width: 23, height: 18)
+                }
             }
             .buttonStyle(.plain)
             .disabled(!recorder.isRecording)
@@ -271,8 +285,8 @@ struct VideoNoteRecorderView: View {
             Button {
                 recorder.flipCamera()
             } label: {
-                GRUNeonIcon(
-                    systemName: "arrow.triangle.2.circlepath.camera.fill",
+                VideoNoteRecorderNeonIcon(
+                    systemName: "camera.rotate.fill",
                     size: 38,
                     iconSize: 13
                 )
@@ -348,7 +362,7 @@ final class VideoNoteRecorderModel:
                     for: .video
                 )
 
-            let audioAllowed =
+            _ =
                 await Self.requestAccess(
                     for: .audio
                 )
@@ -358,13 +372,6 @@ final class VideoNoteRecorderModel:
                     self.isPreparing = false
                     self.errorText =
                         "Разреши доступ к камере в Настройках"
-                    return
-                }
-
-                guard audioAllowed else {
-                    self.isPreparing = false
-                    self.errorText =
-                        "Разреши доступ к микрофону в Настройках"
                     return
                 }
 
@@ -396,9 +403,7 @@ final class VideoNoteRecorderModel:
 
     private func configureAndStartSession() {
         sessionQueue.async { [weak self] in
-            guard let self else {
-                return
-            }
+            guard let self else { return }
 
             do {
                 if !self.isSessionConfigured {
@@ -406,33 +411,89 @@ final class VideoNoteRecorderModel:
                     self.isSessionConfigured = true
                 }
 
-                // IMPORTANT:
-                // startRunning is intentionally AFTER commitConfiguration,
-                // and executes on the same serial sessionQueue.
-                if !self.session.isRunning {
-                    self.session.startRunning()
-                }
+                print(
+                    "🐱 VIDEO NOTE: configured inputs=",
+                    self.session.inputs.count,
+                    "outputs=",
+                    self.session.outputs.count
+                )
 
-                let running = self.session.isRunning
-                let isFront =
-                    self.currentVideoInput?.device.position == .front
-
-                DispatchQueue.main.async {
-                    self.isPreparing = false
-                    self.isReady = running
-                    self.isFrontCamera = isFront
-                    self.errorText =
-                        running
-                            ? nil
-                            : "Не удалось запустить камеру"
-                }
+                self.startSessionWithRetry(attempt: 0)
             } catch {
+                print(
+                    "❌ VIDEO NOTE: configure session error:",
+                    error
+                )
+
                 DispatchQueue.main.async {
                     self.isPreparing = false
                     self.isReady = false
-                    self.errorText = error.localizedDescription
+                    self.errorText =
+                        "Не удалось настроить камеру: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+
+    private func startSessionWithRetry(
+        attempt: Int
+    ) {
+        dispatchPrecondition(
+            condition: .onQueue(sessionQueue)
+        )
+
+        if !session.isRunning {
+            print(
+                "🐱 VIDEO NOTE: startRunning attempt",
+                attempt + 1
+            )
+            session.startRunning()
+        }
+
+        if session.isRunning {
+            let isFront =
+                currentVideoInput?.device.position == .front
+
+            print(
+                "✅ VIDEO NOTE: CAPTURE SESSION RUNNING"
+            )
+
+            DispatchQueue.main.async {
+                self.isPreparing = false
+                self.isReady = true
+                self.isFrontCamera = isFront
+                self.errorText = nil
+            }
+
+            sessionQueue.asyncAfter(
+                deadline: .now() + 0.18
+            ) { [weak self] in
+                self?.startRecordingOnSessionQueue()
+            }
+
+            return
+        }
+
+        guard attempt < 5 else {
+            print(
+                "❌ VIDEO NOTE: session failed to start after retries"
+            )
+
+            DispatchQueue.main.async {
+                self.isPreparing = false
+                self.isReady = false
+                self.errorText =
+                    "Камера не запустилась"
+            }
+            return
+        }
+
+        sessionQueue.asyncAfter(
+            deadline: .now() + 0.30
+        ) { [weak self] in
+            self?.startSessionWithRetry(
+                attempt: attempt + 1
+            )
         }
     }
 
@@ -472,17 +533,29 @@ final class VideoNoteRecorderModel:
             session.addInput(videoInput)
             currentVideoInput = videoInput
 
-            if let audioDevice =
-                AVCaptureDevice.default(
+            if
+                AVCaptureDevice.authorizationStatus(
                     for: .audio
-                ) {
-                let audioInput =
-                    try AVCaptureDeviceInput(
-                        device: audioDevice
+                ) == .authorized,
+                let audioDevice =
+                    AVCaptureDevice.default(
+                        for: .audio
                     )
+            {
+                do {
+                    let audioInput =
+                        try AVCaptureDeviceInput(
+                            device: audioDevice
+                        )
 
-                if session.canAddInput(audioInput) {
-                    session.addInput(audioInput)
+                    if session.canAddInput(audioInput) {
+                        session.addInput(audioInput)
+                    }
+                } catch {
+                    print(
+                        "⚠️ VIDEO NOTE: mic unavailable; video continues:",
+                        error
+                    )
                 }
             }
 
@@ -559,9 +632,68 @@ final class VideoNoteRecorderModel:
         }
     }
 
-    private func startRecording() {
-        guard isReady else {
+    func startRecordingIfNeeded() {
+        guard !isRecording else { return }
+        startRecording()
+    }
+
+    private func startRecordingOnSessionQueue() {
+        dispatchPrecondition(
+            condition: .onQueue(sessionQueue)
+        )
+
+        guard session.isRunning else { return }
+
+        guard !movieOutput.isRecording else {
             return
+        }
+
+        guard
+            let connection =
+                movieOutput.connection(with: .video),
+            connection.isEnabled
+        else {
+            print(
+                "❌ VIDEO NOTE: no active video connection"
+            )
+            DispatchQueue.main.async {
+                self.errorText =
+                    "Нет активного видеоканала"
+            }
+            return
+        }
+
+        configurePortraitRotation(on: connection)
+        configureMirroring(
+            on: connection,
+            mirrored:
+                currentVideoInput?.device.position == .front
+        )
+
+        if
+            AVCaptureDevice.authorizationStatus(
+                for: .audio
+            ) == .authorized
+        {
+            do {
+                let audioSession =
+                    AVAudioSession.sharedInstance()
+
+                try audioSession.setCategory(
+                    .playAndRecord,
+                    mode: .videoRecording,
+                    options: [
+                        .defaultToSpeaker,
+                        .allowBluetoothHFP
+                    ]
+                )
+                try audioSession.setActive(true)
+            } catch {
+                print(
+                    "⚠️ VIDEO NOTE: audio session error; video continues:",
+                    error
+                )
+            }
         }
 
         let url =
@@ -572,50 +704,39 @@ final class VideoNoteRecorderModel:
                 )
                 .appendingPathExtension("mov")
 
-        try? FileManager.default.removeItem(
-            at: url
-        )
+        try? FileManager.default.removeItem(at: url)
 
         recordingURL = url
         didCancelRecording = false
-        elapsed = 0
 
+        DispatchQueue.main.async {
+            self.elapsed = 0
+            self.errorText = nil
+        }
+
+        print(
+            "🐱 VIDEO NOTE: movieOutput.startRecording ->",
+            url.lastPathComponent
+        )
+
+        movieOutput.startRecording(
+            to: url,
+            recordingDelegate: self
+        )
+    }
+
+    private func startRecording() {
         sessionQueue.async { [weak self] in
-            guard let self else {
+            guard let self else { return }
+
+            if !self.session.isRunning {
+                self.startSessionWithRetry(
+                    attempt: 0
+                )
                 return
             }
 
-            guard
-                self.session.isRunning,
-                !self.movieOutput.isRecording
-            else {
-                return
-            }
-
-            if let connection =
-                self.movieOutput.connection(
-                    with: .video
-                )
-            {
-                self.configurePortraitRotation(
-                    on: connection
-                )
-                self.configureMirroring(
-                    on: connection,
-                    mirrored:
-                        self.currentVideoInput?.device.position == .front
-                )
-            }
-
-            self.movieOutput.startRecording(
-                to: url,
-                recordingDelegate: self
-            )
-
-            DispatchQueue.main.async {
-                self.isRecording = true
-                self.startTimer()
-            }
+            self.startRecordingOnSessionQueue()
         }
     }
 
@@ -806,6 +927,23 @@ final class VideoNoteRecorderModel:
 
     nonisolated func fileOutput(
         _ output: AVCaptureFileOutput,
+        didStartRecordingTo fileURL: URL,
+        from connections: [AVCaptureConnection]
+    ) {
+        Task { @MainActor in
+            self.isRecording = true
+            self.errorText = nil
+            self.startTimer()
+
+            print(
+                "✅ VIDEO NOTE: REAL RECORDING STARTED ->",
+                fileURL.lastPathComponent
+            )
+        }
+    }
+
+    nonisolated func fileOutput(
+        _ output: AVCaptureFileOutput,
         didFinishRecordingTo outputFileURL: URL,
         from connections: [AVCaptureConnection],
         error: Error?
@@ -823,6 +961,11 @@ final class VideoNoteRecorderModel:
             }
 
             if let error {
+                print(
+                    "❌ VIDEO NOTE: recording finished with error:",
+                    error
+                )
+
                 let nsError = error as NSError
                 let finishedSuccessfully =
                     nsError.userInfo[
@@ -865,6 +1008,162 @@ private enum RecorderError: LocalizedError {
         case .cannotAddMovieOutput:
             return "Не удалось запустить запись видео"
         }
+    }
+}
+
+private struct VideoNoteRecorderNeonIcon: View {
+    @AppStorage("gru.settings.appearance.neonGlow") private var neonGlow = true
+    @AppStorage("gru.settings.accessibility.highContrast") private var highContrast = false
+
+    let systemName: String
+    var size: CGFloat = 40
+    var iconSize: CGFloat = 17
+    var isActive: Bool = true
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(GRUColors.card.opacity(0.94))
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            GRUColors.accent.opacity(isActive && neonGlow ? 0.20 : 0.04),
+                            GRUColors.card.opacity(0.18)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.54
+                    )
+                )
+
+            Circle()
+                .fill(GRUColors.accent.opacity(isActive ? 0.055 : 0.018))
+                .padding(2)
+
+            Circle()
+                .stroke(
+                    GRUColors.neonGradient,
+                    lineWidth: highContrast ? 2.2 : (isActive && neonGlow ? 1.55 : 0.72)
+                )
+                .opacity(isActive ? 1 : (highContrast ? 0.55 : 0.24))
+
+            Circle()
+                .stroke(GRUColors.accent.opacity(isActive && neonGlow ? 0.20 : 0.04), lineWidth: 5)
+                .blur(radius: 5)
+
+            Image(systemName: systemName)
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(isActive ? GRUColors.accent : .secondary)
+                .shadow(
+                    color: GRUColors.accent.opacity(isActive && neonGlow ? 0.36 : 0),
+                    radius: isActive && neonGlow ? 4 : 0
+                )
+        }
+        .frame(width: size, height: size)
+        .shadow(
+            color: GRUColors.accent.opacity(isActive && neonGlow ? 0.20 : 0.02),
+            radius: isActive && neonGlow ? 9 : 1
+        )
+        .shadow(
+            color: GRUColors.accentSecondary.opacity(isActive && neonGlow ? 0.12 : 0),
+            radius: isActive && neonGlow ? 15 : 0
+        )
+    }
+}
+
+private struct VideoNoteRecorderEnvelopeShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let w = rect.width
+        let h = rect.height
+
+        path.move(to: CGPoint(x: 0, y: h * 0.18))
+        path.addLine(to: CGPoint(x: w, y: h * 0.18))
+        path.addLine(to: CGPoint(x: w, y: h))
+        path.addLine(to: CGPoint(x: 0, y: h))
+        path.closeSubpath()
+
+        path.move(to: CGPoint(x: 0, y: h * 0.18))
+        path.addLine(to: CGPoint(x: w / 2, y: h * 0.60))
+        path.addLine(to: CGPoint(x: w, y: h * 0.18))
+
+        path.move(to: CGPoint(x: 0, y: h))
+        path.addLine(to: CGPoint(x: w / 2, y: h * 0.55))
+        path.addLine(to: CGPoint(x: w, y: h))
+
+        return path
+    }
+}
+
+private struct VideoNoteRecorderCatNoteShape: InsettableShape {
+    var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let bounds = rect.insetBy(dx: insetAmount, dy: insetAmount)
+
+        guard bounds.width > 0, bounds.height > 0 else {
+            return Path()
+        }
+
+        let diameter = min(bounds.width, bounds.height * 0.925)
+        let radius = diameter / 2
+
+        let headRect = CGRect(
+            x: bounds.midX - radius,
+            y: bounds.maxY - diameter,
+            width: diameter,
+            height: diameter
+        )
+
+        let cx = headRect.midX
+        let cy = headRect.midY
+        let r = radius
+
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: cx + r * x, y: cy + r * y)
+        }
+
+        var path = Path()
+
+        path.move(to: point(0.0, 1.0))
+        path.addCurve(to: point(-1.0, 0.0), control1: point(-0.56, 1.0), control2: point(-1.0, 0.56))
+        path.addCurve(to: point(-0.82, -0.56), control1: point(-1.0, -0.25), control2: point(-0.94, -0.43))
+        path.addCurve(
+            to: CGPoint(x: cx - r * 0.56, y: bounds.minY + max(1, insetAmount)),
+            control1: point(-0.78, -0.71),
+            control2: CGPoint(x: cx - r * 0.68, y: bounds.minY + r * 0.03)
+        )
+        path.addCurve(
+            to: point(-0.28, -0.82),
+            control1: CGPoint(x: cx - r * 0.43, y: bounds.minY + r * 0.02),
+            control2: point(-0.34, -0.74)
+        )
+        path.addCurve(to: point(0.28, -0.82), control1: point(-0.12, -0.93), control2: point(0.12, -0.93))
+        path.addCurve(
+            to: CGPoint(x: cx + r * 0.56, y: bounds.minY + max(1, insetAmount)),
+            control1: point(0.34, -0.74),
+            control2: CGPoint(x: cx + r * 0.43, y: bounds.minY + r * 0.02)
+        )
+        path.addCurve(
+            to: point(0.82, -0.56),
+            control1: CGPoint(x: cx + r * 0.68, y: bounds.minY + r * 0.03),
+            control2: point(0.78, -0.71)
+        )
+        path.addCurve(to: point(1.0, 0.0), control1: point(0.94, -0.43), control2: point(1.0, -0.25))
+        path.addCurve(to: point(0.0, 1.0), control1: point(1.0, 0.56), control2: point(0.56, 1.0))
+
+        path.closeSubpath()
+
+        return path
+    }
+
+    func inset(by amount: CGFloat) -> some InsettableShape {
+        var copy = self
+        copy.insetAmount += amount
+        return copy
     }
 }
 
