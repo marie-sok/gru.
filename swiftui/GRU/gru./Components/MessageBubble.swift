@@ -156,6 +156,46 @@ struct MessageBubble: View {
         .contextMenu {
             messageActions
         }
+        .offset(x: dragOffset)
+        .overlay(alignment: .trailing) {
+            if dragOffset < -10 {
+                Image(systemName: "arrowshape.turn.up.left.circle.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(GRUColors.accent)
+                    .opacity(min(1.0, Double(-dragOffset) / 45.0))
+                    .scaleEffect(min(1.1, max(0.5, Double(-dragOffset) / 45.0)))
+                    .padding(.trailing, 6)
+                    .allowsHitTesting(false)
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { value in
+                    guard !isSelectionMode else { return }
+                    if value.translation.width < 0 && abs(value.translation.width) > abs(value.translation.height) {
+                        let translation = value.translation.width
+                        if translation < -50 {
+                            dragOffset = -50 + (translation + 50) * 0.2
+                        } else {
+                            dragOffset = translation
+                        }
+
+                        if translation < -45 && !hasTriggeredReplyHaptic {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            hasTriggeredReplyHaptic = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    if hasTriggeredReplyHaptic {
+                        onReply(message)
+                    }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        dragOffset = 0
+                        hasTriggeredReplyHaptic = false
+                    }
+                }
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             if isSelectionMode {

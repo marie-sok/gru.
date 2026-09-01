@@ -26,6 +26,8 @@ struct ChatListView: View {
 
     @State
     private var socket = WebSocketService.shared
+    @State
+    private var network = NetworkMonitor.shared
 
     // MARK: - New Chat
 
@@ -530,7 +532,7 @@ struct ChatListView: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
 
-                if service.chatLoadingError != nil || service.isUsingCachedChats {
+                if !network.isConnected || service.chatLoadingError != nil || service.isUsingCachedChats {
                     connectionBanner
                         .padding(.horizontal, 14)
                 }
@@ -544,12 +546,14 @@ struct ChatListView: View {
 
     private var connectionBanner: some View {
 
+        let isOffline = !network.isConnected
+
         HStack(
             spacing: 11
         ) {
 
             GRUNeonIcon(
-                systemName: "wifi.exclamationmark",
+                systemName: isOffline ? "wifi.slash" : "wifi.exclamationmark",
                 size: 34,
                 iconSize: 13,
                 isActive: false
@@ -561,16 +565,20 @@ struct ChatListView: View {
             ) {
 
                 Text(
-                    service.isUsingCachedChats
-                        ? "Показан сохранённый список"
-                        : "Backend временно недоступен"
+                    isOffline
+                        ? "Ожидание сети..."
+                        : (service.isUsingCachedChats
+                            ? "Показан сохранённый список"
+                            : "Backend временно недоступен")
                 )
                 .font(
                     .caption.weight(.semibold)
                 )
 
                 Text(
-                    connectionSubtitle
+                    isOffline
+                        ? "Поиск подключения к интернету"
+                        : connectionSubtitle
                 )
                 .font(
                     .caption2
