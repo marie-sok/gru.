@@ -1,18 +1,15 @@
 # gru.
 
-**gru.** is a private, expressive messenger focused on close communication, a distinct visual language, and lightweight real-time interaction.
+**gru.** is a private, expressive messenger for close communication — a native iOS experience with its own visual language, realtime messaging and lightweight media flows.
 
-> **Status:** `0.9.0` closed-beta preparation. The active release target is the native iOS app in SwiftUI.
+> **Status:** `0.9.0` closed-beta preparation. The active release target is the native SwiftUI iOS app.
 
-## Product direction
+## Product
 
-gru. is being built around personal communication rather than feature-count competition: chats, media, voice, branded cat video notes, expressive themes, contacts, and a focused AI layer.
-
-The current beta scope includes:
+The first beta is intentionally focused on the core messenger experience:
 
 - authentication and session persistence;
-- chat list and one-to-one chats;
-- realtime messaging over WebSocket/STOMP;
+- one-to-one chats and realtime messaging;
 - reply, edit and delete flows;
 - photo, video, document and contact attachments;
 - voice messages;
@@ -21,56 +18,61 @@ The current beta scope includes:
 - per-chat appearance and app themes;
 - optional `gru.bot` integration.
 
-Calls, GRU Pulse and Music/Purr Library are intentionally outside the first beta scope.
+Calls, GRU Pulse and Music/Purr Library are outside the first beta scope.
 
-## Current stack
+## Active stack
 
-### iOS client
+### iOS
 
 - Swift / SwiftUI
 - iOS 17+
+- AVFoundation
+- REST API
+- WebSocket / STOMP
 - Xcode project: `swiftui/GRU/gru..xcodeproj`
 - scheme: `gru`
 - bundle identifier: `sok.com.gru`
-- REST API + WebSocket/STOMP
-- AVFoundation for voice/video capture
 
 ### Backend
 
 - Java 21
-- Spring Boot 3.2.x
-- REST API
-- Spring WebSocket / STOMP
+- Spring Boot
 - Spring Security + JWT
+- REST API
+- WebSocket / STOMP
 - MongoDB
 - Maven
 
-The repository also contains older Flutter/Android and experimental materials. They are retained for history/reference, but **the SwiftUI iOS client is the active beta target**.
-
-## Repository map
+## Repository layout
 
 ```text
 .
 ├── swiftui/GRU/                 # Active native iOS client
 │   ├── gru..xcodeproj
-│   └── gru./                    # SwiftUI application source
-├── src/                         # Spring backend source where present
-├── pom.xml                      # Spring Boot / Maven configuration
-├── android/                     # Legacy / experimental Android material
-├── lib/                         # Legacy Flutter source
-├── BETA_0.9.0.md                # Beta freeze and acceptance checklist
-├── AUTHORS.md                   # Authorship and maintainership
+│   ├── gru./                    # SwiftUI application source
+│   ├── gru.Tests/
+│   └── gru.UITests/
+├── src/                         # Spring Boot backend
+├── pom.xml                      # Maven build
+├── Dockerfile
+├── docker-compose.yml
+├── docs/                        # Architecture and repository notes
+├── BETA_0.9.0.md                # Beta acceptance checklist
+├── AUTHORS.md                   # Project authorship
+├── SECURITY.md                  # Security reporting policy
 └── README.md
 ```
+
+Old Flutter, generated IDE/tooling output and abandoned web experiments are not part of the beta branch. Their previous versions remain available through Git history.
 
 ## Run the iOS app
 
 1. Open `swiftui/GRU/gru..xcodeproj` in Xcode.
 2. Select scheme `gru`.
-3. Select a physical iPhone for camera, microphone and video-note testing.
+3. Select a **physical iPhone** for camera, microphone and video-note testing.
 4. Build and run with `⌘R`.
 
-For TestFlight/Release, the app must use production HTTPS/WSS endpoints rather than localhost or a developer-LAN address.
+For TestFlight/Release, the app must use production HTTPS/WSS endpoints instead of localhost or a developer-LAN address.
 
 ## Run the backend
 
@@ -80,42 +82,34 @@ Requirements: Java 21 and Maven.
 mvn spring-boot:run
 ```
 
-Production configuration, credentials and secrets must be supplied through deployment configuration/environment variables and must not be committed to the repository.
+Production credentials and secrets must be supplied through deployment configuration or environment variables. They must never be committed to the repository.
 
 ## Beta 0.9.0
 
-The beta branch is:
+Active beta branch:
 
 ```text
 beta/0.9.0
 ```
 
-Beta readiness and blocker criteria are tracked in [`BETA_0.9.0.md`](./BETA_0.9.0.md).
+Readiness criteria are tracked in [`BETA_0.9.0.md`](./BETA_0.9.0.md).
 
 Current P0 focus:
 
 1. stable cat-video recording on a physical iPhone;
 2. production HTTPS/WSS transport for TestFlight;
 3. clean-install/login/session/reconnect stability;
-4. message send/receive/edit/delete and media smoke tests.
-
-## Security
-
-Do not commit:
-
-- API keys;
-- JWT signing secrets;
-- production credentials;
-- private certificates or provisioning files;
-- `.env` files containing secrets.
+4. message and media smoke tests on real devices.
 
 ## Authorship
 
 **Created and developed by Marie Sok (`@marie-sok`).**
 
-Primary author, product creator and repository maintainer: **Marie Sok**.
+Marie Sok is the creator of **gru.**, primary product author, designer/developer and repository maintainer. See [`AUTHORS.md`](./AUTHORS.md).
 
-See [`AUTHORS.md`](./AUTHORS.md) for the authorship statement.
+## License
+
+Copyright © 2026 Marie Sok. All rights reserved. See [`LICENSE`](./LICENSE).
 
 ---
 

@@ -24,18 +24,28 @@ target/
 .gradle/
 **/build/
 local.properties
+android/local.properties
 *.jks
 *.keystore
 *.apk
 *.aab
 
-# Flutter / Dart
+# Flutter / Dart legacy output
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.metadata
 .packages
 .pub-cache/
 build/
+**/Flutter/Generated.xcconfig
+**/Flutter/ephemeral/
+**/Flutter/flutter_export_environment.sh
+**/GeneratedPluginRegistrant.*
+
+# Generated exports / diagnostics
+exportToHTML/
+nohup.log
 
 # IDEs
 .idea/
