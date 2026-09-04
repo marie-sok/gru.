@@ -119,4 +119,4 @@ See [`AUTHORS.md`](./AUTHORS.md) for the authorship statement.
 
 ---
 
-**gru. — Для своих.**
+**gru. — For your people.**
