@@ -628,6 +628,9 @@ private extension ChatView {
                             onReply: { message in
                                 vm.startReply(to: message)
                             },
+                            onEdit: { message in
+                                vm.startEditing(message)
+                            },
                             onDeleteLocal: { message in
                                 vm.deleteLocal(message)
                             },

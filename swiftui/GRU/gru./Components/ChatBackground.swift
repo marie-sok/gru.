@@ -221,8 +221,8 @@ struct ChatBackgroundView: View {
                         let y = CGFloat(index) * 62 + 18
                         var line = Path()
                         line.move(to: CGPoint(x: 0, y: y))
-                        line.addLine(to: CGPoint(x: min(size.width, 34 + CGFloat(index % 4) * 30), y))
-                        line.addLine(to: CGPoint(x: min(size.width, 34 + CGFloat(index % 4) * 30), y + 18))
+                        line.addLine(to: CGPoint(x: min(size.width, 34 + CGFloat(index % 4) * 30), y: y))
+                        line.addLine(to: CGPoint(x: min(size.width, 34 + CGFloat(index % 4) * 30), y: y + 18))
                         context.stroke(line, with: .color(GRUColors.accentSecondary.opacity(0.12)), lineWidth: 0.9)
                     }
                 }

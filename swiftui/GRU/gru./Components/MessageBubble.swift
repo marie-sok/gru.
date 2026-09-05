@@ -10,6 +10,8 @@ private enum MessageDeleteScope: Equatable {
 struct MessageBubble: View {
 
     @State private var pendingDeleteScope: MessageDeleteScope?
+    @State private var dragOffset: CGFloat = 0
+    @State private var hasTriggeredReplyHaptic = false
 
     @AppStorage("gru.settings.chats.swipeReply") private var swipeReplyEnabled = true
     @AppStorage("gru.settings.chats.quickReactions") private var quickReactions = true
@@ -19,6 +21,8 @@ struct MessageBubble: View {
     let isCurrentUser: Bool
 
     let onReply: (Message) -> Void
+
+    let onEdit: (Message) -> Void
 
     let onDeleteLocal: (Message) -> Void
 
@@ -171,7 +175,7 @@ struct MessageBubble: View {
         .gesture(
             DragGesture(minimumDistance: 20)
                 .onChanged { value in
-                    guard !isSelectionMode else { return }
+                    guard swipeReplyEnabled, !isSelectionMode else { return }
                     if value.translation.width < 0 && abs(value.translation.width) > abs(value.translation.height) {
                         let translation = value.translation.width
                         if translation < -50 {
@@ -213,19 +217,6 @@ struct MessageBubble: View {
         }
         .background(
             isSelected ? GRUColors.accent.opacity(0.08) : Color.clear
-        )
-        .gesture(
-
-            DragGesture(
-                minimumDistance: 30
-            )
-            .onEnded { value in
-                guard swipeReplyEnabled, !isSelectionMode else { return }
-
-                if value.translation.width > 60 {
-                    onReply(message)
-                }
-            }
         )
         .confirmationDialog(
             "Удалить сообщение?",
@@ -276,7 +267,7 @@ struct MessageBubble: View {
             )
         }
 
-                if isCurrentUser && !message.text.isEmpty && message.status != .sending && message.status != .failed {
+        if isCurrentUser && !message.text.isEmpty && message.status != .sending && message.status != .failed {
             Button {
                 onEdit(message)
             } label: {
