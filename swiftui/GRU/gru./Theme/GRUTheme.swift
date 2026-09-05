@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 
 enum GRUAppTheme: String, CaseIterable, Identifiable {
+    // Legacy cases stay decodable so old installations do not crash while
+    // migrating, but only GRUThemePolicy/customThemes are user-selectable.
     case ultraviolet
     case cyberMint
     case electricRose
@@ -22,12 +24,10 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     static var current: GRUAppTheme {
         let rawValue = UserDefaults.standard.string(forKey: GRUTheme.selectionKey)
-        return GRUAppTheme(rawValue: rawValue ?? "") ?? .blackMoonCat
+        let selected = GRUAppTheme(rawValue: rawValue ?? "") ?? .blackMoonCat
+        return customThemes.contains(selected) ? selected : .blackMoonCat
     }
 
-    /// Themes intentionally designed for GRU. There is no generic/default
-    /// theme in the picker; the first signature theme is the migration target
-    /// for old installations that stored the removed `obsidian` value.
     static let customThemes: [GRUAppTheme] = [
         .blackMoonCat,
         .neonCatDemon,
@@ -36,14 +36,8 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         .cyberMidnight,
         .ultravioletUnicorn,
         .powderPrincess,
-        .ironKnight,
         .greenAcidMonster,
-        .midnightGold,
-        .acidLime,
-        .electricRose,
-        .cyberMint,
-        .ultraviolet,
-        .arcticSignal
+        .ironKnight
     ]
 
     var title: String {
@@ -62,7 +56,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .ironKnight: return "Iron Knight"
         case .bloodDragon: return "Blood Dragon"
         case .greenAcidMonster: return "Green Acid Monster"
-        case .neonCatDemon: return "Neon Cat Demon"
+        case .neonCatDemon: return "Neon Demon Cat"
         }
     }
 
@@ -82,7 +76,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .ironKnight: return "Сталь, щиты и холодные клинки"
         case .bloodDragon: return "Кровавое пламя, когти и драконьи дуги"
         case .greenAcidMonster: return "Ядовитые глаза, слизь и рейв-кислота"
-        case .neonCatDemon: return "Демонический кот, рога, руны и фиолетовый огонь"
+        case .neonCatDemon: return "Демонический кот, руны и фиолетовый огонь"
         }
     }
 
@@ -92,7 +86,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .cyberMint: return "bolt.fill"
         case .electricRose: return "heart.fill"
         case .arcticSignal: return "snowflake"
-        case .acidLime: return "drop.triangle.fill"
+        case .acidLime: return "drop.fill"
         case .midnightGold: return "crown.fill"
         case .ultravioletUnicorn: return "wand.and.stars.inverse"
         case .powderPrincess: return "crown.fill"
@@ -197,7 +191,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
     var wallpaperSymbols: [String] {
         switch self {
         case .ultraviolet: return ["sparkles", "wave.3.right", "bolt.fill"]
-        case .cyberMint: return ["cpu.fill", "bolt.fill", "point.3.connected.trianglepath.dotted"]
+        case .cyberMint: return ["cpu.fill", "bolt.fill", "circle.hexagongrid.fill"]
         case .electricRose: return ["heart.fill", "bolt.heart.fill", "sparkles"]
         case .arcticSignal: return ["snowflake", "diamond.fill", "wind"]
         case .acidLime: return ["drop.fill", "bolt.fill", "atom"]
@@ -208,7 +202,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .cyberMidnight: return ["cpu.fill", "terminal.fill", "circle.grid.cross.fill"]
         case .blackMoonCat: return ["cat.fill", "moon.fill", "pawprint.fill"]
         case .ironKnight: return ["shield.fill", "bolt.shield.fill", "diamond.fill"]
-        case .bloodDragon: return ["flame.fill", "bolt.fill", "triangle.fill"]
+        case .bloodDragon: return ["flame.fill", "bolt.fill", "sparkles"]
         case .greenAcidMonster: return ["eye.fill", "drop.fill", "burst.fill"]
         case .neonCatDemon: return ["cat.fill", "flame.fill", "eye.fill"]
         }
@@ -228,7 +222,8 @@ struct GRUAppBackdrop: View {
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
     private var theme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat
+        let selected = GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat
+        return GRUAppTheme.customThemes.contains(selected) ? selected : .blackMoonCat
     }
 
     var body: some View {
@@ -450,7 +445,7 @@ struct GRUSignatureWallpaper: View {
                 Image(systemName: "shield.fill").font(.system(size: 120)).foregroundStyle(theme.accent.opacity(0.07 * intensity))
                 Image(systemName: "bolt.shield.fill").font(.system(size: 58)).foregroundStyle(theme.secondaryAccent.opacity(0.08 * intensity))
             }
-            .offset(x: size.width * 0.20, y: -size.height * 0.16)
+            .offset(x: size.width * 0.20, y: -size.height * 0.16 + CGFloat(sin(phase * 0.55)) * 4)
 
         default:
             ZStack {
