@@ -25,8 +25,9 @@ private struct GRUAgentMessage: Identifiable, Codable {
 }
 
 private enum GRUAgentHistoryStore {
-    static let key = "gru.bot.dialog.v4"
+    static let key = "gru.bot.dialog.v5"
     private static let legacyKeys = [
+        "gru.bot.dialog.v4",
         "gru.bot.dialog.v3",
         "gru.bot.history.v2",
         "gru.bot.dialog.v1"
@@ -35,7 +36,7 @@ private enum GRUAgentHistoryStore {
     static func welcome() -> GRUAgentMessage {
         GRUAgentMessage(
             author: .bot,
-            text: "Я gru.bot ✦ Можем просто поболтать, разобрать задачу или собрать план по шагам."
+            text: "Я gru.bot ✦ Теперь умею не только отвечать, но и выполнять команды приложения: менять темы, включать живой фон, открывать чаты, людей, настройки и test lab."
         )
     }
 
@@ -111,7 +112,7 @@ struct GRUAgentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("gru.bot")
                     .font(.headline)
-                Text(isSending ? "думает…" : "AI • chat + planner")
+                Text(isSending ? "выполняет…" : "AI • chat • actions")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -181,7 +182,7 @@ struct GRUAgentView: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(GRUColors.accent)
-                            Text("gru.bot думает…")
+                            Text("gru.bot выполняет…")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -204,9 +205,11 @@ struct GRUAgentView: View {
     private var quickPrompts: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                promptButton("Включи Blood Dragon", icon: "flame.fill")
+                promptButton("Следующая тема", icon: "paintpalette.fill")
+                promptButton("Открой test lab", icon: "testtube.2")
+                promptButton("Открой настройки", icon: "gearshape.fill")
                 promptButton("Составь план", icon: "checklist")
-                promptButton("Помоги подумать", icon: "brain.head.profile")
-                promptButton("Просто поболтаем", icon: "bubble.left.and.bubble.right.fill")
             }
         }
         .padding(.bottom, 2)
@@ -241,7 +244,7 @@ struct GRUAgentView: View {
             }
 
             HStack(spacing: 9) {
-                TextField("Сообщение gru.bot", text: $text, axis: .vertical)
+                TextField("Команда или сообщение", text: $text, axis: .vertical)
                     .focused($inputFocused)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
@@ -334,7 +337,7 @@ struct GRUAgentCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("gru.bot")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text("поболтать • подумать • спланировать")
+                    Text("AI • темы • навигация • test lab")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
