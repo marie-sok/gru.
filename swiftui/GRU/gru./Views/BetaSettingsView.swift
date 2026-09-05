@@ -161,10 +161,10 @@ private enum BetaThemeName {
         switch theme {
         case .blackMoonCat: return "Black Moon Cat"
         case .neonCatDemon: return "Neon Demon Cat"
-        case .bloodDragon: return "Blood Dragon"
+        case .bloodDragon: return "Fold-Eared Cat Dragon"
         case .forestWitch: return "Forest Witch"
         case .cyberMidnight: return "Cyber Midnight"
-        case .ultravioletUnicorn: return "Ultraviolet Unicorn"
+        case .ultravioletUnicorn: return "Ultraviolet Caticorn"
         case .powderPrincess: return "Powder Princess"
         case .greenAcidMonster: return "Green Acid Monster"
         case .ironKnight: return "Iron Knight"
@@ -211,8 +211,8 @@ private struct GRUBetaThemesView: View {
                         UISelectionFeedbackGenerator().selectionChanged()
                     } label: {
                         HStack(spacing: 12) {
-                            GRUSignatureWallpaper(theme: theme, intensity: 1.0)
-                                .frame(width: 74, height: 58)
+                            GRUSignatureWallpaper(theme: theme, intensity: 1.0, animated: false)
+                                .frame(width: 74, height: 124)
                                 .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 17, style: .continuous)

@@ -253,7 +253,7 @@ struct ChatBackgroundPicker: View {
                             dismiss()
                         } label: {
                             ZStack(alignment: .bottomLeading) {
-                                GRUSignatureWallpaper(theme: style, intensity: 0.92)
+                                GRUSignatureWallpaper(theme: style, intensity: 0.92, animated: false)
                                     .frame(height: 150)
                                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 

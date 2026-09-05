@@ -48,13 +48,13 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return "Arctic Signal"
         case .acidLime: return "Acid Lime"
         case .midnightGold: return "Midnight Gold"
-        case .ultravioletUnicorn: return "Ultraviolet Unicorn"
+        case .ultravioletUnicorn: return "Ultraviolet Caticorn"
         case .powderPrincess: return "Powder Princess"
         case .forestWitch: return "Forest Witch"
         case .cyberMidnight: return "Cyber Midnight"
         case .blackMoonCat: return "Black Moon Cat"
         case .ironKnight: return "Iron Knight"
-        case .bloodDragon: return "Blood Dragon"
+        case .bloodDragon: return "Fold-Eared Cat Dragon"
         case .greenAcidMonster: return "Green Acid Monster"
         case .neonCatDemon: return "Neon Demon Cat"
         }
@@ -68,13 +68,13 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return "Лёд, снег и северные орбиты"
         case .acidLime: return "Лаймовые капли и кислотный ток"
         case .midnightGold: return "Чёрное золото, короны и звёзды"
-        case .ultravioletUnicorn: return "Единороги, облака и ультрафиолетовые радуги"
+        case .ultravioletUnicorn: return "Котоединороги, облака и ультрафиолетовые радуги"
         case .powderPrincess: return "Пудровые пузыри, короны, звёзды и сердца"
         case .forestWitch: return "Болотная магия, dot-work руны, котлы и шляпы"
         case .cyberMidnight: return "Киберпанк-полночь, сетка, сканирование и коты"
         case .blackMoonCat: return "Коты, лунный цикл, лапки и ночное мерцание"
         case .ironKnight: return "Серебро, сталь, мечи, латы и рыцарские силуэты"
-        case .bloodDragon: return "Кроваво-красные китайские драконы и искры"
+        case .bloodDragon: return "Вислоухие котодраконы, алый неон и искры"
         case .greenAcidMonster: return "Кислотное болото, монстры, глаза и слизь"
         case .neonCatDemon: return "Неоновые кошачьи мордочки, огоньки и злое хихиканье"
         }
@@ -235,6 +235,7 @@ struct GRUAppBackdrop: View {
 struct GRUSignatureWallpaper: View {
     let theme: GRUAppTheme
     var intensity: Double = 1.0
+    var animated = true
 
     @AppStorage("gru.settings.appearance.dynamicBackground")
     private var dynamicBackground = true
@@ -243,10 +244,10 @@ struct GRUSignatureWallpaper: View {
     private var reduceMotion = false
 
     var body: some View {
-        GRUAnimatedThemeScene(
+        GRUIllustratedWallpaper(
             theme: theme,
             intensity: intensity,
-            animated: dynamicBackground && !reduceMotion
+            animated: animated && dynamicBackground && !reduceMotion
         )
     }
 }
