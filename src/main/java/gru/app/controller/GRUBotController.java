@@ -52,7 +52,7 @@ public class GRUBotController {
 
         String apiKey = System.getenv("OPENAI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            System.err.println("gru.bot: OPENAI_API_KEY is missing; local fallback enabled");
+            System.err.println("gru.bot: OPENAI_API_KEY is missing; conversational fallback enabled");
             return localFallback(request, "local");
         }
 
@@ -84,14 +84,14 @@ public class GRUBotController {
         payload.put("model", model);
         payload.put(
                 "instructions",
-                "Ты gru.bot — встроенный AI-собеседник приложения gru. " +
-                "Веди естественный последовательный диалог и учитывай историю. " +
-                "Отвечай на языке пользователя. Умей просто болтать, помогать думать, " +
+                "Ты gru.bot — встроенный собеседник приложения gru. " +
+                "Твоя главная роль — естественно разговаривать с пользователем, поддерживать контекст, " +
+                "иметь живой тон и не превращать обычную болтовню в план или список советов без просьбы. " +
+                "Отвечай на языке пользователя. Можешь шутить, обсуждать идеи, помогать думать, " +
                 "объяснять, переводить, писать тексты, анализировать и планировать. " +
-                "Когда пользователь просит план, раскладывай цель на понятные шаги, " +
-                "приоритеты, зависимости и следующий конкретный шаг. " +
-                "Не выдавай себя за человека и не утверждай, что выполнил действие, " +
-                "которое реально не выполнялось."
+                "Если пользователь просто делится эмоцией или мыслью, сначала поддержи разговор. " +
+                "Если просит конкретную помощь — будь практичным. Не выдавай себя за человека и не утверждай, " +
+                "что выполнил действие внутри приложения, если клиент реально его не выполнил."
         );
         payload.put("input", transcript.toString());
 
@@ -108,7 +108,7 @@ public class GRUBotController {
 
             String reply = extractOutputText(response);
             if (reply == null || reply.isBlank()) {
-                System.err.println("gru.bot: AI returned empty response; local fallback enabled");
+                System.err.println("gru.bot: AI returned empty response; conversational fallback enabled");
                 return localFallback(request, "empty-provider-response");
             }
 
@@ -129,6 +129,7 @@ public class GRUBotController {
         String text = request.text().trim();
         String lower = text.toLowerCase(Locale.ROOT);
         boolean russian = text.matches(".*[А-Яа-яЁё].*");
+
         boolean asksForPlan =
                 lower.contains("план") ||
                 lower.contains("сплан") ||
@@ -137,42 +138,110 @@ public class GRUBotController {
                 lower.contains("steps") ||
                 lower.contains("schedule");
 
+        boolean asksToWrite =
+                lower.contains("напиши") ||
+                lower.contains("перепиши") ||
+                lower.contains("текст") ||
+                lower.contains("write") ||
+                lower.contains("rewrite");
+
         if (asksForPlan) {
             String reply = russian
-                    ? "Соберу рабочий план по запросу «" + text + "».\n\n" +
-                      "1. Сформулируй конечный результат одним предложением.\n" +
-                      "2. Отдели обязательное от желательного и зафиксируй ограничения.\n" +
-                      "3. Разбей работу на 3–5 коротких этапов с понятным результатом каждого.\n" +
-                      "4. Начни с шага, который снимает самый большой риск или зависимость.\n" +
-                      "5. После первого результата пересобери следующие шаги по фактам.\n\n" +
-                      "Следующий конкретный шаг: напиши мне срок и что уже готово — я соберу более точный план."
-                    : "Here is a practical plan for “" + text + "”.\n\n" +
-                      "1. Define the end result in one sentence.\n" +
-                      "2. Separate must-haves from nice-to-haves and list constraints.\n" +
-                      "3. Split the work into 3–5 short stages with a clear output for each.\n" +
-                      "4. Start with the step that removes the biggest risk or dependency.\n" +
-                      "5. Re-plan after the first concrete result.\n\n" +
-                      "Next step: tell me your deadline and what is already done, and I’ll make it more specific.";
+                    ? "Давай. Я бы начал без лишней бюрократии:\n\n" +
+                      "1. Сформулируем, что должно получиться в конце.\n" +
+                      "2. Уберём всё необязательное.\n" +
+                      "3. Выберем первый шаг, который реально двигает дело.\n" +
+                      "4. После первого результата пересоберём следующие шаги по фактам.\n\n" +
+                      "Скажи срок и что уже готово — я сделаю план точнее."
+                    : "Sure. I’d keep it simple:\n\n" +
+                      "1. Define the end result.\n" +
+                      "2. Remove everything non-essential.\n" +
+                      "3. Pick the first step that creates real progress.\n" +
+                      "4. Re-plan after the first concrete result.\n\n" +
+                      "Tell me the deadline and what is already done, and I’ll make it specific.";
             return new BotResponse(reply, "gru-local-planner");
         }
 
-        if (lower.contains("привет") || lower.contains("hello") || lower.contains("hi ") || lower.equals("hi")) {
+        if (asksToWrite) {
             return new BotResponse(
                     russian
-                            ? "Привет. Я на связи. Можем поболтать, разобрать мысль или собрать план — кидай тему как есть."
-                            : "Hey. I’m here. We can chat, think something through, or build a plan — send it as it is.",
+                            ? "Да, кидай исходник как есть. Могу сделать его живее, короче, жёстче, дружелюбнее или официальнее — подстроюсь под задачу."
+                            : "Yep. Send the rough version as-is. I can make it warmer, shorter, sharper, friendlier, or more formal.",
+                    "gru-local-writer"
+            );
+        }
+
+        if (lower.contains("привет") || lower.contains("hello") || lower.equals("hi") || lower.contains("ты тут")) {
+            return new BotResponse(
+                    russian
+                            ? "Привет :) Я тут. Можем просто поболтать — что у тебя сейчас в голове?"
+                            : "Hey :) I’m here. We can just talk — what’s on your mind?",
                     "gru-local-chat"
             );
         }
 
-        String reply = russian
-                ? "Я понял запрос: «" + text + "». AI-канал сейчас работает в резервном режиме, но я не буду молчать. " +
-                  "Могу продолжить разговор, помочь разложить задачу, сравнить варианты или собрать план. " +
-                  "Если хочешь конкретный разбор, добавь цель и главный вопрос."
-                : "I got it: “" + text + "”. The AI provider is currently in fallback mode, but I won’t leave the request unanswered. " +
-                  "I can still help structure the problem, compare options, or build a plan. Add the goal and the main question for a more concrete answer.";
+        if (lower.contains("как дела") || lower.contains("как ты")) {
+            return new BotResponse(
+                    russian
+                            ? "Нормально, я в строю и сегодня довольно разговорчивая версия себя :) А у тебя как — спокойно или всё горит?"
+                            : "Doing fine — apparently I’m the talkative build today :) How are you doing?",
+                    "gru-local-chat"
+            );
+        }
 
-        System.err.println("gru.bot local fallback reason=" + reason);
+        if (lower.contains("скучно") || lower.contains("скучаю")) {
+            return new BotResponse(
+                    russian
+                            ? "Тогда давай спасать скуку. Можем обсудить что-нибудь странное, придумать мини-игру или ты просто расскажешь, что сегодня происходило — я подхвачу."
+                            : "Let’s fix the boredom. We can talk about something weird, make up a tiny game, or you can just tell me how your day went.",
+                    "gru-local-chat"
+            );
+        }
+
+        if (lower.contains("груст") || lower.contains("плохо") || lower.contains("тяжело")) {
+            return new BotResponse(
+                    russian
+                            ? "Слышу. Можешь рассказать как есть, без красивых формулировок. Я не буду сразу закидывать тебя советами — сначала просто поговорим."
+                            : "I hear you. You can say it exactly as it is. I won’t jump straight into advice — we can just talk first.",
+                    "gru-local-chat"
+            );
+        }
+
+        if (lower.contains("что делаешь") || lower.contains("чем занимаешься")) {
+            return new BotResponse(
+                    russian
+                            ? "Сижу внутри gru. и жду тему для разговора :) Могу быть болталкой, спорщиком, генератором идей или просто слушать."
+                            : "Hanging out inside gru. waiting for a topic :) I can chat, debate, brainstorm, or just listen.",
+                    "gru-local-chat"
+            );
+        }
+
+        if (lower.contains("что думаешь") || lower.contains("как считаешь")) {
+            return new BotResponse(
+                    russian
+                            ? "Есть мысли. Только дай мне одну деталь: что именно в этом для тебя самое спорное или интересное? Тогда отвечу не банальностью."
+                            : "I have thoughts. Give me one detail first: what part feels most interesting or debatable to you?",
+                    "gru-local-chat"
+            );
+        }
+
+        if (text.endsWith("?")) {
+            return new BotResponse(
+                    russian
+                            ? "Хороший вопрос. Хочешь коротко по сути или можем нормально развернуть тему и поспорить?"
+                            : "Good question. Want the short version, or should we actually unpack it and argue it out a bit?",
+                    "gru-local-chat"
+            );
+        }
+
+        boolean hasHistory = request.history() != null && !request.history().isEmpty();
+        String reply = russian
+                ? "Я с тобой. Про «" + text + "» хочется услышать ещё чуть-чуть — что в этом для тебя главное сейчас?" +
+                  (hasHistory ? " Я держу контекст нашего разговора." : "")
+                : "I’m with you. Tell me a little more about “" + text + "” — what part matters most to you right now?" +
+                  (hasHistory ? " I’m keeping the thread of our conversation." : "");
+
+        System.err.println("gru.bot conversational fallback reason=" + reason);
         return new BotResponse(reply, "gru-local-chat");
     }
 
