@@ -248,7 +248,11 @@ private struct GRUBetaThemesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             let selected = GRUAppTheme(rawValue: themeRaw)
-            if selected == nil || !GRUThemePolicy.allowed.contains(selected!) {
+            if let selected {
+                if !GRUThemePolicy.allowed.contains(selected) {
+                    themeRaw = GRUAppTheme.blackMoonCat.rawValue
+                }
+            } else {
                 themeRaw = GRUAppTheme.blackMoonCat.rawValue
             }
         }
@@ -325,7 +329,7 @@ private struct GRUBetaPrivacyView: View {
                 Toggle("Показывать «печатает…»", isOn: $typing)
             }
 
-            Section("Защита приложения") {
+            Section {
                 Toggle("Face ID / код устройства", isOn: $biometrics)
                 Toggle("Скрывать приложение в переключателе", isOn: $hideSwitcherPreview)
 
@@ -335,6 +339,8 @@ private struct GRUBetaPrivacyView: View {
                 } label: {
                     Label("Защита экрана", systemImage: "eye.slash.fill")
                 }
+            } header: {
+                Text("Защита приложения")
             } footer: {
                 Text("gru. скрывает защищённый контент при захвате экрана и блокирует запись/трансляцию интерфейса.")
             }
@@ -357,12 +363,14 @@ private struct GRUBetaDataStorageView: View {
                 Toggle("Экономия трафика", isOn: $dataSaver)
             }
 
-            Section("Хранилище") {
+            Section {
                 Button(role: .destructive) {
                     showClearCache = true
                 } label: {
                     Label("Очистить кэш", systemImage: "trash")
                 }
+            } header: {
+                Text("Хранилище")
             } footer: {
                 Text("История с сервера не удаляется; локальные данные будут загружены заново при необходимости.")
             }
