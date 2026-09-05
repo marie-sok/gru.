@@ -539,7 +539,7 @@ struct ChatListView: View {
 
         let isOffline = !network.isConnected
 
-        HStack(
+        return HStack(
             spacing: 11
         ) {
 
