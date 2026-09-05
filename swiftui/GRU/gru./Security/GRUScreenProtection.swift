@@ -62,6 +62,8 @@ struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let container = UIViewController()
         container.view.backgroundColor = .clear
+        container.view.insetsLayoutMarginsFromSafeArea = false
+        container.additionalSafeAreaInsets = .zero
 
         let secureField = UITextField(frame: .zero)
         secureField.isSecureTextEntry = true
@@ -82,10 +84,14 @@ struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
 
         let protectedCanvas = secureField.subviews.first ?? secureField
         protectedCanvas.isUserInteractionEnabled = true
+        protectedCanvas.insetsLayoutMarginsFromSafeArea = false
 
         let host = context.coordinator.host
-        container.addChild(host)
         host.view.backgroundColor = .clear
+        host.view.insetsLayoutMarginsFromSafeArea = false
+        host.additionalSafeAreaInsets = .zero
+
+        container.addChild(host)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         protectedCanvas.addSubview(host.view)
 
@@ -102,6 +108,8 @@ struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         context.coordinator.host.rootView = content
+        uiViewController.view.setNeedsLayout()
+        uiViewController.view.layoutIfNeeded()
     }
 
     final class Coordinator {
@@ -109,6 +117,7 @@ struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
 
         init(rootView: Content) {
             host = UIHostingController(rootView: rootView)
+            host.view.backgroundColor = .clear
         }
     }
 }
@@ -125,7 +134,9 @@ struct GRUScreenProtectionView<Content: View>: View {
         ZStack {
             GRUSecureContent {
                 content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .ignoresSafeArea(.container, edges: .all)
 
             if model.isCaptureActive {
                 ZStack {
@@ -150,6 +161,8 @@ struct GRUScreenProtectionView<Content: View>: View {
                 .zIndex(1000)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.container, edges: .all)
         .alert("Защита gru.", isPresented: $model.showScreenshotWarning) {
             Button("Понятно", role: .cancel) {}
         } message: {
