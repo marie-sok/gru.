@@ -136,7 +136,7 @@ private extension ProfileView {
             .buttonStyle(.plain)
             .accessibilityLabel("Изменить аватар")
 
-            Text(profile.nickname.isEmpty ? "GRU" : profile.nickname)
+            Text(profile.nickname.isEmpty ? "gru." : profile.nickname)
                 .font(.title2.bold())
 
             Text("@\(profile.username)")
