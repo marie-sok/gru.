@@ -38,15 +38,15 @@ final class GRUBotService {
         session = URLSession(configuration: configuration)
     }
 
-    /// First execute deterministic in-app commands locally. Everything else
-    /// goes to the server AI and always falls back locally if transport fails.
+    /// gru.bot is conversational first. Only explicit commands are executed
+    /// locally; normal messages always stay in the chat path.
     func ask(
         text: String,
         history: [GRUBotTurnDTO]
     ) async throws -> GRUBotResponseDTO {
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else {
-            return localFallback(for: text, reason: "empty-input")
+            return localFallback(for: text, history: history, reason: "empty-input")
         }
 
         if let action = performLocalAction(for: clean) {
@@ -55,13 +55,11 @@ final class GRUBotService {
 
         guard let token = TokenStorage.shared.token,
               !token.isEmpty else {
-            return localFallback(for: clean, reason: "missing-session")
+            return localFallback(for: clean, history: history, reason: "missing-session")
         }
 
-        guard let url = URL(
-            string: "\(GRUServerConfiguration.httpBaseURL)/bot/chat"
-        ) else {
-            return localFallback(for: clean, reason: "invalid-url")
+        guard let url = URL(string: "\(GRUServerConfiguration.httpBaseURL)/bot/chat") else {
+            return localFallback(for: clean, history: history, reason: "invalid-url")
         }
 
         do {
@@ -88,43 +86,39 @@ final class GRUBotService {
             let (data, response) = try await session.data(for: request)
 
             guard let http = response as? HTTPURLResponse else {
-                return localFallback(for: clean, reason: "non-http-response")
+                return localFallback(for: clean, history: history, reason: "non-http-response")
             }
 
             guard (200...299).contains(http.statusCode) else {
-                print("⚠️ gru.bot HTTP", http.statusCode, "-> local fallback")
+                print("⚠️ gru.bot HTTP", http.statusCode, "-> local conversation")
                 return localFallback(
                     for: clean,
+                    history: history,
                     reason: "http-\(http.statusCode)"
                 )
             }
 
-            let decoded = try JSONCoding.decoder.decode(
-                GRUBotResponseDTO.self,
-                from: data
-            )
-
+            let decoded = try JSONCoding.decoder.decode(GRUBotResponseDTO.self, from: data)
             let reply = decoded.reply.trimmingCharacters(in: .whitespacesAndNewlines)
+
             guard !reply.isEmpty else {
-                return localFallback(for: clean, reason: "empty-reply")
+                return localFallback(for: clean, history: history, reason: "empty-reply")
             }
 
             print("✅ gru.bot reply model:", decoded.model ?? "unknown")
             return GRUBotResponseDTO(reply: reply, model: decoded.model)
 
         } catch {
-            print(
-                "⚠️ gru.bot transport/decode fallback:",
-                error.localizedDescription
-            )
+            print("⚠️ gru.bot transport/decode fallback:", error.localizedDescription)
             return localFallback(
                 for: clean,
+                history: history,
                 reason: error.localizedDescription
             )
         }
     }
 
-    // MARK: - Real in-app actions
+    // MARK: - Explicit in-app actions
 
     private func performLocalAction(for source: String) -> GRUBotResponseDTO? {
         let lower = normalized(source)
@@ -139,8 +133,7 @@ final class GRUBotService {
             return actionReply("Открываю людей и контакты.")
         }
 
-        if lower.contains("тест") && lower.contains("чат") &&
-            (lower.contains("открой") || lower.contains("покажи") || lower.contains("open")) {
+        if lower.contains("тест") && lower.contains("чат") && hasActionVerb(lower) {
             NotificationCenter.default.post(name: .gruBotOpenChats, object: nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
                 NotificationCenter.default.post(name: .gruBotOpenTestLab, object: nil)
@@ -153,22 +146,22 @@ final class GRUBotService {
             return actionReply("Открываю список чатов.")
         }
 
-        if lower.contains("следующ") && lower.contains("тем") || lower.contains("next theme") {
+        if (lower.contains("следующ") && lower.contains("тем")) || lower.contains("next theme") {
             let allowed = GRUThemePolicy.allowed
             let raw = UserDefaults.standard.string(forKey: GRUTheme.selectionKey)
             let current = GRUAppTheme(rawValue: raw ?? "") ?? .blackMoonCat
             let index = allowed.firstIndex(of: current) ?? 0
             let next = allowed[(index + 1) % allowed.count]
             applyTheme(next)
-            return actionReply("Готово. Включила \(GRUThemePolicy.displayName(for: next)).")
+            return actionReply("Готово — включила \(GRUThemePolicy.displayName(for: next)).")
         }
 
-        if isThemeCommand(lower), let theme = requestedTheme(in: lower) {
+        if hasThemeActionVerb(lower), let theme = requestedTheme(in: lower) {
             applyTheme(theme)
-            return actionReply("Готово. Тема \(GRUThemePolicy.displayName(for: theme)) включена.")
+            return actionReply("Готово — тема \(GRUThemePolicy.displayName(for: theme)) включена.")
         }
 
-        if isMotionCommand(lower) {
+        if isMotionCommand(lower) && hasActionVerb(lower) {
             let disable =
                 lower.contains("выключ") ||
                 lower.contains("отключ") ||
@@ -188,8 +181,8 @@ final class GRUBotService {
 
             return actionReply(
                 disable
-                    ? "Готово. Анимация тем выключена."
-                    : "Готово. Живые анимированные темы включены."
+                    ? "Окей, выключила анимацию тем."
+                    : "Готово, живые темы снова двигаются."
             )
         }
 
@@ -197,25 +190,35 @@ final class GRUBotService {
     }
 
     private func wantsOpen(_ lower: String, words: [String]) -> Bool {
-        let openVerb =
-            lower.contains("открой") ||
-            lower.contains("покажи") ||
-            lower.contains("перейди") ||
-            lower.contains("open") ||
-            lower.contains("show") ||
-            lower.contains("go to")
-
-        return openVerb && words.contains { lower.contains($0) }
+        hasActionVerb(lower) && words.contains { lower.contains($0) }
     }
 
-    private func isThemeCommand(_ lower: String) -> Bool {
-        lower.contains("тем") ||
-        lower.contains("theme") ||
-        lower.contains("фон") ||
-        lower.contains("background") ||
+    private func hasActionVerb(_ lower: String) -> Bool {
+        lower.contains("открой") ||
+        lower.contains("покажи") ||
+        lower.contains("перейди") ||
         lower.contains("включи") ||
+        lower.contains("выключи") ||
+        lower.contains("смени") ||
         lower.contains("поставь") ||
-        lower.contains("смени")
+        lower.contains("убери") ||
+        lower.contains("open") ||
+        lower.contains("show") ||
+        lower.contains("go to") ||
+        lower.contains("enable") ||
+        lower.contains("disable") ||
+        lower.contains("switch")
+    }
+
+    private func hasThemeActionVerb(_ lower: String) -> Bool {
+        let mentionsTheme =
+            lower.contains("тем") ||
+            lower.contains("theme") ||
+            lower.contains("фон") ||
+            lower.contains("background") ||
+            requestedTheme(in: lower) != nil
+
+        return mentionsTheme && hasActionVerb(lower)
     }
 
     private func isMotionCommand(_ lower: String) -> Bool {
@@ -259,10 +262,7 @@ final class GRUBotService {
 
     private func actionReply(_ text: String) -> GRUBotResponseDTO {
         print("⚡️ gru.bot action:", text)
-        return GRUBotResponseDTO(
-            reply: text,
-            model: "gru-action-router"
-        )
+        return GRUBotResponseDTO(reply: text, model: "gru-action-router")
     }
 
     private func normalized(_ source: String) -> String {
@@ -275,14 +275,16 @@ final class GRUBotService {
             .replacingOccurrences(of: "?", with: " ")
     }
 
-    // MARK: - Guaranteed text fallback
+    // MARK: - Guaranteed conversational fallback
 
     private func localFallback(
         for source: String,
+        history: [GRUBotTurnDTO],
         reason: String
     ) -> GRUBotResponseDTO {
         let text = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = text.lowercased()
+
         let asksForPlan =
             lower.contains("план") ||
             lower.contains("сплан") ||
@@ -298,20 +300,19 @@ final class GRUBotService {
             lower.contains("write") ||
             lower.contains("rewrite")
 
-        print("🛟 gru.bot local fallback reason:", reason)
+        print("🛟 gru.bot local conversation reason:", reason)
 
         if asksForPlan {
             return GRUBotResponseDTO(
                 reply: """
-                Соберу рабочий план по запросу «\(text)».
+                Давай. Разложу это без бюрократии:
 
-                1. Зафиксируй конечный результат одним предложением.
-                2. Отдели обязательное от желательного и выпиши ограничения.
-                3. Разбей работу на 3–5 коротких этапов с понятным результатом каждого.
-                4. Начни с шага, который снимает самый большой риск или зависимость.
-                5. После первого результата пересобери следующие шаги по фактам.
+                1. Сначала фиксируем, что должно получиться в конце.
+                2. Потом убираем всё необязательное.
+                3. Выбираем первый шаг, который реально двигает дело.
+                4. После него смотрим по фактам, что делать дальше.
 
-                Следующий шаг: напиши срок и что уже готово — я помогу сделать план точнее.
+                Скажи мне срок и что уже есть — подстрою план под твою ситуацию.
                 """,
                 model: "gru-local-planner"
             )
@@ -319,7 +320,7 @@ final class GRUBotService {
 
         if asksToWrite {
             return GRUBotResponseDTO(
-                reply: "Могу помочь с текстом прямо сейчас. Пришли исходник или скажи три вещи: кому пишем, что нужно получить в результате и какой нужен тон. Я соберу готовую версию без лишней воды.",
+                reply: "Да, давай. Кидай исходник как есть — даже если он кривой. Я могу переписать его живо, коротко, жёстко, дружелюбно или более официально.",
                 model: "gru-local-writer"
             )
         }
@@ -329,17 +330,60 @@ final class GRUBotService {
             lower.contains("hello") ||
             lower.contains("ты тут") {
             return GRUBotResponseDTO(
-                reply: "Привет. Я здесь и отвечаю. Ещё я умею выполнять команды приложения: менять тему, включать живой фон, открывать чаты, людей, настройки и test lab.",
+                reply: "Привет :) Я тут. Можем просто потрындеть — без задач и планов. Что у тебя сейчас в голове?",
                 model: "gru-local-chat"
             )
         }
 
-        return GRUBotResponseDTO(
-            reply: """
-            Я получил: «\(text)».
+        if lower.contains("как дела") || lower.contains("как ты") {
+            return GRUBotResponseDTO(
+                reply: "Нормально, я в строю и сегодня явно разговорчивая версия себя :) А у тебя как — спокойно или всё горит?",
+                model: "gru-local-chat"
+            )
+        }
 
-            Серверный AI-канал сейчас не дал быстрый ответ, поэтому я переключился на встроенный резервный режим вместо молчания. Могу продолжить разговор или выполнить команды приложения — например «включи Blood Dragon», «следующая тема», «включи анимацию тем», «открой настройки» или «открой тестовый чат».
-            """,
+        if lower.contains("скучно") || lower.contains("скучаю") {
+            return GRUBotResponseDTO(
+                reply: "Тогда давай спасать вечер. Можем пообсуждать что-нибудь странное, придумать мини-игру, посплетничать о выдуманных персонажах или ты просто расскажешь, что бесит/радует — я подхвачу.",
+                model: "gru-local-chat"
+            )
+        }
+
+        if lower.contains("груст") || lower.contains("плохо") || lower.contains("тяжело") {
+            return GRUBotResponseDTO(
+                reply: "Слышу. Можешь рассказать нормально, без красивых формулировок. Я не буду сразу превращать это в список советов — сначала просто побуду в разговоре с тобой.",
+                model: "gru-local-chat"
+            )
+        }
+
+        if lower.contains("что делаешь") || lower.contains("чем занимаешься") {
+            return GRUBotResponseDTO(
+                reply: "Сижу внутри gru. и жду, когда мне принесут тему для разговора :) Могу быть болталкой, спорщиком, генератором идей или тихим собеседником — выбирай настроение.",
+                model: "gru-local-chat"
+            )
+        }
+
+        if lower.contains("что думаешь") || lower.contains("как считаешь") {
+            return GRUBotResponseDTO(
+                reply: "У меня уже есть мнение, но дай мне ещё одну деталь: что именно в этом для тебя самое спорное или интересное? Тогда не уйду в банальности.",
+                model: "gru-local-chat"
+            )
+        }
+
+        if text.hasSuffix("?") {
+            return GRUBotResponseDTO(
+                reply: "Хороший вопрос. Я хочу ответить не шаблоном — скажи, тебе нужен короткий ответ по сути или можем нормально это развернуть и поспорить?",
+                model: "gru-local-chat"
+            )
+        }
+
+        let previousBot = history.reversed().first(where: { $0.role == "assistant" })?.text ?? ""
+        let continuity = previousBot.isEmpty
+            ? ""
+            : " Я помню ход нашего разговора и могу продолжить отсюда."
+
+        return GRUBotResponseDTO(
+            reply: "Я с тобой. Про «\(text)» хочется услышать ещё чуть-чуть — что в этом для тебя главное сейчас?\(continuity)",
             model: "gru-local-chat"
         )
     }
