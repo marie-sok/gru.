@@ -5,13 +5,9 @@ import Observation
 @Observable
 final class LoginViewModel {
 
-    // MARK: - Input
-
     var phone = ""
     var password = ""
     var nickname = ""
-
-    // MARK: - State
 
     var loading = false
     var error: String?
@@ -19,108 +15,34 @@ final class LoginViewModel {
     // MARK: - Login
 
     func login() async -> Bool {
-
-        guard validateLogin() else {
-            return false
-        }
+        guard validateLogin() else { return false }
 
         loading = true
         error = nil
-
-        defer {
-            loading = false
-        }
+        defer { loading = false }
 
         do {
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("🔐 LOGIN START")
+            print("📱 phone:", cleanPhone)
+            print("🌐 backend:", GRUServerConfiguration.httpBaseURL)
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            print(
-                "🔐 LOGIN START"
-            )
-            print(
-                "📱 phone:",
-                cleanPhone
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            let response = try await AuthService.shared.login(
+                phone: cleanPhone,
+                password: password
             )
 
-            let response =
-                try await AuthService.shared.login(
-                    phone: cleanPhone,
-                    password: password
-                )
-
-            print(
-                "✅ LOGIN RESPONSE RECEIVED"
+            try await acceptFreshSession(
+                response: response,
+                fallbackNickname: nil
             )
 
-            /*
-             Важно:
-             старый WebSocket мог продолжать
-             reconnect с предыдущим JWT.
-             Сначала полностью его останавливаем.
-             */
-
-            WebSocketService.shared
-                .resetSession()
-
-            /*
-             Очищаем старую локальную
-             авторизованную сессию.
-             */
-
-            TokenStorage.shared
-                .clear()
-
-            ChatService.shared
-                .clearAuthenticatedUser()
-
-            /*
-             Сохраняем только что
-             полученный JWT.
-             */
-
-            try saveAndVerifySession(
-                response: response
-            )
-
-            /*
-             Обновляем currentUser
-             только после успешного
-             сохранения сессии.
-             */
-
-            applyUser(
-                response: response
-            )
-
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            print(
-                "✅ LOGIN COMPLETE"
-            )
-            print(
-                "👤 userID:",
-                response.userId
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
+            print("✅ LOGIN COMPLETE")
+            print("👤 userID:", response.userId)
             return true
-
         } catch {
-
-            handleError(
-                error
-            )
-
+            rejectFailedAuth(error)
             return false
         }
     }
@@ -128,368 +50,211 @@ final class LoginViewModel {
     // MARK: - Register
 
     func register() async -> Bool {
-
-        guard validateRegistration() else {
-            return false
-        }
+        guard validateRegistration() else { return false }
 
         loading = true
         error = nil
-
-        defer {
-            loading = false
-        }
+        defer { loading = false }
 
         do {
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("🆕 REGISTER START")
+            print("📱 phone:", cleanPhone)
+            print("👤 nickname:", cleanNickname)
+            print("🌐 backend:", GRUServerConfiguration.httpBaseURL)
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            print(
-                "🆕 REGISTER START"
-            )
-            print(
-                "📱 phone:",
-                cleanPhone
-            )
-            print(
-                "👤 nickname:",
-                cleanNickname
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            let response = try await AuthService.shared.register(
+                phone: cleanPhone,
+                password: password,
+                nickname: cleanNickname
             )
 
-            let response =
-                try await AuthService.shared.register(
-                    phone: cleanPhone,
-                    password: password,
-                    nickname: cleanNickname
-                )
-
-            print(
-                "✅ REGISTER RESPONSE RECEIVED"
-            )
-
-            /*
-             Убираем любое старое
-             WebSocket-соединение.
-             */
-
-            WebSocketService.shared
-                .resetSession()
-
-            /*
-             Полностью заменяем
-             предыдущую сессию.
-             */
-
-            TokenStorage.shared
-                .clear()
-
-            ChatService.shared
-                .clearAuthenticatedUser()
-
-            try saveAndVerifySession(
-                response: response
-            )
-
-            applyUser(
+            try await acceptFreshSession(
                 response: response,
-                fallbackNickname:
-                    cleanNickname
+                fallbackNickname: cleanNickname
             )
 
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            print(
-                "✅ REGISTER COMPLETE"
-            )
-            print(
-                "👤 userID:",
-                response.userId
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
+            print("✅ REGISTER COMPLETE")
+            print("👤 userID:", response.userId)
             return true
-
         } catch {
-
-            handleError(
-                error
-            )
-
+            rejectFailedAuth(error)
             return false
         }
     }
 
-    // MARK: - Save + Verify Session
+    // MARK: - Fresh session transaction
 
-    private func saveAndVerifySession(
-        response: AuthResponse
-    ) throws {
+    private func acceptFreshSession(
+        response: AuthResponse,
+        fallbackNickname: String?
+    ) async throws {
+        let cleanToken = response.token
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let cleanToken =
-            response.token
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-
-        let cleanUserID =
-            response.userId
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
+        let cleanUserID = response.userId
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !cleanToken.isEmpty else {
-
-            throw LoginViewModelError
-                .emptyToken
+            throw LoginViewModelError.emptyToken
         }
 
         guard !cleanUserID.isEmpty else {
-
-            throw LoginViewModelError
-                .emptyUserID
+            throw LoginViewModelError.emptyUserID
         }
 
+        /*
+         The auth response alone is not enough. Before MainView can ever see
+         this session, prove that the same backend accepts the freshly issued
+         JWT on an authenticated endpoint.
+        */
+        let probe = await APIClient.shared.probeServer(token: cleanToken)
+
+        guard let statusCode = probe.statusCode,
+              (200...299).contains(statusCode) else {
+            throw LoginViewModelError.tokenRejected(
+                statusCode: probe.statusCode,
+                message: probe.message
+            )
+        }
+
+        // Stop every reconnect path that still carries the previous JWT.
+        WebSocketService.shared.resetSession()
+        TokenStorage.shared.clear()
+        ChatService.shared.clearAuthenticatedUser()
+        CacheStorage.shared.clearCurrentUser()
+
+        // Persist only the JWT that has just passed server validation.
         TokenStorage.shared.save(
             token: cleanToken,
             userID: cleanUserID
         )
 
-        let savedToken =
-            TokenStorage.shared.token
-
-        let savedUserID =
-            TokenStorage.shared.userID
-
-        // MARK: Safe JWT Diagnostics
-
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "🔐 SESSION SAVE CHECK"
-        )
-        print(
-            "🔐 LOGIN TOKEN LENGTH:",
-            cleanToken.count
-        )
-        print(
-            "💾 SAVED TOKEN LENGTH:",
-            savedToken?.count ?? 0
-        )
-        print(
-            "✅ TOKEN SAVED CORRECTLY:",
-            savedToken == cleanToken
-        )
-        print(
-            "✅ USER ID SAVED CORRECTLY:",
-            savedUserID == cleanUserID
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        /*
-         Сам JWT специально
-         никогда не выводим в Console.
-         */
-
-        guard savedToken == cleanToken else {
-
-            TokenStorage.shared
-                .clear()
-
-            throw LoginViewModelError
-                .tokenSaveFailed
+        guard TokenStorage.shared.belongsToCurrentBackend else {
+            TokenStorage.shared.clear()
+            throw LoginViewModelError.backendBindingFailed
         }
 
-        guard savedUserID == cleanUserID else {
-
-            TokenStorage.shared
-                .clear()
-
-            throw LoginViewModelError
-                .userIDSaveFailed
+        guard TokenStorage.shared.token == cleanToken else {
+            TokenStorage.shared.clear()
+            throw LoginViewModelError.tokenSaveFailed
         }
+
+        guard TokenStorage.shared.userID == cleanUserID else {
+            TokenStorage.shared.clear()
+            throw LoginViewModelError.userIDSaveFailed
+        }
+
+        applyUser(
+            response: response,
+            fallbackNickname: fallbackNickname
+        )
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("✅ FRESH SESSION VERIFIED")
+        print("✅ protected endpoint status:", statusCode)
+        print("✅ backend binding:", TokenStorage.shared.storedBackend ?? "nil")
+        print("🔐 token length:", cleanToken.count)
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 
-    // MARK: - Apply User
+    private func rejectFailedAuth(_ authError: Error) {
+        WebSocketService.shared.resetSession()
+        TokenStorage.shared.clear()
+        ChatService.shared.clearAuthenticatedUser()
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("❌ AUTH ERROR")
+        print(authError.localizedDescription)
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        error = authError.localizedDescription
+    }
+
+    // MARK: - Apply user
 
     private func applyUser(
         response: AuthResponse,
-        fallbackNickname: String? = nil
+        fallbackNickname: String?
     ) {
-
         let displayName: String?
 
-        if let nickname =
-            response.nickname?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                ),
+        if let nickname = response.nickname?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
            !nickname.isEmpty {
-
-            displayName =
-                nickname
-
+            displayName = nickname
         } else if let fallbackNickname {
-
-            let cleanFallback =
-                fallbackNickname
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-
-            displayName =
-                cleanFallback.isEmpty
-                ? nil
-                : cleanFallback
-
+            let clean = fallbackNickname
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            displayName = clean.isEmpty ? nil : clean
         } else {
-
-            displayName =
-                nil
+            displayName = nil
         }
 
-        ChatService.shared
-            .applyAuthenticatedUser(
-                serverID:
-                    response.userId,
-                displayName:
-                    displayName
-            )
+        ChatService.shared.applyAuthenticatedUser(
+            serverID: response.userId,
+            displayName: displayName
+        )
     }
 
-    // MARK: - Validation Login
+    // MARK: - Validation
 
     private func validateLogin() -> Bool {
-
         error = nil
 
         guard !cleanPhone.isEmpty else {
-
-            error =
-                "Введите номер телефона"
-
+            error = "Введите номер телефона"
             return false
         }
 
         guard !password.isEmpty else {
-
-            error =
-                "Введите пароль"
-
+            error = "Введите пароль"
             return false
         }
 
         return true
     }
 
-    // MARK: - Validation Registration
-
     private func validateRegistration() -> Bool {
-
         error = nil
 
         guard !cleanPhone.isEmpty else {
-
-            error =
-                "Введите номер телефона"
-
+            error = "Введите номер телефона"
             return false
         }
 
         guard !cleanNickname.isEmpty else {
-
-            error =
-                "Введите имя"
-
+            error = "Введите имя"
             return false
         }
 
         guard !password.isEmpty else {
-
-            error =
-                "Введите пароль"
-
+            error = "Введите пароль"
             return false
         }
 
         guard password.count >= 6 else {
-
-            error =
-                "Пароль должен содержать минимум 6 символов"
-
+            error = "Пароль должен содержать минимум 6 символов"
             return false
         }
 
         return true
     }
 
-    // MARK: - Error
-
-    private func handleError(
-        _ error: Error
-    ) {
-
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "❌ AUTH ERROR"
-        )
-        print(
-            error.localizedDescription
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        self.error =
-            error.localizedDescription
-    }
-
-    // MARK: - Helpers
-
     private var cleanPhone: String {
-
-        phone.trimmingCharacters(
-            in:
-                .whitespacesAndNewlines
-        )
+        phone.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var cleanNickname: String {
-
-        nickname.trimmingCharacters(
-            in:
-                .whitespacesAndNewlines
-        )
+        nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var canLogin: Bool {
-
-        !cleanPhone.isEmpty &&
-        !password.isEmpty &&
-        !loading
+        !cleanPhone.isEmpty && !password.isEmpty && !loading
     }
 
     var canRegister: Bool {
-
         !cleanPhone.isEmpty &&
         !cleanNickname.isEmpty &&
         !password.isEmpty &&
@@ -497,39 +262,31 @@ final class LoginViewModel {
     }
 }
 
-// MARK: - Login View Model Error
-
-private enum LoginViewModelError:
-    LocalizedError {
-
+private enum LoginViewModelError: LocalizedError {
     case emptyToken
     case emptyUserID
     case tokenSaveFailed
     case userIDSaveFailed
+    case backendBindingFailed
+    case tokenRejected(statusCode: Int?, message: String)
 
     var errorDescription: String? {
-
         switch self {
-
         case .emptyToken:
-
-            return
-                "Сервер не вернул токен авторизации"
-
+            return "Сервер не вернул токен авторизации"
         case .emptyUserID:
-
-            return
-                "Сервер не вернул ID пользователя"
-
+            return "Сервер не вернул ID пользователя"
         case .tokenSaveFailed:
-
-            return
-                "Не удалось сохранить новую сессию"
-
+            return "Не удалось сохранить новую сессию"
         case .userIDSaveFailed:
-
-            return
-                "Не удалось сохранить данные пользователя"
+            return "Не удалось сохранить ID новой сессии"
+        case .backendBindingFailed:
+            return "Новая сессия не привязалась к текущему backend"
+        case .tokenRejected(let statusCode, let message):
+            if let statusCode {
+                return "Backend отклонил только что выданную сессию (HTTP \(statusCode)). \(message)"
+            }
+            return "Не удалось проверить новую сессию на backend. \(message)"
         }
     }
 }
