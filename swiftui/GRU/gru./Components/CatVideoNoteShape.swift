@@ -1,144 +1,100 @@
 import SwiftUI
 
-/// Single continuous cat silhouette used by GRU video notes.
-/// The ears are part of the same curved path as the face: no separate
-/// triangular masks or filled triangle overlays are used.
-struct CatVideoNoteShape: Shape {
+/// Compact GRU cat-note silhouette: visually almost circular, with two soft
+/// ear bumps integrated into the outline. No separate triangles are drawn.
+struct CatVideoNoteShape: InsettableShape {
+    var insetAmount: CGFloat = 0
+
     func path(in rect: CGRect) -> Path {
-        let width = rect.width
-        let height = rect.height
+        let bounds = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        guard bounds.width > 0, bounds.height > 0 else { return Path() }
 
-        let topY = height * 0.085
-        let cheekY = height * 0.515
-        let bottomY = height * 0.945
+        let w = bounds.width
+        let h = bounds.height
+        let cx = bounds.midX
 
-        let leftX = width * 0.055
-        let rightX = width * 0.945
-
-        let leftEarOuter = CGPoint(x: width * 0.16, y: height * 0.22)
-        let leftEarTip = CGPoint(x: width * 0.28, y: topY)
-        let leftEarInner = CGPoint(x: width * 0.40, y: height * 0.185)
-
-        let rightEarInner = CGPoint(x: width * 0.60, y: height * 0.185)
-        let rightEarTip = CGPoint(x: width * 0.72, y: topY)
-        let rightEarOuter = CGPoint(x: width * 0.84, y: height * 0.22)
+        let top = bounds.minY + h * 0.08
+        let earBaseY = bounds.minY + h * 0.18
+        let shoulderY = bounds.minY + h * 0.25
+        let midY = bounds.minY + h * 0.53
+        let bottom = bounds.maxY - h * 0.055
 
         var path = Path()
-        path.move(to: CGPoint(x: width * 0.50, y: bottomY))
+        path.move(to: CGPoint(x: cx, y: bottom))
 
         path.addCurve(
-            to: CGPoint(x: leftX, y: cheekY),
-            control1: CGPoint(x: width * 0.23, y: bottomY),
-            control2: CGPoint(x: leftX, y: height * 0.76)
+            to: CGPoint(x: bounds.minX + w * 0.055, y: midY),
+            control1: CGPoint(x: bounds.minX + w * 0.24, y: bottom),
+            control2: CGPoint(x: bounds.minX + w * 0.055, y: bounds.minY + h * 0.78)
         )
 
         path.addCurve(
-            to: leftEarOuter,
-            control1: CGPoint(x: leftX, y: height * 0.36),
-            control2: CGPoint(x: width * 0.09, y: height * 0.25)
+            to: CGPoint(x: bounds.minX + w * 0.18, y: shoulderY),
+            control1: CGPoint(x: bounds.minX + w * 0.045, y: bounds.minY + h * 0.38),
+            control2: CGPoint(x: bounds.minX + w * 0.10, y: bounds.minY + h * 0.29)
         )
 
         path.addCurve(
-            to: leftEarTip,
-            control1: CGPoint(x: width * 0.20, y: height * 0.18),
-            control2: CGPoint(x: width * 0.245, y: height * 0.11)
+            to: CGPoint(x: bounds.minX + w * 0.31, y: top),
+            control1: CGPoint(x: bounds.minX + w * 0.215, y: bounds.minY + h * 0.19),
+            control2: CGPoint(x: bounds.minX + w * 0.265, y: bounds.minY + h * 0.105)
         )
 
         path.addCurve(
-            to: leftEarInner,
-            control1: CGPoint(x: width * 0.305, y: height * 0.105),
-            control2: CGPoint(x: width * 0.35, y: height * 0.155)
+            to: CGPoint(x: bounds.minX + w * 0.41, y: earBaseY),
+            control1: CGPoint(x: bounds.minX + w * 0.345, y: bounds.minY + h * 0.095),
+            control2: CGPoint(x: bounds.minX + w * 0.39, y: bounds.minY + h * 0.15)
         )
 
         path.addCurve(
-            to: rightEarInner,
-            control1: CGPoint(x: width * 0.455, y: height * 0.155),
-            control2: CGPoint(x: width * 0.545, y: height * 0.155)
+            to: CGPoint(x: bounds.minX + w * 0.59, y: earBaseY),
+            control1: CGPoint(x: bounds.minX + w * 0.46, y: bounds.minY + h * 0.145),
+            control2: CGPoint(x: bounds.minX + w * 0.54, y: bounds.minY + h * 0.145)
         )
 
         path.addCurve(
-            to: rightEarTip,
-            control1: CGPoint(x: width * 0.65, y: height * 0.155),
-            control2: CGPoint(x: width * 0.695, y: height * 0.105)
+            to: CGPoint(x: bounds.minX + w * 0.69, y: top),
+            control1: CGPoint(x: bounds.minX + w * 0.61, y: bounds.minY + h * 0.15),
+            control2: CGPoint(x: bounds.minX + w * 0.655, y: bounds.minY + h * 0.095)
         )
 
         path.addCurve(
-            to: rightEarOuter,
-            control1: CGPoint(x: width * 0.755, y: height * 0.11),
-            control2: CGPoint(x: width * 0.80, y: height * 0.18)
+            to: CGPoint(x: bounds.minX + w * 0.82, y: shoulderY),
+            control1: CGPoint(x: bounds.minX + w * 0.735, y: bounds.minY + h * 0.105),
+            control2: CGPoint(x: bounds.minX + w * 0.785, y: bounds.minY + h * 0.19)
         )
 
         path.addCurve(
-            to: CGPoint(x: rightX, y: cheekY),
-            control1: CGPoint(x: width * 0.91, y: height * 0.25),
-            control2: CGPoint(x: rightX, y: height * 0.36)
+            to: CGPoint(x: bounds.maxX - w * 0.055, y: midY),
+            control1: CGPoint(x: bounds.maxX - w * 0.10, y: bounds.minY + h * 0.29),
+            control2: CGPoint(x: bounds.maxX - w * 0.045, y: bounds.minY + h * 0.38)
         )
 
         path.addCurve(
-            to: CGPoint(x: width * 0.50, y: bottomY),
-            control1: CGPoint(x: rightX, y: height * 0.76),
-            control2: CGPoint(x: width * 0.77, y: bottomY)
+            to: CGPoint(x: cx, y: bottom),
+            control1: CGPoint(x: bounds.maxX - w * 0.055, y: bounds.minY + h * 0.78),
+            control2: CGPoint(x: bounds.maxX - w * 0.24, y: bottom)
         )
 
         path.closeSubpath()
         return path
     }
+
+    func inset(by amount: CGFloat) -> some InsettableShape {
+        var copy = self
+        copy.insetAmount += amount
+        return copy
+    }
 }
 
-/// Soft inner-ear accents. They are open Bezier strokes rather than
-/// triangles, so camera/video-note UI never shows geometric triangle patches.
+/// Deliberately minimal ear accents; the silhouette itself carries the cat
+/// identity, so no inner triangle patches are rendered over the camera/video.
 struct CatVideoNoteEarDetails: View {
     let width: CGFloat
 
     var body: some View {
-        ZStack {
-            CatVideoNoteInnerEarShape(side: .left)
-                .stroke(
-                    GRUColors.accentSecondary.opacity(0.42),
-                    style: StrokeStyle(lineWidth: max(1, width * 0.007), lineCap: .round)
-                )
-
-            CatVideoNoteInnerEarShape(side: .right)
-                .stroke(
-                    GRUColors.accentSecondary.opacity(0.42),
-                    style: StrokeStyle(lineWidth: max(1, width * 0.007), lineCap: .round)
-                )
-        }
-        .frame(width: width, height: width * 1.02)
-        .allowsHitTesting(false)
-    }
-}
-
-private struct CatVideoNoteInnerEarShape: Shape {
-    enum Side {
-        case left
-        case right
-    }
-
-    let side: Side
-
-    func path(in rect: CGRect) -> Path {
-        let mirrored: (CGFloat) -> CGFloat = { x in
-            side == .left ? x : 1 - x
-        }
-
-        var path = Path()
-        path.move(
-            to: CGPoint(
-                x: rect.width * mirrored(0.205),
-                y: rect.height * 0.205
-            )
-        )
-        path.addQuadCurve(
-            to: CGPoint(
-                x: rect.width * mirrored(0.345),
-                y: rect.height * 0.202
-            ),
-            control: CGPoint(
-                x: rect.width * mirrored(0.275),
-                y: rect.height * 0.115
-            )
-        )
-        return path
+        EmptyView()
+            .frame(width: width, height: width)
+            .allowsHitTesting(false)
     }
 }
