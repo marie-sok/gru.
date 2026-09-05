@@ -97,6 +97,7 @@ struct BetaChatListView: View {
                     deleteChatEverywhere(chat)
                 }
             }
+
             Button("Отмена", role: .cancel) {
                 pendingDeleteChat = nil
             }
@@ -132,9 +133,11 @@ struct BetaChatListView: View {
                         ProgressView()
                             .controlSize(.small)
                             .tint(GRUColors.accent)
+
                         Text("Синхронизирую реальные чаты…")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
+
                         Spacer()
                     }
                     .padding(.horizontal, 12)
@@ -187,6 +190,7 @@ struct BetaChatListView: View {
             ZStack {
                 Circle()
                     .fill(GRUColors.accent.opacity(0.14))
+
                 Image(systemName: "testtube.2")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
@@ -201,7 +205,8 @@ struct BetaChatListView: View {
                 HStack(spacing: 6) {
                     Text("gru. test lab")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text("BETA")
+
+                    Text("RC")
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.8)
                         .foregroundStyle(GRUColors.accent)
@@ -210,7 +215,7 @@ struct BetaChatListView: View {
                         .background(GRUColors.accent.opacity(0.10), in: Capsule())
                 }
 
-                Text("Локальный тестовый чат • работает без backend")
+                Text("Полный локальный чат: voice • кото-кружки • actions")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -255,7 +260,10 @@ struct BetaChatListView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
-        .background(GRUColors.card.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            GRUColors.card.opacity(0.78),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
@@ -266,9 +274,15 @@ struct BetaChatListView: View {
         HStack(spacing: 7) {
             Image(systemName: socket.isConnected ? "checkmark.circle.fill" : "wifi.slash")
                 .font(.system(size: 11, weight: .bold))
-            Text(service.isUsingCachedChats ? "offline • показываю сохранённые чаты" : "backend недоступен • test lab работает")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .lineLimit(1)
+
+            Text(
+                service.isUsingCachedChats
+                    ? "offline • показываю сохранённые чаты"
+                    : "backend недоступен • test lab полностью работает локально"
+            )
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .lineLimit(1)
+
             Spacer()
         }
         .foregroundStyle(.secondary)
@@ -297,7 +311,7 @@ struct BetaChatListView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return true }
 
-        return "gru. test lab тестовый чат beta local"
+        return "gru. test lab тестовый чат rc local voice кото кружок"
             .localizedCaseInsensitiveContains(query)
     }
 
@@ -399,6 +413,7 @@ struct BetaChatListView: View {
 
         Task {
             defer { deletingChatServerID = nil }
+
             do {
                 try await ChatAPIService.shared.deleteChat(
                     chatID: serverID,
@@ -410,200 +425,5 @@ struct BetaChatListView: View {
                 print("❌ Delete chat error:", error)
             }
         }
-    }
-}
-
-private struct GRUBetaLocalMessage: Identifiable {
-    enum Author {
-        case me
-        case lab
-    }
-
-    let id = UUID()
-    let author: Author
-    let text: String
-    let createdAt: Date
-
-    init(author: Author, text: String, createdAt: Date = Date()) {
-        self.author = author
-        self.text = text
-        self.createdAt = createdAt
-    }
-
-    static var seed: [GRUBetaLocalMessage] {
-        [
-            GRUBetaLocalMessage(
-                author: .lab,
-                text: "Это локальный test lab. Он не зависит от backend — здесь можно проверять чат, ввод и анимацию тем."
-            ),
-            GRUBetaLocalMessage(
-                author: .lab,
-                text: "Нажми палитру сверху: каждые касание переключает следующую из 9 фирменных тем gru."
-            )
-        ]
-    }
-}
-
-@MainActor
-private struct GRUBetaTestChatView: View {
-    @AppStorage(GRUTheme.selectionKey)
-    private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
-
-    @State private var messages = GRUBetaLocalMessage.seed
-    @State private var text = ""
-    @FocusState private var inputFocused: Bool
-
-    private var currentTheme: GRUAppTheme {
-        let candidate = GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
-        return GRUThemePolicy.allowed.contains(candidate) ? candidate : .blackMoonCat
-    }
-
-    var body: some View {
-        ZStack {
-            GRUSignatureWallpaper(
-                theme: currentTheme,
-                intensity: 1.0,
-                animated: true
-            )
-            .ignoresSafeArea()
-
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 10) {
-                        ForEach(messages) { message in
-                            HStack(alignment: .bottom) {
-                                if message.author == .me {
-                                    Spacer(minLength: 54)
-                                }
-
-                                VStack(alignment: message.author == .me ? .trailing : .leading, spacing: 4) {
-                                    Text(message.text)
-                                        .font(.body)
-                                        .foregroundStyle(GRUColors.text)
-                                        .padding(.horizontal, 13)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            message.author == .me
-                                                ? currentTheme.accent.opacity(0.24)
-                                                : GRUColors.card.opacity(0.90),
-                                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        )
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                                .stroke(
-                                                    message.author == .me
-                                                        ? currentTheme.accent.opacity(0.30)
-                                                        : Color.white.opacity(0.05),
-                                                    lineWidth: 1
-                                                )
-                                        }
-
-                                    Text(message.createdAt, style: .time)
-                                        .font(.system(size: 9, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                if message.author == .lab {
-                                    Spacer(minLength: 54)
-                                }
-                            }
-                            .id(message.id)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 14)
-                    .padding(.bottom, 16)
-                }
-                .onChange(of: messages.count) { _, _ in
-                    guard let lastID = messages.last?.id else { return }
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        proxy.scrollTo(lastID, anchor: .bottom)
-                    }
-                }
-            }
-        }
-        .navigationTitle("gru. test lab")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    cycleTheme()
-                } label: {
-                    Image(systemName: "paintpalette.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(currentTheme.accent)
-                }
-                .accessibilityLabel("Следующая тема")
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            composer
-        }
-    }
-
-    private var composer: some View {
-        HStack(spacing: 9) {
-            TextField("Тестовое сообщение", text: $text, axis: .vertical)
-                .focused($inputFocused)
-                .textFieldStyle(.plain)
-                .lineLimit(1...4)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    GRUColors.card.opacity(0.94),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                )
-                .onSubmit { send() }
-
-            Button {
-                send()
-            } label: {
-                GRUNeonIcon(
-                    systemName: "envelope.fill",
-                    size: 42,
-                    iconSize: 16,
-                    isActive: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-    }
-
-    private func send() {
-        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
-
-        messages.append(
-            GRUBetaLocalMessage(author: .me, text: clean)
-        )
-        text = ""
-        inputFocused = false
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-
-        Task {
-            try? await Task.sleep(nanoseconds: 420_000_000)
-            messages.append(
-                GRUBetaLocalMessage(
-                    author: .lab,
-                    text: "Принято локально ✓  UI живой, backend для этого сообщения не использовался."
-                )
-            )
-        }
-    }
-
-    private func cycleTheme() {
-        let themes = GRUThemePolicy.allowed
-        guard !themes.isEmpty else { return }
-        let index = themes.firstIndex(of: currentTheme) ?? 0
-        let next = themes[(index + 1) % themes.count]
-
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-            themeRaw = next.rawValue
-        }
-        UISelectionFeedbackGenerator().selectionChanged()
     }
 }
