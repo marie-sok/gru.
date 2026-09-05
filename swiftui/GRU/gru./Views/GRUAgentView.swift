@@ -1,5 +1,9 @@
 import SwiftUI
 
+private extension Notification.Name {
+    static let gruAgentPresentationChanged = Notification.Name("gru.agent.presentation.changed")
+}
+
 private struct GRUAgentMessage: Identifiable, Codable {
     enum Author: String, Codable {
         case user
@@ -91,9 +95,22 @@ struct GRUAgentView: View {
         .background(GRUColors.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             composer
+                .background(.ultraThinMaterial)
         }
         .navigationTitle("gru.bot")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            NotificationCenter.default.post(
+                name: .gruAgentPresentationChanged,
+                object: true
+            )
+        }
+        .onDisappear {
+            NotificationCenter.default.post(
+                name: .gruAgentPresentationChanged,
+                object: false
+            )
+        }
     }
 
     private var header: some View {
@@ -201,6 +218,7 @@ struct GRUAgentView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _, _ in
                 guard let lastID = messages.last?.id else { return }
                 withAnimation(.easeOut(duration: 0.18)) {
@@ -282,7 +300,6 @@ struct GRUAgentView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
         }
     }
 
