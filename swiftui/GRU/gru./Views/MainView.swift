@@ -3,6 +3,7 @@ import SwiftUI
 struct MainView: View {
     @State private var selectedTab: AppTab = .chats
     @State private var isChatPresented = false
+    @State private var showBotTestLab = false
 
     var body: some View {
         ZStack {
@@ -15,6 +16,18 @@ struct MainView: View {
                     .padding(.top, 6)
                     .padding(.bottom, 6)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .sheet(isPresented: $showBotTestLab) {
+            NavigationStack {
+                GRUBetaTestChatView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Готово") {
+                                showBotTestLab = false
+                            }
+                        }
+                    }
             }
         }
         .onChange(of: selectedTab) { _, _ in
@@ -39,6 +52,11 @@ struct MainView: View {
                 selectedTab = .settings
                 isChatPresented = false
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenTestLab)) { _ in
+            selectedTab = .chats
+            isChatPresented = false
+            showBotTestLab = true
         }
     }
 
