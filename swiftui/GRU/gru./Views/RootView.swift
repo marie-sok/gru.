@@ -1,10 +1,9 @@
 //
 //  RootView.swift
-//  gru
+//  gru.
 //
 //  Created by Maria Morozova on 23.08.2026.
 //
-
 
 import SwiftUI
 import Combine
@@ -23,42 +22,24 @@ struct RootView: View {
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
-    // MARK: - State
+    @State private var isAuthenticated = false
+    @State private var isCheckingSession = true
 
-    @State
-    private var isAuthenticated = false
-
-    @State
-    private var isCheckingSession = true
-
-    // MARK: - One-Time Reset
-
-
-    private let sessionMigrationKey =
-        "gru.sessionMigration.v1"
-
-    // MARK: - Body
+    private let sessionMigrationKey = "gru.sessionMigration.v1"
 
     var body: some View {
-
         ZStack {
             Group {
-
-            if isCheckingSession {
-
-                loadingView
-
-            } else if !didFinishOnboarding {
-
-                GRUReleaseOnboardingView {
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                        didFinishOnboarding = true
+                if isCheckingSession {
+                    loadingView
+                } else if !didFinishOnboarding {
+                    GRUReleaseOnboardingView {
+                        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                            didFinishOnboarding = true
+                        }
                     }
-                }
-
-            } else if isAuthenticated {
-
-                MainView()
+                } else if isAuthenticated {
+                    MainView()
                         .blur(radius: (isBiometricLocked && biometricsEnabled) ? 18 : 0)
                         .disabled(isBiometricLocked && biometricsEnabled)
                         .overlay {
@@ -66,16 +47,13 @@ struct RootView: View {
                                 biometricLockOverlay
                             }
                         }
-
-            } else {
-
-                LoginView(
-                    onLogin: {
-
-                        handleSuccessfulLogin()
-                    }
-                )
-            }
+                } else {
+                    LoginView(
+                        onLogin: {
+                            handleSuccessfulLogin()
+                        }
+                    )
+                }
             }
 
             if hideSwitcherPreview && scenePhase != .active {
@@ -85,7 +63,7 @@ struct RootView: View {
                         Image(systemName: "eye.slash.fill")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundStyle(GRUColors.accent)
-                        Text("gru")
+                        Text("gru.")
                             .font(.system(size: 28, weight: .black, design: .rounded))
                     }
                 }
@@ -94,10 +72,9 @@ struct RootView: View {
             }
         }
         .task {
-
             checkSession()
         }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 if resetBadgeOnOpen {
                     NotificationService.shared.clearBadge()
@@ -112,14 +89,8 @@ struct RootView: View {
             }
         }
         .onReceive(
-            NotificationCenter.default
-                .publisher(
-                    for:
-                        .gruSessionInvalidated
-                )
-        ) {
-            _ in
-
+            NotificationCenter.default.publisher(for: .gruSessionInvalidated)
+        ) { _ in
             handleSessionInvalidated()
         }
         .preferredColorScheme(.dark)
@@ -129,37 +100,26 @@ struct RootView: View {
     }
 }
 
-// MARK: - Session
-
 private extension RootView {
-
     func checkSession() {
-
         performOneTimeSessionResetIfNeeded()
 
-        let token =
-            TokenStorage.shared.token
-
-        let userID =
-            TokenStorage.shared.userID
+        let token = TokenStorage.shared.token
+        let userID = TokenStorage.shared.userID
 
         if let token,
            !token.isEmpty,
            let userID,
            !userID.isEmpty {
-
             ChatService.shared.restoreSession()
-
             applyLocalProfile()
-
             isAuthenticated = true
+
             if biometricsEnabled {
                 isBiometricLocked = true
                 authenticateWithBiometrics()
             }
-
         } else {
-
             isAuthenticated = false
         }
 
@@ -167,90 +127,43 @@ private extension RootView {
     }
 
     func performOneTimeSessionResetIfNeeded() {
-
-        let defaults =
-            UserDefaults.standard
-
-        let alreadyMigrated =
-            defaults.bool(
-                forKey: sessionMigrationKey
-            )
-
-        guard !alreadyMigrated else {
-            return
-        }
-
-        /*
-         Удаляем старую сессию,
-         где сохранялся только JWT.
-         */
+        let defaults = UserDefaults.standard
+        let alreadyMigrated = defaults.bool(forKey: sessionMigrationKey)
+        guard !alreadyMigrated else { return }
 
         TokenStorage.shared.clear()
+        ChatService.shared.clearAuthenticatedUser()
+        defaults.set(true, forKey: sessionMigrationKey)
 
-        ChatService.shared
-            .clearAuthenticatedUser()
-
-        defaults.set(
-            true,
-            forKey: sessionMigrationKey
-        )
-
-        print(
-            "🧹 Old GRU session cleared"
-        )
+        print("🧹 Old gru. session cleared")
     }
 
     func handleSessionInvalidated() {
+        isCheckingSession = false
 
-        isCheckingSession =
-            false
-
-        withAnimation(
-            .easeInOut(
-                duration:
-                    0.25
-            )
-        ) {
-
-            isAuthenticated =
-                false
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isAuthenticated = false
         }
 
-        print(
-            "🔐 GRU session expired — LoginView"
-        )
+        print("🔐 gru. session expired — LoginView")
     }
 
     func handleSuccessfulLogin() {
-
         guard
-            let token =
-                TokenStorage.shared.token,
+            let token = TokenStorage.shared.token,
             !token.isEmpty,
-            let userID =
-                TokenStorage.shared.userID,
+            let userID = TokenStorage.shared.userID,
             !userID.isEmpty
         else {
-
-            print(
-                "❌ Login completed but session was not saved"
-            )
-
+            print("❌ Login completed but session was not saved")
             isAuthenticated = false
-
             return
         }
 
         ChatService.shared.restoreSession()
-
         applyLocalProfile()
 
-        withAnimation(
-            .easeInOut(
-                duration: 0.25
-            )
-        ) {
-
+        withAnimation(.easeInOut(duration: 0.25)) {
             isAuthenticated = true
             if biometricsEnabled {
                 isBiometricLocked = true
@@ -258,9 +171,7 @@ private extension RootView {
             }
         }
 
-        print(
-            "✅ GRU session authenticated"
-        )
+        print("✅ gru. session authenticated")
     }
 
     func applyLocalProfile() {
@@ -279,39 +190,21 @@ private extension RootView {
     }
 }
 
-// MARK: - Loading
-
 private extension RootView {
-
     var loadingView: some View {
-
         ZStack {
-
             GRUAppBackdrop()
 
-            VStack(
-                spacing: 16
-            ) {
-
-                Text("gru")
-                    .font(
-                        .system(
-                            size: 32,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        GRUColors.text
-                    )
+            VStack(spacing: 16) {
+                Text("gru.")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(GRUColors.text)
 
                 ProgressView()
             }
         }
     }
 }
-
-
-// MARK: - V11 Release Onboarding
 
 private struct GRUReleaseOnboardingView: View {
     let onFinish: () -> Void
@@ -321,7 +214,7 @@ private struct GRUReleaseOnboardingView: View {
             GRUAppBackdrop()
 
             VStack(spacing: 12) {
-                Text("gru")
+                Text("gru.")
                     .font(.system(size: 48, weight: .black, design: .rounded))
                     .tracking(-1.8)
 
@@ -336,23 +229,16 @@ private struct GRUReleaseOnboardingView: View {
             onFinish()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("gru — Your gateway to the world")
+        .accessibilityLabel("gru. — Your gateway to the world")
         .accessibilityHint("Коснитесь экрана, чтобы продолжить")
     }
 }
 
-
-// MARK: - Preview
-
 #Preview {
-
     RootView()
 }
 
-// MARK: - Biometric Lock
-
 private extension RootView {
-
     var biometricLockOverlay: some View {
         ZStack {
             GRUAppBackdrop()
@@ -363,7 +249,7 @@ private extension RootView {
                     .foregroundStyle(GRUColors.accent)
 
                 VStack(spacing: 8) {
-                    Text("gru заблокирован")
+                    Text("gru. заблокирован")
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(GRUColors.text)
 
@@ -385,8 +271,7 @@ private extension RootView {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
                     .background(
-                        Capsule()
-                            .fill(GRUColors.accent)
+                        Capsule().fill(GRUColors.accent)
                     )
                 }
                 .buttonStyle(.plain)
@@ -402,7 +287,7 @@ private extension RootView {
 
         let context = LAContext()
         var error: NSError?
-        let reason = "Разблокируйте доступ к приложению gru"
+        let reason = "Разблокируйте доступ к приложению gru."
 
         if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
             context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
