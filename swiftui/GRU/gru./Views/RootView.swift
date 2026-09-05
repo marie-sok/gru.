@@ -25,7 +25,10 @@ struct RootView: View {
     @State private var isAuthenticated = false
     @State private var isCheckingSession = true
 
-    private let sessionMigrationKey = "gru.sessionMigration.v1"
+    // v2 intentionally invalidates the old beta Keychain session once.
+    // The previous startup path trusted token presence without validating it
+    // against the currently selected backend.
+    private let sessionMigrationKey = "gru.sessionMigration.v2"
 
     var body: some View {
         ZStack {
@@ -72,7 +75,7 @@ struct RootView: View {
             }
         }
         .task {
-            checkSession()
+            await checkSession()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -101,16 +104,24 @@ struct RootView: View {
 }
 
 private extension RootView {
-    func checkSession() {
+    func checkSession() async {
         performOneTimeSessionResetIfNeeded()
 
-        let token = TokenStorage.shared.token
-        let userID = TokenStorage.shared.userID
+        guard
+            let token = TokenStorage.shared.token,
+            !token.isEmpty,
+            let userID = TokenStorage.shared.userID,
+            !userID.isEmpty
+        else {
+            isAuthenticated = false
+            isCheckingSession = false
+            return
+        }
 
-        if let token,
-           !token.isEmpty,
-           let userID,
-           !userID.isEmpty {
+        let probe = await APIClient.shared.probeServer(token: token)
+
+        if let statusCode = probe.statusCode,
+           (200...299).contains(statusCode) {
             ChatService.shared.restoreSession()
             applyLocalProfile()
             isAuthenticated = true
@@ -119,8 +130,21 @@ private extension RootView {
                 isBiometricLocked = true
                 authenticateWithBiometrics()
             }
-        } else {
+
+            print("✅ Persisted gru. session validated with backend")
+        } else if probe.statusCode == 401 || probe.statusCode == 403 {
+            clearLocalSession()
             isAuthenticated = false
+            print("🧹 Persisted gru. session rejected by backend — LoginView")
+        } else {
+            // A temporary network/server failure must not destroy a potentially
+            // valid session. Keep the local session and let normal request
+            // handling surface connectivity errors without mislabelling them
+            // as an expired JWT.
+            ChatService.shared.restoreSession()
+            applyLocalProfile()
+            isAuthenticated = true
+            print("⚠️ Session validation deferred: \(probe.message)")
         }
 
         isCheckingSession = false
@@ -131,14 +155,23 @@ private extension RootView {
         let alreadyMigrated = defaults.bool(forKey: sessionMigrationKey)
         guard !alreadyMigrated else { return }
 
-        TokenStorage.shared.clear()
-        ChatService.shared.clearAuthenticatedUser()
+        clearLocalSession()
         defaults.set(true, forKey: sessionMigrationKey)
 
-        print("🧹 Old gru. session cleared")
+        print("🧹 Old gru. beta session cleared for session migration v2")
+    }
+
+    func clearLocalSession() {
+        CacheStorage.shared.clearCurrentUser()
+        WebSocketService.shared.resetSession()
+        TokenStorage.shared.clear()
+        ChatService.shared.clearAuthenticatedUser()
+        NotificationService.shared.removeAllNotifications()
+        NotificationService.shared.clearBadge()
     }
 
     func handleSessionInvalidated() {
+        clearLocalSession()
         isCheckingSession = false
 
         withAnimation(.easeInOut(duration: 0.25)) {
