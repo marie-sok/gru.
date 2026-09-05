@@ -3,6 +3,7 @@ package gru.app.controller;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +22,16 @@ import java.util.Map;
 @RequestMapping("/bot")
 public class GRUBotController {
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+
+    public GRUBotController() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(4_000);
+        requestFactory.setReadTimeout(8_000);
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
+    }
 
     public record BotTurn(String role, String text) {}
     public record BotRequest(String text, List<BotTurn> history) {}
@@ -110,8 +120,8 @@ public class GRUBotController {
             );
             return localFallback(request, "provider-http-error");
         } catch (Exception error) {
-            error.printStackTrace();
-            return localFallback(request, "provider-error");
+            System.err.println("gru.bot provider timeout/error: " + error.getMessage());
+            return localFallback(request, "provider-timeout-or-error");
         }
     }
 
@@ -156,10 +166,10 @@ public class GRUBotController {
         }
 
         String reply = russian
-                ? "Я понял запрос: «" + text + "». Сейчас AI-канал временно работает в резервном режиме, но я не буду молчать. " +
+                ? "Я понял запрос: «" + text + "». AI-канал сейчас работает в резервном режиме, но я не буду молчать. " +
                   "Могу продолжить разговор, помочь разложить задачу, сравнить варианты или собрать план. " +
                   "Если хочешь конкретный разбор, добавь цель и главный вопрос."
-                : "I got it: “" + text + "”. The AI provider is temporarily running in fallback mode, but I won’t leave the request unanswered. " +
+                : "I got it: “" + text + "”. The AI provider is currently in fallback mode, but I won’t leave the request unanswered. " +
                   "I can still help structure the problem, compare options, or build a plan. Add the goal and the main question for a more concrete answer.";
 
         System.err.println("gru.bot local fallback reason=" + reason);
