@@ -3,6 +3,7 @@ import SwiftUI
 struct MainView: View {
     @State private var selectedTab: AppTab = .chats
     @State private var isChatPresented = false
+    @State private var isAgentPresented = false
     @State private var showBotTestLab = false
 
     var body: some View {
@@ -11,7 +12,7 @@ struct MainView: View {
             selectedContent
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !isChatPresented {
+            if !isChatPresented && !isAgentPresented {
                 GRUTabBar(selectedTab: $selectedTab)
                     .padding(.top, 6)
                     .padding(.bottom, 6)
@@ -34,28 +35,41 @@ struct MainView: View {
             if isChatPresented {
                 isChatPresented = false
             }
+            if isAgentPresented {
+                isAgentPresented = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("gru.agent.presentation.changed"))) { note in
+            guard let presented = note.object as? Bool else { return }
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isAgentPresented = presented
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenChats)) { _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedTab = .chats
                 isChatPresented = false
+                isAgentPresented = false
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenContacts)) { _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedTab = .contacts
                 isChatPresented = false
+                isAgentPresented = false
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenSettings)) { _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedTab = .settings
                 isChatPresented = false
+                isAgentPresented = false
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenTestLab)) { _ in
             selectedTab = .chats
             isChatPresented = false
+            isAgentPresented = false
             showBotTestLab = true
         }
     }
