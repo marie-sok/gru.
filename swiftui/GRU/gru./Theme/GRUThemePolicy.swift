@@ -1,6 +1,5 @@
 import Foundation
 
-@MainActor
 enum GRUThemePolicy {
     static let allowed: [GRUAppTheme] = [
         .blackMoonCat,
