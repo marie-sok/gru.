@@ -23,18 +23,18 @@ struct ContactsView: View {
                         searchField
 
                         if isSearchingGRU {
-                            ProgressView("Ищем в GRU…")
+                            ProgressView("Ищем в gru.…")
                                 .tint(GRUColors.accent)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         if !gruSearchResults.isEmpty {
-                            sectionHeader("Найдено в GRU", icon: "sparkles")
+                            sectionHeader("Найдено в gru.", icon: "sparkles")
                             gruSearchSection
                         }
 
                         if !filteredGRUContacts.isEmpty {
-                            sectionHeader("Мои контакты GRU", icon: "bolt.horizontal.circle.fill")
+                            sectionHeader("Мои контакты gru.", icon: "bolt.horizontal.circle.fill")
                             gruContactsSection
                         }
 
@@ -169,7 +169,7 @@ private extension ContactsView {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(user.nickname)
                             .font(.body.weight(.semibold))
-                        Text("Пользователь GRU")
+                        Text("Пользователь gru.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -224,7 +224,7 @@ private extension ContactsView {
                         .font(.headline)
                 }
 
-                Text("Разреши GRU доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
+                Text("Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -377,7 +377,7 @@ private extension ContactsView {
             return
         } catch {
             gruSearchResults = []
-            print("❌ GRU contacts search error:", error)
+            print("❌ gru. contacts search error:", error)
         }
     }
 
@@ -395,7 +395,7 @@ private extension ContactsView {
             } catch {
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.error)
-                print("❌ Create GRU contact chat error:", error)
+                print("❌ Create gru. contact chat error:", error)
             }
         }
     }
