@@ -45,13 +45,13 @@ struct ChatView: View {
 
         let key = chat.serverID ?? chat.id.uuidString
         _chatBackgroundRaw = AppStorage(
-            wrappedValue: ChatBackgroundStyle.midnightPaws.rawValue,
+            wrappedValue: ChatBackgroundStyle.obsidian.rawValue,
             "gru.chat.background.\(key)"
         )
     }
 
     private var backgroundStyle: ChatBackgroundStyle {
-        ChatBackgroundStyle(rawValue: chatBackgroundRaw) ?? .midnightPaws
+        ChatBackgroundStyle(rawValue: chatBackgroundRaw) ?? .obsidian
     }
 
     private var currentTheme: GRUAppTheme {
@@ -65,7 +65,9 @@ struct ChatView: View {
     var body: some View {
         ZStack {
             Group {
-                if backgroundStyle == .obsidian {
+                if let theme = GRUAppTheme(rawValue: chatBackgroundRaw), GRUThemePolicy.allowed.contains(theme) {
+                    GRUSignatureWallpaper(theme: theme, intensity: 0.92)
+                } else if backgroundStyle == .obsidian {
                     GRUSignatureWallpaper(theme: currentTheme, intensity: 0.92)
                 } else {
                     ChatBackgroundView(style: backgroundStyle)

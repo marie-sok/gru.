@@ -238,14 +238,22 @@ struct ChatBackgroundPicker: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                Button {
+                    selectedRawValue = ChatBackgroundStyle.obsidian.rawValue
+                    dismiss()
+                } label: {
+                    Label("Как в приложении", systemImage: selectedRawValue == ChatBackgroundStyle.obsidian.rawValue ? "checkmark.circle.fill" : "paintpalette")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                    ForEach(ChatBackgroundStyle.gruThemes) { style in
+                    ForEach(GRUThemePolicy.allowed) { style in
                         Button {
                             selectedRawValue = style.rawValue
                             dismiss()
                         } label: {
                             ZStack(alignment: .bottomLeading) {
-                                ChatBackgroundView(style: style)
+                                GRUSignatureWallpaper(theme: style, intensity: 0.92)
                                     .frame(height: 150)
                                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 

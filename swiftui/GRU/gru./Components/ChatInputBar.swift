@@ -69,13 +69,6 @@ struct ChatInputBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !canSend, !recordingUIVisible, !showMenu {
-                recordModeHint
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 5)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
             if showMenu, !recordingUIVisible {
                 AttachmentMenu { action in
                     withAnimation(.spring(response: 0.30, dampingFraction: 0.80)) {
