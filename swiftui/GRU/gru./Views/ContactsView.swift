@@ -19,7 +19,7 @@ struct ContactsView: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 18) {
-                        GRUBotCard()
+                        GRUAgentCard()
                         searchField
 
                         if isSearchingGRU {
