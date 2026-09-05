@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - beta/0.9.0
+      - beta/0.9.1-max
   pull_request:
     paths:
       - "swiftui/GRU/**"
