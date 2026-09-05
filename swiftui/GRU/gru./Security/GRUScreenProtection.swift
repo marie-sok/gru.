@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 
@@ -45,9 +46,8 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 }
 
-/// Protects the visible app hierarchy with the same secure compositor path
-/// used by secure text entry. This is a best-effort privacy layer for still
-/// captures; active recording/mirroring is additionally blocked explicitly.
+/// Best-effort still-capture redaction using the secure compositor path used
+/// by secure text entry. Recording/mirroring is also detected and blocked.
 struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
     let content: Content
 
