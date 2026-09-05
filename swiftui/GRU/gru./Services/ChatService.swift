@@ -50,7 +50,9 @@ final class ChatService {
             displayName:
                 "Me",
             isOnline:
-                false
+                false,
+            avatarData:
+                ProfileStorage.shared.avatarData
         )
     }
 
@@ -1770,6 +1772,9 @@ final class ChatService {
         currentUser.username =
             ProfileStorage.shared.username
 
+        currentUser.avatarData =
+            ProfileStorage.shared.avatarData
+
         if let displayName {
 
             let value =
@@ -1806,6 +1811,9 @@ final class ChatService {
 
         currentUser.username =
             ProfileStorage.shared.username
+
+        currentUser.avatarData =
+            ProfileStorage.shared.avatarData
 
         currentUser.isOnline =
             onlineUserIDs
@@ -1874,6 +1882,9 @@ final class ChatService {
 
         currentUser.isOnline =
             false
+
+        currentUser.avatarData =
+            nil
 
         chats.removeAll()
 

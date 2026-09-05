@@ -16,9 +16,11 @@ The first beta is intentionally focused on the core messenger experience:
 - branded **cat video notes**;
 - People / contacts;
 - per-chat appearance and app themes;
-- optional `gru.bot` integration.
+- built-in **GRU Bot** beta agent for navigation, themes and messenger help;
+- automatic network recovery and offline/cached-state feedback.
 
-Calls, GRU Pulse and Music/Purr Library are outside the first beta scope.
+Audio/video calls, GRU Pulse, GRU Radar and Music/Purr Library are intentionally
+not part of the beta product.
 
 ## Active stack
 
@@ -72,6 +74,10 @@ Old Flutter, generated IDE/tooling output and abandoned web experiments are not 
 3. Select a **physical iPhone** for camera, microphone and video-note testing.
 4. Build and run with `⌘R`.
 
+The checked-in development entitlements are compatible with an Apple Personal
+Team. Push Notifications and iCloud are deliberately disabled in this local
+beta configuration; enable them only with a paid team and matching provisioning.
+
 For TestFlight/Release, the app must use production HTTPS/WSS endpoints instead of localhost or a developer-LAN address.
 
 ## Run the backend
@@ -79,8 +85,20 @@ For TestFlight/Release, the app must use production HTTPS/WSS endpoints instead 
 Requirements: Java 21 and Maven.
 
 ```bash
+mvn clean test
 mvn spring-boot:run
 ```
+
+Or launch the complete local server stack (backend + local MongoDB):
+
+```bash
+docker compose up --build
+curl http://127.0.0.1:8081/health
+```
+
+The backend entry point is `gru.app.GruApplication`. The local stack does not
+use Redis, Render or MongoDB Atlas; persistent Mongo data is stored in the
+Docker volume `mongo_data`.
 
 Production credentials and secrets must be supplied through deployment configuration or environment variables. They must never be committed to the repository.
 

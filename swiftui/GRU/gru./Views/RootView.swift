@@ -21,7 +21,7 @@ struct RootView: View {
     @State private var isBiometricLocked = false
 
     @AppStorage(GRUTheme.selectionKey)
-    private var themeRawValue = GRUAppTheme.obsidian.rawValue
+    private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
     // MARK: - State
 
@@ -124,7 +124,7 @@ struct RootView: View {
         }
         .preferredColorScheme(.dark)
         .tint(
-            (GRUAppTheme(rawValue: themeRawValue) ?? .obsidian).accent
+            (GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat).accent
         )
     }
 }
@@ -325,7 +325,7 @@ private struct GRUReleaseOnboardingView: View {
                     .font(.system(size: 48, weight: .black, design: .rounded))
                     .tracking(-1.8)
 
-                Text("твой выход в мир")
+                Text("Your gateway to the world")
                     .font(.system(size: 18, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -336,7 +336,7 @@ private struct GRUReleaseOnboardingView: View {
             onFinish()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("gru — твой выход в мир")
+        .accessibilityLabel("gru — Your gateway to the world")
         .accessibilityHint("Коснитесь экрана, чтобы продолжить")
     }
 }

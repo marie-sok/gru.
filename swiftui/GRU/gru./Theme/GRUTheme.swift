@@ -2,11 +2,9 @@ import Foundation
 import SwiftUI
 
 enum GRUAppTheme: String, CaseIterable, Identifiable {
-    case obsidian
     case ultraviolet
     case cyberMint
     case electricRose
-    case solarPulse
     case arcticSignal
     case acidLime
     case midnightGold
@@ -24,16 +22,35 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     static var current: GRUAppTheme {
         let rawValue = UserDefaults.standard.string(forKey: GRUTheme.selectionKey)
-        return GRUAppTheme(rawValue: rawValue ?? "") ?? .obsidian
+        return GRUAppTheme(rawValue: rawValue ?? "") ?? .blackMoonCat
     }
+
+    /// Themes intentionally designed for GRU. There is no generic/default
+    /// theme in the picker; the first signature theme is the migration target
+    /// for old installations that stored the removed `obsidian` value.
+    static let customThemes: [GRUAppTheme] = [
+        .blackMoonCat,
+        .neonCatDemon,
+        .bloodDragon,
+        .forestWitch,
+        .cyberMidnight,
+        .ultravioletUnicorn,
+        .powderPrincess,
+        .ironKnight,
+        .greenAcidMonster,
+        .midnightGold,
+        .acidLime,
+        .electricRose,
+        .cyberMint,
+        .ultraviolet,
+        .arcticSignal
+    ]
 
     var title: String {
         switch self {
-        case .obsidian: return "Obsidian"
         case .ultraviolet: return "Ultraviolet"
         case .cyberMint: return "Cyber Mint"
         case .electricRose: return "Electric Rose"
-        case .solarPulse: return "Solar Pulse"
         case .arcticSignal: return "Arctic Signal"
         case .acidLime: return "Acid Lime"
         case .midnightGold: return "Midnight Gold"
@@ -51,11 +68,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .obsidian: return "Графит, орбиты и холодное свечение"
         case .ultraviolet: return "Фиолетовые волны и электрические искры"
         case .cyberMint: return "Мятная сеть и цифровые импульсы"
         case .electricRose: return "Розовый неон и сердечный ритм"
-        case .solarPulse: return "Солнечные дуги и горячий сигнал"
         case .arcticSignal: return "Лёд, снег и северные орбиты"
         case .acidLime: return "Лаймовые капли и кислотный ток"
         case .midnightGold: return "Чёрное золото, короны и звёзды"
@@ -73,11 +88,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .obsidian: return "moon.stars.fill"
         case .ultraviolet: return "sparkles"
         case .cyberMint: return "bolt.fill"
         case .electricRose: return "heart.fill"
-        case .solarPulse: return "sun.max.fill"
         case .arcticSignal: return "snowflake"
         case .acidLime: return "drop.triangle.fill"
         case .midnightGold: return "crown.fill"
@@ -95,11 +108,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var accent: Color {
         switch self {
-        case .obsidian: return Color(red: 0.47, green: 0.90, blue: 1.00)
         case .ultraviolet: return Color(red: 0.70, green: 0.49, blue: 1.00)
         case .cyberMint: return Color(red: 0.26, green: 1.00, blue: 0.72)
         case .electricRose: return Color(red: 1.00, green: 0.35, blue: 0.72)
-        case .solarPulse: return Color(red: 1.00, green: 0.68, blue: 0.25)
         case .arcticSignal: return Color(red: 0.35, green: 0.78, blue: 1.00)
         case .acidLime: return Color(red: 0.70, green: 1.00, blue: 0.18)
         case .midnightGold: return Color(red: 1.00, green: 0.78, blue: 0.28)
@@ -117,11 +128,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var secondaryAccent: Color {
         switch self {
-        case .obsidian: return Color(red: 0.47, green: 0.51, blue: 1.00)
         case .ultraviolet: return Color(red: 0.20, green: 0.88, blue: 1.00)
         case .cyberMint: return Color(red: 0.18, green: 0.67, blue: 1.00)
         case .electricRose: return Color(red: 0.58, green: 0.39, blue: 1.00)
-        case .solarPulse: return Color(red: 1.00, green: 0.30, blue: 0.34)
         case .arcticSignal: return Color(red: 0.55, green: 0.46, blue: 1.00)
         case .acidLime: return Color(red: 0.08, green: 0.90, blue: 0.70)
         case .midnightGold: return Color(red: 1.00, green: 0.42, blue: 0.15)
@@ -139,11 +148,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var background: Color {
         switch self {
-        case .obsidian: return Color(red: 0.018, green: 0.024, blue: 0.040)
         case .ultraviolet: return Color(red: 0.030, green: 0.018, blue: 0.060)
         case .cyberMint: return Color(red: 0.012, green: 0.038, blue: 0.040)
         case .electricRose: return Color(red: 0.050, green: 0.014, blue: 0.042)
-        case .solarPulse: return Color(red: 0.054, green: 0.026, blue: 0.014)
         case .arcticSignal: return Color(red: 0.010, green: 0.030, blue: 0.060)
         case .acidLime: return Color(red: 0.018, green: 0.034, blue: 0.018)
         case .midnightGold: return Color(red: 0.030, green: 0.024, blue: 0.012)
@@ -161,11 +168,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var card: Color {
         switch self {
-        case .obsidian: return Color(red: 0.060, green: 0.076, blue: 0.110)
         case .ultraviolet: return Color(red: 0.090, green: 0.054, blue: 0.145)
         case .cyberMint: return Color(red: 0.040, green: 0.105, blue: 0.105)
         case .electricRose: return Color(red: 0.120, green: 0.045, blue: 0.100)
-        case .solarPulse: return Color(red: 0.125, green: 0.072, blue: 0.038)
         case .arcticSignal: return Color(red: 0.040, green: 0.080, blue: 0.140)
         case .acidLime: return Color(red: 0.060, green: 0.105, blue: 0.055)
         case .midnightGold: return Color(red: 0.100, green: 0.080, blue: 0.040)
@@ -191,11 +196,9 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
 
     var wallpaperSymbols: [String] {
         switch self {
-        case .obsidian: return ["moon.fill", "sparkle", "circle.fill"]
         case .ultraviolet: return ["sparkles", "wave.3.right", "bolt.fill"]
         case .cyberMint: return ["cpu.fill", "bolt.fill", "point.3.connected.trianglepath.dotted"]
         case .electricRose: return ["heart.fill", "bolt.heart.fill", "sparkles"]
-        case .solarPulse: return ["sun.max.fill", "flame.fill", "circle.dotted"]
         case .arcticSignal: return ["snowflake", "diamond.fill", "wind"]
         case .acidLime: return ["drop.fill", "bolt.fill", "atom"]
         case .midnightGold: return ["crown.fill", "star.fill", "moon.stars.fill"]
@@ -222,10 +225,10 @@ enum GRUTheme {
 
 struct GRUAppBackdrop: View {
     @AppStorage(GRUTheme.selectionKey)
-    private var themeRawValue = GRUAppTheme.obsidian.rawValue
+    private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
     private var theme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRawValue) ?? .obsidian
+        GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat
     }
 
     var body: some View {

@@ -82,6 +82,13 @@ The repository root contains Maven/Spring Boot configuration. The current backen
 - WebSocket/STOMP;
 - MongoDB.
 
+The checked-in Compose configuration is self-contained: it builds the backend
+from the repository root and starts a local MongoDB volume. Redis is not part
+of the active runtime. Hosted-vendor instructions are intentionally absent.
+
+Backend unit tests cover JWT validation, authentication, content-safety rules
+and the public health endpoint. GitHub Actions runs them on beta/backend changes.
+
 Deployment configuration and secrets belong in environment/deployment settings, not in Git.
 
 ## Beta release rule

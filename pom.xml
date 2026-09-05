@@ -208,7 +208,7 @@
                 <configuration>
 
                     <mainClass>
-                        gru.app.FunctionalUniqueCreatorKerryApplication
+                        gru.app.GruApplication
                     </mainClass>
 
                     <excludeDevtools>

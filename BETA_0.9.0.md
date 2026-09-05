@@ -26,6 +26,9 @@ No new large features before the first beta build. Only blocker, crash, auth, ne
 - [ ] Cat video note recording starts and finishes on a physical iPhone.
 - [ ] Cat video note sends and plays on the peer device.
 - [ ] Contacts/People screen does not crash when Contacts permission is denied.
+- [ ] GRU Bot opens from Chats and People and clearly identifies itself as a beta AI agent.
+- [ ] Only GRU signature app/chat themes are visible in theme pickers.
+- [ ] App avatar and GRU AppIcon render after a clean install.
 - [ ] Camera/microphone/photo permissions have valid usage descriptions.
 - [ ] Release build uses production HTTP/WSS endpoints, not `192.168.31.61` or localhost.
 - [ ] Archive succeeds with automatic signing for bundle id `sok.com.gru`.
@@ -52,11 +55,14 @@ Debug currently has a physical-device LAN fallback (`192.168.31.61:8081`). Relea
 
 ## Allowed to defer from first beta
 
-- `gru.bot` while provider/API billing is unavailable.
 - Calls/video calls.
 - GRU Pulse.
 - Music/Purr Library.
 - Cosmetic polish that does not block primary chat flows.
+
+`gru.bot` is included as an honest local beta agent for navigation, theme guidance
+and messenger help. A production model/provider endpoint may replace the local
+response engine later without changing the visible chat flow.
 
 ## First beta acceptance test
 
