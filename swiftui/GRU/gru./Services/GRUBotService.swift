@@ -19,43 +19,104 @@ struct GRUBotResponseDTO: Decodable {
 final class GRUBotService {
     static let shared = GRUBotService()
 
-    private init() {}
+    private let session: URLSession
+    private let timeout: TimeInterval = 7
 
+    private init() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 7
+        configuration.timeoutIntervalForResource = 8
+        configuration.waitsForConnectivity = false
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        session = URLSession(configuration: configuration)
+    }
+
+    /// gru.bot must always answer. A live backend/provider response is preferred,
+    /// but transport, auth, decode and provider failures fall back locally.
     func ask(
         text: String,
         history: [GRUBotTurnDTO]
     ) async throws -> GRUBotResponseDTO {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else {
+            return localFallback(for: text, reason: "empty-input")
+        }
+
         guard let token = TokenStorage.shared.token,
               !token.isEmpty else {
-            return localFallback(for: text)
+            return localFallback(for: clean, reason: "missing-session")
+        }
+
+        guard let url = URL(
+            string: "\(GRUServerConfiguration.httpBaseURL)/bot/chat"
+        ) else {
+            return localFallback(for: clean, reason: "invalid-url")
         }
 
         do {
             let body = try JSONCoding.encoder.encode(
                 GRUBotRequestDTO(
-                    text: text,
-                    history: history
+                    text: clean,
+                    history: Array(history.suffix(30))
                 )
             )
 
-            let data = try await APIClient.shared.request(
-                path: "/bot/chat",
-                method: "POST",
-                token: token,
-                body: body
+            var request = URLRequest(
+                url: url,
+                cachePolicy: .reloadIgnoringLocalCacheData,
+                timeoutInterval: timeout
             )
+            request.httpMethod = "POST"
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-            return try JSONCoding.decoder.decode(
+            print("🤖 gru.bot request ->", url.absoluteString)
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let http = response as? HTTPURLResponse else {
+                return localFallback(for: clean, reason: "non-http-response")
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                print("⚠️ gru.bot HTTP", http.statusCode, "-> local fallback")
+                return localFallback(
+                    for: clean,
+                    reason: "http-\(http.statusCode)"
+                )
+            }
+
+            let decoded = try JSONCoding.decoder.decode(
                 GRUBotResponseDTO.self,
                 from: data
             )
+
+            let reply = decoded.reply.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !reply.isEmpty else {
+                return localFallback(for: clean, reason: "empty-reply")
+            }
+
+            print("✅ gru.bot reply model:", decoded.model ?? "unknown")
+            return GRUBotResponseDTO(reply: reply, model: decoded.model)
+
         } catch {
-            print("⚠️ gru.bot backend unavailable, using local fallback:", error)
-            return localFallback(for: text)
+            print(
+                "⚠️ gru.bot transport/decode fallback:",
+                error.localizedDescription
+            )
+            return localFallback(
+                for: clean,
+                reason: error.localizedDescription
+            )
         }
     }
 
-    private func localFallback(for source: String) -> GRUBotResponseDTO {
+    private func localFallback(
+        for source: String,
+        reason: String
+    ) -> GRUBotResponseDTO {
         let text = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = text.lowercased()
         let asksForPlan =
@@ -65,6 +126,15 @@ final class GRUBotService {
             lower.contains("plan") ||
             lower.contains("steps") ||
             lower.contains("schedule")
+
+        let asksToWrite =
+            lower.contains("напиши") ||
+            lower.contains("перепиши") ||
+            lower.contains("текст") ||
+            lower.contains("write") ||
+            lower.contains("rewrite")
+
+        print("🛟 gru.bot local fallback reason:", reason)
 
         if asksForPlan {
             return GRUBotResponseDTO(
@@ -83,15 +153,31 @@ final class GRUBotService {
             )
         }
 
-        if lower.contains("привет") || lower == "hi" || lower.contains("hello") {
+        if asksToWrite {
             return GRUBotResponseDTO(
-                reply: "Привет. Я на связи. Можем поболтать, разобрать мысль или собрать план — кидай тему как есть.",
+                reply: """
+                Могу помочь с текстом прямо сейчас. Пришли исходник или скажи три вещи: кому пишем, что нужно получить в результате и какой нужен тон. Я соберу готовую версию без лишней воды.
+                """,
+                model: "gru-local-writer"
+            )
+        }
+
+        if lower.contains("привет") ||
+            lower == "hi" ||
+            lower.contains("hello") ||
+            lower.contains("ты тут") {
+            return GRUBotResponseDTO(
+                reply: "Привет. Я здесь и отвечаю. Можем поболтать, разобрать задачу, написать текст или собрать план — кидай тему как есть.",
                 model: "gru-local-chat"
             )
         }
 
         return GRUBotResponseDTO(
-            reply: "Я понял: «\(text)». Сейчас серверный AI-канал недоступен, поэтому я отвечаю в резервном режиме. Могу помочь разложить задачу, сравнить варианты, сформулировать текст или собрать план. Добавь цель и главный вопрос — продолжим.",
+            reply: """
+            Я получил: «\(text)».
+
+            Серверный AI-канал сейчас не дал быстрый ответ, поэтому я переключился на встроенный резервный режим вместо молчания. Могу продолжить разговор, разложить задачу, сравнить варианты, подготовить текст или план. Добавь цель или главный вопрос — отвечу дальше.
+            """,
             model: "gru-local-chat"
         )
     }
