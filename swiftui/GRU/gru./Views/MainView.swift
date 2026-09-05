@@ -22,6 +22,24 @@ struct MainView: View {
                 isChatPresented = false
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenChats)) { _ in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedTab = .chats
+                isChatPresented = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenContacts)) { _ in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedTab = .contacts
+                isChatPresented = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenSettings)) { _ in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedTab = .settings
+                isChatPresented = false
+            }
+        }
     }
 
     @ViewBuilder
