@@ -29,7 +29,7 @@ struct MainView: View {
         if selectedTab == .contacts {
             ContactsView()
         } else if selectedTab == .settings {
-            BetaSettingsView()
+            GRUReleaseSettingsView()
         } else {
             BetaChatListView(
                 onChatPresentationChanged: { isPresented in
