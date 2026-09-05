@@ -12,8 +12,8 @@ struct MainView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !isChatPresented {
                 GRUTabBar(selectedTab: $selectedTab)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
+                    .padding(.top, 6)
+                    .padding(.bottom, 6)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -29,9 +29,9 @@ struct MainView: View {
         if selectedTab == .contacts {
             ContactsView()
         } else if selectedTab == .settings {
-            SettingsView()
+            BetaSettingsView()
         } else {
-            ChatListView(
+            BetaChatListView(
                 onChatPresentationChanged: { isPresented in
                     DispatchQueue.main.async {
                         guard isChatPresented != isPresented else { return }

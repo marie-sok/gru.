@@ -19,22 +19,22 @@ struct ContactsView: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 18) {
-                        gruRadar
+                        GRUAgentCard()
                         searchField
 
                         if isSearchingGRU {
-                            ProgressView("Ищем в GRU…")
+                            ProgressView("Ищем в gru.…")
                                 .tint(GRUColors.accent)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         if !gruSearchResults.isEmpty {
-                            sectionHeader("Найдено в GRU", icon: "sparkles")
+                            sectionHeader("Найдено в gru.", icon: "sparkles")
                             gruSearchSection
                         }
 
                         if !filteredGRUContacts.isEmpty {
-                            sectionHeader("Мои контакты GRU", icon: "bolt.horizontal.circle.fill")
+                            sectionHeader("Мои контакты gru.", icon: "bolt.horizontal.circle.fill")
                             gruContactsSection
                         }
 
@@ -76,59 +76,6 @@ struct ContactsView: View {
 }
 
 private extension ContactsView {
-    var gruRadar: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(GRUColors.accent.opacity(0.12))
-                    .frame(width: 50, height: 50)
-                Circle()
-                    .stroke(GRUColors.accent.opacity(0.18), lineWidth: 1)
-                    .frame(width: 38, height: 38)
-                Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(GRUColors.accent)
-            }
-            .shadow(color: GRUColors.accent.opacity(0.28), radius: 13)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
-                    Text("GRU RADAR")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .tracking(0.8)
-                    Text("LIVE")
-                        .font(.system(size: 7, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.black.opacity(0.80))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(GRUColors.accent, in: Capsule())
-                }
-                Text("Люди из GRU и телефонной книги в одном месте")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(filteredGRUContacts.count)")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(GRUColors.accent)
-                Text("в GRU")
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(14)
-        .background(GRUColors.card.opacity(0.86), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(GRUColors.neonGradient, lineWidth: 1)
-                .opacity(0.46)
-        }
-        .shadow(color: GRUColors.accent.opacity(0.10), radius: 18, y: 7)
-    }
-
     var searchField: some View {
         HStack(spacing: 10) {
             GRUNeonIcon(systemName: "magnifyingglass", size: 34, iconSize: 14)
@@ -222,7 +169,7 @@ private extension ContactsView {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(user.nickname)
                             .font(.body.weight(.semibold))
-                        Text("Пользователь GRU")
+                        Text("Пользователь gru.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -277,7 +224,7 @@ private extension ContactsView {
                         .font(.headline)
                 }
 
-                Text("Разреши GRU доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
+                Text("Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -430,7 +377,7 @@ private extension ContactsView {
             return
         } catch {
             gruSearchResults = []
-            print("❌ GRU contacts search error:", error)
+            print("❌ gru. contacts search error:", error)
         }
     }
 
@@ -448,7 +395,7 @@ private extension ContactsView {
             } catch {
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.error)
-                print("❌ Create GRU contact chat error:", error)
+                print("❌ Create gru. contact chat error:", error)
             }
         }
     }

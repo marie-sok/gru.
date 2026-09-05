@@ -33,7 +33,7 @@ struct ChatView: View {
     @State private var showDeleteChatConfirmation = false
     @State private var deletingChat = false
 
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.obsidian.rawValue
+    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
     @AppStorage("showStatus") private var showOnlineStatus = true
     @AppStorage("gru.settings.privacy.typing") private var showTypingStatus = true
     @AppStorage("gru.settings.chats.wallpaperBlur") private var wallpaperBlur = false
@@ -45,17 +45,17 @@ struct ChatView: View {
 
         let key = chat.serverID ?? chat.id.uuidString
         _chatBackgroundRaw = AppStorage(
-            wrappedValue: ChatBackgroundStyle.obsidian.rawValue,
+            wrappedValue: ChatBackgroundStyle.midnightPaws.rawValue,
             "gru.chat.background.\(key)"
         )
     }
 
     private var backgroundStyle: ChatBackgroundStyle {
-        ChatBackgroundStyle(rawValue: chatBackgroundRaw) ?? .obsidian
+        ChatBackgroundStyle(rawValue: chatBackgroundRaw) ?? .midnightPaws
     }
 
     private var currentTheme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRaw) ?? .obsidian
+        GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
     }
 
     private var peerUser: User? {
@@ -627,6 +627,9 @@ private extension ChatView {
                             isCurrentUser: message.senderID == ChatService.shared.currentUser.id,
                             onReply: { message in
                                 vm.startReply(to: message)
+                            },
+                            onEdit: { message in
+                                vm.startEditing(message)
                             },
                             onDeleteLocal: { message in
                                 vm.deleteLocal(message)

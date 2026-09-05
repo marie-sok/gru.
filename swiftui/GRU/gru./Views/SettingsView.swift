@@ -5,7 +5,7 @@ import UIKit
 @MainActor
 struct SettingsView: View {
     @State private var showLogoutConfirmation = false
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.obsidian.rawValue
+    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
     @AppStorage("notifications") private var notificationsEnabled = true
     @AppStorage("showStatus") private var showOnlineStatus = true
 
@@ -266,7 +266,7 @@ struct SettingsView: View {
     }
 
     private var currentTheme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRaw) ?? .obsidian
+        GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
     }
 
     private func controlChip(icon: String, text: String) -> some View {
@@ -553,14 +553,14 @@ private struct DataStorageSettingsView: View {
 }
 
 private struct AppearanceSettingsView: View {
-    @AppStorage(GRUTheme.selectionKey) private var theme = GRUAppTheme.obsidian.rawValue
+    @AppStorage(GRUTheme.selectionKey) private var theme = GRUAppTheme.blackMoonCat.rawValue
     @AppStorage("gru.settings.appearance.neonGlow") private var neon = true
     @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
     @AppStorage("gru.settings.appearance.dynamicBackground") private var dynamicBackground = true
     @AppStorage("gru.settings.appearance.largeAvatars") private var largeAvatars = false
 
     private var selectedTheme: GRUAppTheme {
-        GRUAppTheme(rawValue: theme) ?? .obsidian
+        GRUAppTheme(rawValue: theme) ?? .blackMoonCat
     }
 
     var body: some View {
@@ -600,7 +600,7 @@ private struct AppearanceSettingsView: View {
             }
 
             Section("Коллекция тем") {
-                ForEach(GRUAppTheme.allCases) { item in
+                ForEach(GRUAppTheme.customThemes) { item in
                     Button {
                         theme = item.rawValue
                     } label: {
@@ -802,7 +802,7 @@ private struct AboutGRUSettingsView: View {
                 Label("Видео-сообщения: tap / hold / lock / cancel", systemImage: "video.circle.fill")
                 Label("Ответы и реакции", systemImage: "arrowshape.turn.up.left.fill")
                 Label("Локальный кэш", systemImage: "externaldrive.fill")
-                Label("17 Signature themes + animated wallpapers", systemImage: "paintpalette.fill")
+                Label("15 GRU signature themes + animated wallpapers", systemImage: "paintpalette.fill")
                 Label("Report / Block / Account deletion", systemImage: "checkmark.shield.fill")
                 Label("Privacy Manifest + release audit", systemImage: "checkmark.seal.fill")
             }

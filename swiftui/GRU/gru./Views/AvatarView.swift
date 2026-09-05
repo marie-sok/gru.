@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AvatarView: View {
 
@@ -13,14 +14,21 @@ struct AvatarView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
-                if let image = avatarImage {
+                if let data = user.avatarData,
+                   let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                } else if let image = avatarImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: size, height: size)
                         .clipShape(Circle())
                 } else {
-                    initialsView
+                    fallbackAvatar
                 }
             }
             .task(id: user.avatarURL) {
@@ -39,22 +47,46 @@ struct AvatarView: View {
         }
     }
 
-    private var initialsView: some View {
+    private var fallbackAvatar: some View {
         ZStack {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.blue, Color.purple],
+                        colors: fallbackPalette,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: size, height: size)
 
-            Text(initials)
-                .font(.system(size: size * 0.36, weight: .bold))
-                .foregroundStyle(.white)
+            Circle()
+                .stroke(GRUColors.neonGradient, lineWidth: max(1, size * 0.025))
+
+            if user.isBot {
+                Image(systemName: "cat.fill")
+                    .font(.system(size: size * 0.40, weight: .black))
+                    .foregroundStyle(.white)
+                    .shadow(color: GRUColors.accent, radius: 5)
+            } else {
+                Text(initials)
+                    .font(.system(size: size * 0.36, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
         }
+        .frame(width: size, height: size)
+        .shadow(color: fallbackPalette.first?.opacity(0.42) ?? .clear, radius: 10)
+    }
+
+    private var fallbackPalette: [Color] {
+        let seed = (user.serverID ?? user.id.uuidString).utf8.reduce(UInt64(1469598103934665603)) { partial, byte in
+            (partial ^ UInt64(byte)) &* 1099511628211
+        }
+        let palettes: [[Color]] = [
+            [GRUColors.accent, GRUColors.accentSecondary],
+            [Color(red: 0.95, green: 0.18, blue: 0.78), Color(red: 0.25, green: 0.33, blue: 1.0)],
+            [Color(red: 0.40, green: 1.0, blue: 0.70), Color(red: 0.08, green: 0.48, blue: 0.92)],
+            [Color(red: 1.0, green: 0.34, blue: 0.24), Color(red: 0.50, green: 0.08, blue: 0.60)]
+        ]
+        return palettes[Int(seed % UInt64(palettes.count))]
     }
 
     private var initials: String {
@@ -71,6 +103,11 @@ struct AvatarView: View {
     }
 
     private func loadAvatar() async {
+        guard user.avatarData == nil else {
+            avatarImage = nil
+            return
+        }
+
         guard let urlString = user.avatarURL, !urlString.isEmpty else {
             avatarImage = nil
             return

@@ -26,6 +26,7 @@ struct ChatListView: View {
 
     @State
     private var socket = WebSocketService.shared
+
     @State
     private var network = NetworkMonitor.shared
 
@@ -34,13 +35,12 @@ struct ChatListView: View {
     @State
     private var showingNewChat = false
 
-    // MARK: - V8 Pulse / Filters
+    // MARK: - Search and filters
 
     @State private var searchText = ""
     @State private var chatFilter: GRUChatFilter = .all
     @State private var pendingDeleteChat: Chat?
     @State private var deletingChatServerID: String?
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.obsidian.rawValue
 
     // MARK: - Realtime
 
@@ -176,7 +176,7 @@ struct ChatListView: View {
 
         syncRealtimeSubscriptions()
 
-  
+
 
         connectWebSocket()
     }
@@ -506,38 +506,29 @@ struct ChatListView: View {
     @ViewBuilder
     private var content: some View {
 
-        if service.isLoadingChats &&
-            service.chats.isEmpty {
-
+        if service.isLoadingChats && service.chats.isEmpty {
             loadingView
-
-        } else if
-            let error =
-                service.chatLoadingError,
-            service.chats.isEmpty {
-
-            errorView(
-                message: error
-            )
-
-        } else if
-            service.chats.isEmpty {
-
-            emptyView
-
         } else {
-
             VStack(spacing: 10) {
-                gruPulse
+                chatControls
                     .padding(.horizontal, 14)
                     .padding(.top, 8)
+
+                GRUBotCard()
+                    .padding(.horizontal, 14)
 
                 if !network.isConnected || service.chatLoadingError != nil || service.isUsingCachedChats {
                     connectionBanner
                         .padding(.horizontal, 14)
                 }
 
-                chatList
+                if let error = service.chatLoadingError, service.chats.isEmpty {
+                    errorView(message: error)
+                } else if service.chats.isEmpty {
+                    emptyView
+                } else {
+                    chatList
+                }
             }
         }
     }
@@ -548,7 +539,7 @@ struct ChatListView: View {
 
         let isOffline = !network.isConnected
 
-        HStack(
+        return HStack(
             spacing: 11
         ) {
 
@@ -567,9 +558,9 @@ struct ChatListView: View {
                 Text(
                     isOffline
                         ? "Ожидание сети..."
-                        : (service.isUsingCachedChats
-                            ? "Показан сохранённый список"
-                            : "Backend временно недоступен")
+                        : service.isUsingCachedChats
+                        ? "Показан сохранённый список"
+                        : "Backend временно недоступен"
                 )
                 .font(
                     .caption.weight(.semibold)
@@ -676,31 +667,21 @@ struct ChatListView: View {
         return GRUServerConfiguration.httpBaseURL
     }
 
-    // MARK: - V11 GRU Pulse
+    // MARK: - Chat controls
 
-    private var gruPulse: some View {
+    private var chatControls: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(GRUColors.accent.opacity(0.13))
-                        .frame(width: 44, height: 44)
-
-                    Image(systemName: socket.isConnected ? "bolt.horizontal.circle.fill" : "bolt.slash.circle.fill")
-                        .font(.system(size: 19, weight: .bold))
-                        .foregroundStyle(socket.isConnected ? GRUColors.accent : .secondary)
-                }
-                .overlay {
-                    Circle().stroke(
-                        socket.isConnected ? GRUColors.accent.opacity(0.30) : Color.white.opacity(0.08),
-                        lineWidth: 1
-                    )
-                }
-                .shadow(color: socket.isConnected ? GRUColors.accent.opacity(0.24) : .clear, radius: 12)
+                GRUNeonIcon(
+                    systemName: socket.isConnected ? "bolt.horizontal.fill" : "bolt.slash.fill",
+                    size: 44,
+                    iconSize: 18,
+                    isActive: socket.isConnected
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("GRU PULSE")
+                        Text("GRU CHATS")
                             .font(.system(size: 13, weight: .black, design: .rounded))
                             .tracking(0.9)
 
@@ -720,22 +701,8 @@ struct ChatListView: View {
 
                 Spacer()
 
-                pulseMetric(value: unreadTotal, label: "новых")
-                pulseMetric(value: onlineTotal, label: "online")
-            }
-
-            HStack(spacing: 8) {
-                Label(currentTheme.title, systemImage: currentTheme.icon)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(GRUColors.accent)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Text(currentTheme.subtitle)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                metric(value: unreadTotal, label: "новых")
+                metric(value: onlineTotal, label: "online")
             }
 
             HStack(spacing: 8) {
@@ -812,11 +779,7 @@ struct ChatListView: View {
         .shadow(color: GRUColors.accent.opacity(0.10), radius: 18, y: 8)
     }
 
-    private var currentTheme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRaw) ?? .obsidian
-    }
-
-    private func pulseMetric(value: Int, label: String) -> some View {
+    private func metric(value: Int, label: String) -> some View {
         VStack(spacing: 1) {
             Text("\(value)")
                 .font(.system(size: 14, weight: .black, design: .rounded))
@@ -1152,7 +1115,287 @@ struct ChatListView: View {
 
 // MARK: - Preview
 
-#Preview {
+// MARK: - GRU Bot
 
+/// A deterministic built-in assistant for the beta. It is deliberately a
+/// local agent until the production backend exposes an AI endpoint.
+enum GRUBotIdentity {
+    static let user = User(
+        id: UUID(uuidString: "B0B0B0B0-0000-4000-8000-000000000001") ?? UUID(),
+        username: "gru.bot",
+        displayName: "GRU Bot",
+        isOnline: true,
+        isBot: true
+    )
+}
+
+struct GRUBotCard: View {
+    var body: some View {
+        NavigationLink {
+            GRUBotView()
+        } label: {
+            HStack(spacing: 12) {
+                AvatarView(user: GRUBotIdentity.user, size: 48)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 7) {
+                        Text("GRU Bot")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+
+                        Text("AI")
+                            .font(.system(size: 8, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.black.opacity(0.82))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(GRUColors.accent, in: Capsule())
+                    }
+
+                    Text("AI agent внутри GRU")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(GRUColors.accent)
+            }
+            .padding(13)
+            .background(GRUColors.card.opacity(0.90), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(GRUColors.neonGradient, lineWidth: 1.1)
+                    .opacity(0.65)
+            }
+            .shadow(color: GRUColors.accent.opacity(0.16), radius: 16, y: 7)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Открыть GRU Bot")
+    }
+}
+
+@MainActor
+struct GRUBotView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var messages: [GRUBotMessage] = [
+        GRUBotMessage(
+            role: .bot,
+            text: "Привет. Я GRU Bot — встроенный AI agent. Помогу найти функцию, выбрать тему и разобраться с перепиской."
+        )
+    ]
+    @State private var input = ""
+    @State private var isThinking = false
+    @FocusState private var inputFocused: Bool
+
+    private let quickPrompts = ["Что умеет GRU?", "Как выбрать тему?", "Где мои контакты?"]
+
+    var body: some View {
+        ZStack {
+            GRUAppBackdrop()
+
+            VStack(spacing: 0) {
+                botHeader
+
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: 12) {
+                            ForEach(messages) { message in
+                                messageRow(message).id(message.id)
+                            }
+
+                            if isThinking {
+                                thinkingRow.id("thinking")
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                    }
+                    .onChange(of: messages.count) { _, _ in scrollToLast(proxy) }
+                    .onChange(of: isThinking) { _, _ in scrollToLast(proxy) }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
+        .navigationBarBackButtonHidden(true)
+    }
+
+    private var botHeader: some View {
+        HStack(spacing: 11) {
+            Button { dismiss() } label: {
+                GRUNeonIcon(systemName: "chevron.left", size: 38, iconSize: 14)
+            }
+            .buttonStyle(.plain)
+
+            AvatarView(user: GRUBotIdentity.user, size: 40)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("GRU Bot").font(.headline)
+                Text("AI agent • beta")
+                    .font(.caption)
+                    .foregroundStyle(GRUColors.accent)
+            }
+
+            Spacer()
+            GRUNeonIcon(systemName: "sparkles", size: 36, iconSize: 14)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+    }
+
+    private var composer: some View {
+        VStack(spacing: 8) {
+            if messages.count == 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(quickPrompts, id: \.self) { prompt in
+                            Button(prompt) { send(prompt) }
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(GRUColors.accent)
+                                .padding(.horizontal, 12)
+                                .frame(height: 32)
+                                .background(GRUColors.accent.opacity(0.10), in: Capsule())
+                                .overlay { Capsule().stroke(GRUColors.accent.opacity(0.20), lineWidth: 1) }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+            }
+
+            HStack(spacing: 9) {
+                TextField("Спросить GRU Bot", text: $input, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...4)
+                    .focused($inputFocused)
+                    .submitLabel(.send)
+                    .onSubmit { send(input) }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(GRUColors.card.opacity(0.94), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+
+                Button { send(input) } label: {
+                    GRUNeonIcon(systemName: "arrow.up", size: 42, iconSize: 17, isActive: canSend)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend || isThinking)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    private var canSend: Bool {
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func messageRow(_ message: GRUBotMessage) -> some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if message.role == .bot {
+                AvatarView(user: GRUBotIdentity.user, size: 28)
+            } else {
+                Spacer(minLength: 32)
+            }
+
+            Text(message.text)
+                .font(.body)
+                .foregroundStyle(message.role == .bot ? GRUColors.text : Color.black.opacity(0.86))
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 10)
+                .background(message.role == .bot ? GRUColors.card.opacity(0.94) : GRUColors.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    if message.role == .bot {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(GRUColors.accent.opacity(0.16), lineWidth: 1)
+                    }
+                }
+
+            if message.role == .user {
+                Spacer(minLength: 32)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: message.role == .bot ? .leading : .trailing)
+    }
+
+    private var thinkingRow: some View {
+        HStack(spacing: 8) {
+            AvatarView(user: GRUBotIdentity.user, size: 28)
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle().fill(GRUColors.accent).frame(width: 5, height: 5)
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(GRUColors.card.opacity(0.94), in: Capsule())
+            Spacer()
+        }
+    }
+
+    private func send(_ rawText: String) {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isThinking else { return }
+
+        messages.append(GRUBotMessage(role: .user, text: text))
+        input = ""
+        inputFocused = false
+        isThinking = true
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard !Task.isCancelled else { return }
+            messages.append(GRUBotMessage(role: .bot, text: GRUBotAgent.answer(for: text)))
+            isThinking = false
+        }
+    }
+
+    private func scrollToLast(_ proxy: ScrollViewProxy) {
+        withAnimation(.easeOut(duration: 0.20)) {
+            if isThinking {
+                proxy.scrollTo("thinking", anchor: .bottom)
+            } else if let id = messages.last?.id {
+                proxy.scrollTo(id, anchor: .bottom)
+            }
+        }
+    }
+}
+
+private enum GRUBotMessageRole { case bot, user }
+
+private struct GRUBotMessage: Identifiable {
+    let id = UUID()
+    let role: GRUBotMessageRole
+    let text: String
+}
+
+private enum GRUBotAgent {
+    static func answer(for text: String) -> String {
+        let query = text.lowercased()
+
+        if query.contains("тема") || query.contains("оформ") || query.contains("фон") {
+            return "Открой Настройки → Оформление. Там оставлены только фирменные темы GRU с детальными рисунками; тема меняется сразу."
+        }
+        if query.contains("контакт") || query.contains("люд") {
+            return "Вкладка «Люди» показывает пользователей GRU и телефонную книгу. Доступ к контактам iPhone запрашивается только при открытии раздела."
+        }
+        if query.contains("видео") || query.contains("круж") || query.contains("голос") {
+            return "Видео выбирается из медиатеки или камеры. Лапка в поле ввода: двойной тап переключает голос/кружок, удержание записывает."
+        }
+        if query.contains("звон") {
+            return "В beta GRU нет аудио- и видеозвонков — только голосовые, видео и видео-кружки внутри чата."
+        }
+        if query.contains("удал") {
+            return "Зажми сообщение или выбери несколько: доступно удаление только у себя, а для своих сообщений — у себя и собеседника."
+        }
+        if query.contains("помощ") || query.contains("умеет") || query.contains("help") {
+            return "Я подсказываю по чатам, темам, профилю, контактам, медиа и настройкам. Напиши вопрос обычными словами."
+        }
+        return "Принял. Я beta-агент GRU: могу подсказать путь в приложении или объяснить, как работает нужная функция."
+    }
+}
+
+#Preview {
     ChatListView()
 }

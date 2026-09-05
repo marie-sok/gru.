@@ -2,7 +2,6 @@ import AVFoundation
 import SwiftUI
 
 struct VideoNoteBubble: View {
-
     let attachment: Attachment
 
     @State private var player: AVPlayer?
@@ -12,8 +11,8 @@ struct VideoNoteBubble: View {
     @State private var glowPulse = false
     @AppStorage("gru.settings.chats.videoNoteAutoplay") private var autoplay = true
 
-    private let width: CGFloat = 154
-    private let height: CGFloat = 168
+    private let width: CGFloat = 150
+    private let height: CGFloat = 160
 
     private var catShape: CatVideoNoteShape {
         CatVideoNoteShape()
@@ -23,50 +22,31 @@ struct VideoNoteBubble: View {
         ZStack {
             videoLayer
 
-            CatVideoNoteEarDetails(width: width)
-
-            catShape
-                .stroke(GRUColors.accent.opacity(glowPulse ? 0.48 : 0.24), lineWidth: 8)
-                .blur(radius: 9)
-                .frame(width: width, height: height)
-                .allowsHitTesting(false)
-
             catShape
                 .stroke(
-                    LinearGradient(
-                        colors: [
-                            GRUColors.accent.opacity(1.0),
-                            .white.opacity(0.82),
-                            GRUColors.accentSecondary.opacity(0.72),
-                            GRUColors.accent.opacity(0.96)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2.4
+                    GRUColors.accent.opacity(glowPulse ? 0.22 : 0.10),
+                    lineWidth: 5
                 )
-                .shadow(
-                    color: GRUColors.accent.opacity(glowPulse ? 0.72 : 0.38),
-                    radius: glowPulse ? 22 : 11
-                )
-                .shadow(
-                    color: GRUColors.accentSecondary.opacity(glowPulse ? 0.28 : 0.12),
-                    radius: glowPulse ? 32 : 16
-                )
+                .blur(radius: 6)
                 .frame(width: width, height: height)
                 .allowsHitTesting(false)
 
-            if player != nil,
-               !isPlaying {
+            catShape
+                .stroke(GRUColors.neonGradient, lineWidth: 1.8)
+                .frame(width: width, height: height)
+                .shadow(
+                    color: GRUColors.accent.opacity(glowPulse ? 0.34 : 0.16),
+                    radius: glowPulse ? 11 : 6
+                )
+                .allowsHitTesting(false)
+
+            if player != nil, !isPlaying {
                 playButton
             }
 
             durationOverlay
         }
-        .frame(
-            width: width,
-            height: height
-        )
+        .frame(width: width, height: height)
         .contentShape(catShape)
         .onTapGesture {
             togglePlayback()
@@ -76,10 +56,8 @@ struct VideoNoteBubble: View {
         }
         .onAppear {
             withAnimation(
-                .easeInOut(duration: 1.5)
-                    .repeatForever(
-                        autoreverses: true
-                    )
+                .easeInOut(duration: 1.7)
+                    .repeatForever(autoreverses: true)
             ) {
                 glowPulse = true
             }
@@ -93,28 +71,26 @@ struct VideoNoteBubble: View {
     @ViewBuilder
     private var videoLayer: some View {
         if let player {
-            VideoNotePlayerView(
-                player: player
-            )
-            .frame(
-                width: width,
-                height: height
-            )
-            .clipShape(catShape)
+            VideoNotePlayerView(player: player)
+                .frame(width: width, height: height)
+                .clipShape(catShape)
         } else {
             placeholder
         }
     }
 
     private var playButton: some View {
-        GRUNeonIcon(
-            systemName: "play.fill",
-            size: 42,
-            iconSize: 15
-        )
-        .background(.black.opacity(0.26), in: Circle())
-        .shadow(color: GRUColors.accent.opacity(0.48), radius: 14)
-        .offset(y: 7)
+        ZStack {
+            Circle()
+                .fill(.black.opacity(0.42))
+                .frame(width: 40, height: 40)
+
+            Image(systemName: "play.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .offset(x: 1)
+        }
+        .offset(y: 4)
     }
 
     private var placeholder: some View {
@@ -123,16 +99,13 @@ struct VideoNoteBubble: View {
                 LinearGradient(
                     colors: [
                         GRUColors.card,
-                        GRUColors.accent.opacity(0.18)
+                        GRUColors.accent.opacity(0.13)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
-            .frame(
-                width: width,
-                height: height
-            )
+            .frame(width: width, height: height)
             .overlay {
                 Group {
                     if isLoading {
@@ -140,59 +113,37 @@ struct VideoNoteBubble: View {
                             .tint(.white)
                     } else {
                         Image(
-                            systemName:
-                                loadError == nil
-                                    ? "play.circle.fill"
-                                    : "exclamationmark.triangle.fill"
+                            systemName: loadError == nil
+                                ? "play.fill"
+                                : "exclamationmark.circle.fill"
                         )
-                        .font(
-                            .system(
-                                size: 42,
-                                weight: .medium
-                            )
-                        )
+                        .font(.system(size: 24, weight: .semibold))
                     }
                 }
-                .foregroundStyle(
-                    .white.opacity(0.86)
-                )
-                .offset(y: 8)
+                .foregroundStyle(.white.opacity(0.84))
+                .offset(y: 4)
             }
     }
 
     private var durationOverlay: some View {
         VStack {
             Spacer()
-
             HStack {
                 Spacer()
-
                 if let durationText {
                     Text(durationText)
-                        .font(
-                            .system(
-                                size: 11,
-                                weight: .semibold,
-                                design: .rounded
-                            )
-                        )
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            .black.opacity(0.46)
-                        )
-                        .clipShape(Capsule())
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 13)
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(.black.opacity(0.44), in: Capsule())
+                        .padding(.trailing, 13)
+                        .padding(.bottom, 10)
                 }
             }
         }
-        .frame(
-            width: width,
-            height: height
-        )
+        .frame(width: width, height: height)
         .allowsHitTesting(false)
     }
 
@@ -206,12 +157,7 @@ struct VideoNoteBubble: View {
         }
 
         let total = Int(duration.rounded())
-
-        return String(
-            format: "%d:%02d",
-            total / 60,
-            total % 60
-        )
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 
     private var loadIdentity: String {
@@ -225,18 +171,11 @@ struct VideoNoteBubble: View {
 
     @MainActor
     private func preparePlayerIfNeeded() async {
-        guard player == nil else {
-            return
-        }
-
+        guard player == nil else { return }
         loadError = nil
 
         if let localURL = localVideoURL {
-            player = AVPlayer(url: localURL)
-            if autoplay {
-                player?.play()
-                isPlaying = true
-            }
+            installPlayer(url: localURL)
             return
         }
 
@@ -250,42 +189,29 @@ struct VideoNoteBubble: View {
         }
 
         isLoading = true
-
-        defer {
-            isLoading = false
-        }
+        defer { isLoading = false }
 
         do {
-            let data =
-                try await APIClient.shared.download(
-                    path: remotePath,
-                    token: token
-                )
-
-            let cachedURL =
-                try saveRemoteVideo(data)
-
-            player =
-                AVPlayer(url: cachedURL)
-
-            if autoplay {
-                player?.play()
-                isPlaying = true
-            }
-
-            print("")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            print("🐱 VIDEO MESSAGE LOADED")
-            print("📎", attachment.fileName)
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
+            let data = try await APIClient.shared.download(
+                path: remotePath,
+                token: token
+            )
+            let cachedURL = try saveRemoteVideo(data)
+            installPlayer(url: cachedURL)
         } catch {
             loadError = error.localizedDescription
+            print("❌ Video note load error:", error)
+        }
+    }
 
-            print(
-                "❌ Video message load error:",
-                error
-            )
+    @MainActor
+    private func installPlayer(url: URL) {
+        let created = AVPlayer(url: url)
+        player = created
+
+        if autoplay {
+            created.play()
+            isPlaying = true
         }
     }
 
@@ -293,64 +219,29 @@ struct VideoNoteBubble: View {
         guard
             let path = attachment.localPath,
             !path.isEmpty,
-            FileManager.default
-                .fileExists(
-                    atPath: path
-                )
+            FileManager.default.fileExists(atPath: path)
         else {
             return nil
         }
 
-        return URL(
-            fileURLWithPath: path
-        )
+        return URL(fileURLWithPath: path)
     }
 
-    private func saveRemoteVideo(
-        _ data: Data
-    ) throws -> URL {
-        let directory =
-            FileManager.default
-                .urls(
-                    for: .cachesDirectory,
-                    in: .userDomainMask
-                )
-                .first!
+    private func saveRemoteVideo(_ data: Data) throws -> URL {
+        let directory = FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)
+            .first!
 
-        let ext =
-            URL(
-                fileURLWithPath:
-                    attachment.fileName
-            )
-            .pathExtension
+        let ext = URL(fileURLWithPath: attachment.fileName).pathExtension
+        let fileName = "remote-cat-note-" + attachment.id.uuidString + (ext.isEmpty ? ".mov" : ".\(ext)")
+        let fileURL = directory.appendingPathComponent(fileName)
 
-        let fileName =
-            "remote-cat-note-" +
-            attachment.id.uuidString +
-            (
-                ext.isEmpty
-                    ? ".mov"
-                    : ".\(ext)"
-            )
-
-        let fileURL =
-            directory
-                .appendingPathComponent(
-                    fileName
-                )
-
-        try data.write(
-            to: fileURL,
-            options: .atomic
-        )
-
+        try data.write(to: fileURL, options: .atomic)
         return fileURL
     }
 
     private func togglePlayback() {
-        guard let player else {
-            return
-        }
+        guard let player else { return }
 
         if isPlaying {
             player.pause()
@@ -358,11 +249,7 @@ struct VideoNoteBubble: View {
             return
         }
 
-        if
-            player.currentTime() >=
-            player.currentItem?.duration
-                ?? .positiveInfinity
-        {
+        if player.currentTime() >= player.currentItem?.duration ?? .positiveInfinity {
             player.seek(to: .zero)
         }
 
@@ -371,57 +258,40 @@ struct VideoNoteBubble: View {
     }
 }
 
-private struct VideoNotePlayerView:
-    UIViewRepresentable {
-
+private struct VideoNotePlayerView: UIViewRepresentable {
     let player: AVPlayer
 
-    func makeUIView(
-        context: Context
-    ) -> VideoNotePlayerContainerView {
-        let view =
-            VideoNotePlayerContainerView()
-
-        view.playerLayer.player =
-            player
-
-        view.playerLayer.videoGravity =
-            .resizeAspectFill
-
+    func makeUIView(context: Context) -> VideoNotePlayerContainerView {
+        let view = VideoNotePlayerContainerView()
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
         return view
     }
 
     func updateUIView(
-        _ uiView:
-            VideoNotePlayerContainerView,
+        _ uiView: VideoNotePlayerContainerView,
         context: Context
     ) {
-        uiView.playerLayer.player =
-            player
+        uiView.playerLayer.player = player
     }
 }
 
-private final class VideoNotePlayerContainerView:
-    UIView {
-
-    override class var layerClass:
-        AnyClass {
+private final class VideoNotePlayerContainerView: UIView {
+    override class var layerClass: AnyClass {
         AVPlayerLayer.self
     }
 
-    var playerLayer:
-        AVPlayerLayer {
+    var playerLayer: AVPlayerLayer {
         layer as! AVPlayerLayer
     }
 }
 
 #Preview {
     VideoNoteBubble(
-        attachment:
-            Attachment(
-                type: .videoNote,
-                fileName: "cat-note.mov",
-                duration: 12
-            )
+        attachment: Attachment(
+            type: .videoNote,
+            fileName: "cat-note.mov",
+            duration: 12
+        )
     )
 }

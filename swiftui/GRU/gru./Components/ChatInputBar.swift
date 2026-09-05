@@ -297,6 +297,9 @@ struct ChatInputBar: View {
             iconSize: didStartRecordingGesture ? 20 : 18,
             isActive: !cancelRecording
         )
+        .overlay {
+            recordingButtonOutline
+        }
         .overlay(alignment: .bottomTrailing) {
             ZStack {
                 Circle().fill(GRUColors.card)
@@ -337,6 +340,19 @@ struct ChatInputBar: View {
             "Двойной тап переключает режим записи. Удерживай для записи. Свайп влево отменяет, вверх фиксирует."
         )
         .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    private var recordingButtonOutline: some View {
+        if cancelRecording {
+            CatVideoNoteShape()
+                .stroke(Color.red.opacity(0.72), lineWidth: 1.45)
+                .shadow(color: Color.red.opacity(0.36), radius: 6)
+        } else {
+            CatVideoNoteShape()
+                .stroke(GRUColors.neonGradient, lineWidth: 1.45)
+                .shadow(color: GRUColors.accent.opacity(0.34), radius: 6)
+        }
     }
 
     private var recordGesture: some Gesture {

@@ -1,5 +1,0 @@
-<root>
-    <item name='org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory java.lang.Object initializeBean(java.lang.String, java.lang.Object, org.springframework.beans.factory.support.RootBeanDefinition)'>
-        <annotation name='java.lang.Deprecated'/>
-    </item>
-</root>
