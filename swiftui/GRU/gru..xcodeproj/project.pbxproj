@@ -15,16 +15,6 @@
 		C0FF3E53303F85C7005E1234 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		C0FF3E5C303F85C8005E1234 /* Exceptions for "gru" folder in "gru" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = C0FF3E50303F85C7005E1234 /* gru */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C0A1CFA92F93C7A700D763FD /* gru. */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -39,14 +29,6 @@
 		C0A1CFC52F93C7AC00D763FD /* gru.UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gru.UITests;
-			sourceTree = "<group>";
-		};
-		C0FF3E55303F85C7005E1234 /* gru */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				C0FF3E5C303F85C8005E1234 /* Exceptions for "gru" folder in "gru" target */,
-			);
-			path = gru;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,7 +51,6 @@
 				C0A1CFA92F93C7A700D763FD /* gru. */,
 				C0A1CFBB2F93C7AC00D763FD /* gru.Tests */,
 				C0A1CFC52F93C7AC00D763FD /* gru.UITests */,
-				C0FF3E55303F85C7005E1234 /* gru */,
 				C0FF3E52303F85C7005E1234 /* Frameworks */,
 				C0A1CFA82F93C7A700D763FD /* Products */,
 			);
