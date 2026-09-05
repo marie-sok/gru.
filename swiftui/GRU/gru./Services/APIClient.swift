@@ -6,7 +6,7 @@ enum GRUServerConfiguration {
 
     static let defaultPort = 8081
 
-    private static let customHostKey = "gru.server.customHost.v10"
+    private static let customHostKey = "gru.server.customHost.v11"
     private static let customPortKey = "gru.server.customPort.v1"
     private static let productionHTTPKey = "GRUProductionHTTPBaseURL"
     private static let productionWebSocketKey = "GRUProductionWebSocketURL"
@@ -19,7 +19,7 @@ enum GRUServerConfiguration {
     // Last known LAN address of the development Mac.  The Simulator always
     // uses 127.0.0.1; a physical iPhone can override this in Backend GRU
     // settings without rebuilding the app.
-    private static let physicalDeviceHost = "192.168.31.61"
+    private static let physicalDeviceHost = "192.168.31.88"
 
     static var port: Int {
         let configured = UserDefaults.standard.integer(forKey: customPortKey)
