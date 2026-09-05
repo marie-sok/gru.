@@ -25,10 +25,12 @@ struct RootView: View {
     @State private var isAuthenticated = false
     @State private var isCheckingSession = true
 
-    // v2 intentionally invalidates the old beta Keychain session once.
-    // The previous startup path trusted token presence without validating it
-    // against the currently selected backend.
-    private let sessionMigrationKey = "gru.sessionMigration.v2"
+    /*
+     v3 is a deliberate hard boundary for the beta auth rewrite.
+     It purges every old Keychain/UserDefaults session exactly once so no JWT
+     created by the previous storage implementation can enter this build.
+    */
+    private let sessionMigrationKey = "gru.sessionMigration.v3"
 
     var body: some View {
         ZStack {
@@ -82,7 +84,11 @@ struct RootView: View {
                 if resetBadgeOnOpen {
                     NotificationService.shared.clearBadge()
                 }
-                if biometricsEnabled && isAuthenticated && didFinishOnboarding && isBiometricLocked {
+
+                if biometricsEnabled &&
+                    isAuthenticated &&
+                    didFinishOnboarding &&
+                    isBiometricLocked {
                     authenticateWithBiometrics()
                 }
             } else if newPhase == .background {
@@ -104,15 +110,17 @@ struct RootView: View {
 }
 
 private extension RootView {
-    func checkSession() async {
-        performOneTimeSessionResetIfNeeded()
 
-        guard
-            let token = TokenStorage.shared.token,
-            !token.isEmpty,
-            let userID = TokenStorage.shared.userID,
-            !userID.isEmpty
-        else {
+    // MARK: - Bootstrap session gate
+
+    func checkSession() async {
+        performOneTimeHardSessionResetIfNeeded()
+
+        guard let token = TokenStorage.shared.token,
+              !token.isEmpty,
+              let userID = TokenStorage.shared.userID,
+              !userID.isEmpty,
+              TokenStorage.shared.belongsToCurrentBackend else {
             isAuthenticated = false
             isCheckingSession = false
             return
@@ -120,45 +128,124 @@ private extension RootView {
 
         let probe = await APIClient.shared.probeServer(token: token)
 
-        if let statusCode = probe.statusCode,
-           (200...299).contains(statusCode) {
-            ChatService.shared.restoreSession()
-            applyLocalProfile()
-            isAuthenticated = true
-
-            if biometricsEnabled {
-                isBiometricLocked = true
-                authenticateWithBiometrics()
+        guard let statusCode = probe.statusCode,
+              (200...299).contains(statusCode) else {
+            if probe.statusCode == 401 || probe.statusCode == 403 {
+                clearLocalSession()
+                print("🧹 Persisted GRU session rejected by backend")
+            } else {
+                print("⚠️ GRU session not admitted: \(probe.message)")
             }
 
-            print("✅ Persisted gru. session validated with backend")
-        } else if probe.statusCode == 401 || probe.statusCode == 403 {
-            clearLocalSession()
+            // Hard beta policy: never enter authenticated UI unless the current
+            // backend has actually accepted the persisted JWT in this launch.
             isAuthenticated = false
-            print("🧹 Persisted gru. session rejected by backend — LoginView")
-        } else {
-            // A temporary network/server failure must not destroy a potentially
-            // valid session. Keep the local session and let normal request
-            // handling surface connectivity errors without mislabelling them
-            // as an expired JWT.
-            ChatService.shared.restoreSession()
-            applyLocalProfile()
-            isAuthenticated = true
-            print("⚠️ Session validation deferred: \(probe.message)")
+            isCheckingSession = false
+            return
         }
 
+        activateAuthenticatedSession(
+            token: token,
+            userID: userID
+        )
+
         isCheckingSession = false
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("✅ PERSISTED SESSION VERIFIED")
+        print("✅ HTTP:", statusCode)
+        print("🌐 backend:", GRUServerConfiguration.httpBaseURL)
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 
-    func performOneTimeSessionResetIfNeeded() {
+    // MARK: - Login callback gate
+
+    func handleSuccessfulLogin() {
+        isCheckingSession = true
+        isAuthenticated = false
+
+        Task {
+            await finalizeSuccessfulLogin()
+        }
+    }
+
+    func finalizeSuccessfulLogin() async {
+        guard let token = TokenStorage.shared.token,
+              !token.isEmpty,
+              let userID = TokenStorage.shared.userID,
+              !userID.isEmpty,
+              TokenStorage.shared.belongsToCurrentBackend else {
+            clearLocalSession()
+            isCheckingSession = false
+            isAuthenticated = false
+            print("❌ Login callback received without a complete backend-bound session")
+            return
+        }
+
+        // Second server confirmation closes the gap between LoginViewModel and
+        // MainView. MainView cannot start chat/WebSocket work until this passes.
+        let probe = await APIClient.shared.probeServer(token: token)
+
+        guard let statusCode = probe.statusCode,
+              (200...299).contains(statusCode) else {
+            clearLocalSession()
+            isCheckingSession = false
+            isAuthenticated = false
+            print("❌ Fresh GRU session failed final gate: \(probe.message)")
+            return
+        }
+
+        activateAuthenticatedSession(
+            token: token,
+            userID: userID
+        )
+
+        isCheckingSession = false
+
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("✅ FINAL SESSION GATE PASSED")
+        print("✅ HTTP:", statusCode)
+        print("👤 userID:", userID)
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    }
+
+    func activateAuthenticatedSession(
+        token: String,
+        userID: String
+    ) {
+        guard TokenStorage.shared.token == token,
+              TokenStorage.shared.userID == userID else {
+            isAuthenticated = false
+            return
+        }
+
+        ChatService.shared.restoreSession()
+        applyLocalProfile()
+        isAuthenticated = true
+
+        if biometricsEnabled {
+            isBiometricLocked = true
+            authenticateWithBiometrics()
+        }
+    }
+
+    // MARK: - Hard migration / clear
+
+    func performOneTimeHardSessionResetIfNeeded() {
         let defaults = UserDefaults.standard
         let alreadyMigrated = defaults.bool(forKey: sessionMigrationKey)
         guard !alreadyMigrated else { return }
 
-        clearLocalSession()
+        WebSocketService.shared.resetSession()
+        TokenStorage.shared.purgeAllKnownSessions()
+        ChatService.shared.clearAuthenticatedUser()
+        CacheStorage.shared.clearCurrentUser()
+        NotificationService.shared.removeAllNotifications()
+        NotificationService.shared.clearBadge()
+
         defaults.set(true, forKey: sessionMigrationKey)
 
-        print("🧹 Old gru. beta session cleared for session migration v2")
+        print("🧹 All pre-v3 GRU beta sessions purged")
     }
 
     func clearLocalSession() {
@@ -178,34 +265,10 @@ private extension RootView {
             isAuthenticated = false
         }
 
-        print("🔐 gru. session expired — LoginView")
+        print("🔐 GRU session invalidated — LoginView")
     }
 
-    func handleSuccessfulLogin() {
-        guard
-            let token = TokenStorage.shared.token,
-            !token.isEmpty,
-            let userID = TokenStorage.shared.userID,
-            !userID.isEmpty
-        else {
-            print("❌ Login completed but session was not saved")
-            isAuthenticated = false
-            return
-        }
-
-        ChatService.shared.restoreSession()
-        applyLocalProfile()
-
-        withAnimation(.easeInOut(duration: 0.25)) {
-            isAuthenticated = true
-            if biometricsEnabled {
-                isBiometricLocked = true
-                authenticateWithBiometrics()
-            }
-        }
-
-        print("✅ gru. session authenticated")
-    }
+    // MARK: - Local profile
 
     func applyLocalProfile() {
         let profile = ProfileStorage.shared
@@ -319,11 +382,14 @@ private extension RootView {
         guard biometricsEnabled && isAuthenticated else { return }
 
         let context = LAContext()
-        var error: NSError?
+        var authError: NSError?
         let reason = "Разблокируйте доступ к приложению gru."
 
-        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) {
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: reason
+            ) { success, _ in
                 DispatchQueue.main.async {
                     if success {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
