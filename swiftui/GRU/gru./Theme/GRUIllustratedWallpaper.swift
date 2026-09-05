@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Displays the user-approved illustration pack as a permanent full-screen layer.
-/// The artwork itself never scales, slides or collapses. Optional animation is
-/// limited to soft ambient glows above the fixed illustration.
+/// Displays the approved illustration pack as a permanent edge-to-edge layer.
+/// The artwork itself never scales, slides or collapses. Animation lives only
+/// in ambient glow and the cat-life overlay above the fixed PNG.
 struct GRUIllustratedWallpaper: View {
     let theme: GRUAppTheme
     var intensity: Double = 1
@@ -44,6 +44,12 @@ struct GRUIllustratedWallpaper: View {
 
                 if shouldAnimate {
                     ambientGlowLayer(size: proxy.size)
+
+                    GRUCatLifeOverlay(
+                        theme: theme,
+                        intensity: intensity,
+                        animated: true
+                    )
                 }
             }
             .frame(
@@ -51,14 +57,15 @@ struct GRUIllustratedWallpaper: View {
                 height: proxy.size.height
             )
             .clipped()
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container, edges: .all)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
             .onAppear {
                 glowPhase = true
             }
         }
-        .ignoresSafeArea()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.container, edges: .all)
     }
 
     @ViewBuilder
