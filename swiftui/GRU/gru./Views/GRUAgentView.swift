@@ -25,8 +25,9 @@ private struct GRUAgentMessage: Identifiable, Codable {
 }
 
 private enum GRUAgentHistoryStore {
-    static let key = "gru.bot.dialog.v5"
+    static let key = "gru.bot.dialog.v6"
     private static let legacyKeys = [
+        "gru.bot.dialog.v5",
         "gru.bot.dialog.v4",
         "gru.bot.dialog.v3",
         "gru.bot.history.v2",
@@ -36,7 +37,7 @@ private enum GRUAgentHistoryStore {
     static func welcome() -> GRUAgentMessage {
         GRUAgentMessage(
             author: .bot,
-            text: "Я gru.bot ✦ Теперь умею не только отвечать, но и выполнять команды приложения: менять темы, включать живой фон, открывать чаты, людей, настройки и test lab."
+            text: "Я gru.bot ✦ Я здесь прежде всего поболтать. Можешь кидать мысли как есть — без формулировок и задач. Если захочешь, я ещё умею помочь с идеями, текстом, планом и несколькими действиями внутри gru."
         )
     }
 
@@ -100,8 +101,8 @@ struct GRUAgentView: View {
             ZStack {
                 Circle()
                     .fill(GRUColors.accent.opacity(0.13))
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .bold))
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
             }
             .frame(width: 38, height: 38)
@@ -112,7 +113,7 @@ struct GRUAgentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("gru.bot")
                     .font(.headline)
-                Text(isSending ? "выполняет…" : "AI • chat • actions")
+                Text(isSending ? "печатает…" : "болталка • идеи • действия")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -120,6 +121,13 @@ struct GRUAgentView: View {
             Spacer()
 
             Menu {
+                Button {
+                    text = "Открой test lab"
+                    inputFocused = true
+                } label: {
+                    Label("Открыть test lab", systemImage: "testtube.2")
+                }
+
                 Button(role: .destructive) {
                     GRUAgentHistoryStore.clear()
                     messages = [GRUAgentHistoryStore.welcome()]
@@ -182,7 +190,7 @@ struct GRUAgentView: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(GRUColors.accent)
-                            Text("gru.bot выполняет…")
+                            Text("gru.bot печатает…")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -205,11 +213,12 @@ struct GRUAgentView: View {
     private var quickPrompts: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                promptButton("Включи Blood Dragon", icon: "flame.fill")
-                promptButton("Следующая тема", icon: "paintpalette.fill")
-                promptButton("Открой test lab", icon: "testtube.2")
-                promptButton("Открой настройки", icon: "gearshape.fill")
+                promptButton("Просто поболтаем", icon: "bubble.left.and.bubble.right.fill")
+                promptButton("Как ты?", icon: "face.smiling")
+                promptButton("Мне скучно", icon: "sparkles")
+                promptButton("Что думаешь?", icon: "brain.head.profile")
                 promptButton("Составь план", icon: "checklist")
+                promptButton("Включи Blood Dragon", icon: "flame.fill")
             }
         }
         .padding(.bottom, 2)
@@ -244,13 +253,16 @@ struct GRUAgentView: View {
             }
 
             HStack(spacing: 9) {
-                TextField("Команда или сообщение", text: $text, axis: .vertical)
+                TextField("Напиши что-нибудь…", text: $text, axis: .vertical)
                     .focused($inputFocused)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(GRUColors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(
+                        GRUColors.card,
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
                     .onSubmit {
                         send()
                     }
@@ -289,9 +301,7 @@ struct GRUAgentView: View {
             )
         }
 
-        messages.append(
-            GRUAgentMessage(author: .user, text: clean)
-        )
+        messages.append(GRUAgentMessage(author: .user, text: clean))
         GRUAgentHistoryStore.save(messages)
 
         text = ""
@@ -328,8 +338,8 @@ struct GRUAgentCard: View {
             HStack(spacing: 11) {
                 ZStack {
                     Circle().fill(GRUColors.accent.opacity(0.12))
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .bold))
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(GRUColors.accent)
                 }
                 .frame(width: 40, height: 40)
@@ -337,7 +347,7 @@ struct GRUAgentCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("gru.bot")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text("AI • темы • навигация • test lab")
+                    Text("поболтать • идеи • помощь • actions")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -351,7 +361,10 @@ struct GRUAgentCard: View {
             }
             .padding(.horizontal, 11)
             .frame(height: 56)
-            .background(GRUColors.card.opacity(0.76), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(
+                GRUColors.card.opacity(0.76),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
         }
         .buttonStyle(.plain)
     }
