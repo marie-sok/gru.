@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -41,10 +42,8 @@ public class GRUBotController {
 
         String apiKey = System.getenv("OPENAI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            throw new ResponseStatusException(
-                    HttpStatus.SERVICE_UNAVAILABLE,
-                    "OPENAI_API_KEY is not configured"
-            );
+            System.err.println("gru.bot: OPENAI_API_KEY is missing; local fallback enabled");
+            return localFallback(request, "local");
         }
 
         String model = env("GRU_BOT_MODEL", "gpt-5.6-luna");
@@ -99,10 +98,8 @@ public class GRUBotController {
 
             String reply = extractOutputText(response);
             if (reply == null || reply.isBlank()) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_GATEWAY,
-                        "AI returned empty response"
-                );
+                System.err.println("gru.bot: AI returned empty response; local fallback enabled");
+                return localFallback(request, "empty-provider-response");
             }
 
             return new BotResponse(reply.trim(), model);
@@ -111,19 +108,62 @@ public class GRUBotController {
             System.err.println(
                     "gru.bot OpenAI HTTP " + error.getStatusCode() + ": " + error.getResponseBodyAsString()
             );
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "AI provider returned an error"
-            );
-        } catch (ResponseStatusException error) {
-            throw error;
+            return localFallback(request, "provider-http-error");
         } catch (Exception error) {
             error.printStackTrace();
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "gru.bot is temporarily unavailable"
+            return localFallback(request, "provider-error");
+        }
+    }
+
+    private BotResponse localFallback(BotRequest request, String reason) {
+        String text = request.text().trim();
+        String lower = text.toLowerCase(Locale.ROOT);
+        boolean russian = text.matches(".*[А-Яа-яЁё].*");
+        boolean asksForPlan =
+                lower.contains("план") ||
+                lower.contains("сплан") ||
+                lower.contains("по шаг") ||
+                lower.contains("plan") ||
+                lower.contains("steps") ||
+                lower.contains("schedule");
+
+        if (asksForPlan) {
+            String reply = russian
+                    ? "Соберу рабочий план по запросу «" + text + "».\n\n" +
+                      "1. Сформулируй конечный результат одним предложением.\n" +
+                      "2. Отдели обязательное от желательного и зафиксируй ограничения.\n" +
+                      "3. Разбей работу на 3–5 коротких этапов с понятным результатом каждого.\n" +
+                      "4. Начни с шага, который снимает самый большой риск или зависимость.\n" +
+                      "5. После первого результата пересобери следующие шаги по фактам.\n\n" +
+                      "Следующий конкретный шаг: напиши мне срок и что уже готово — я соберу более точный план."
+                    : "Here is a practical plan for “" + text + "”.\n\n" +
+                      "1. Define the end result in one sentence.\n" +
+                      "2. Separate must-haves from nice-to-haves and list constraints.\n" +
+                      "3. Split the work into 3–5 short stages with a clear output for each.\n" +
+                      "4. Start with the step that removes the biggest risk or dependency.\n" +
+                      "5. Re-plan after the first concrete result.\n\n" +
+                      "Next step: tell me your deadline and what is already done, and I’ll make it more specific.";
+            return new BotResponse(reply, "gru-local-planner");
+        }
+
+        if (lower.contains("привет") || lower.contains("hello") || lower.contains("hi ") || lower.equals("hi")) {
+            return new BotResponse(
+                    russian
+                            ? "Привет. Я на связи. Можем поболтать, разобрать мысль или собрать план — кидай тему как есть."
+                            : "Hey. I’m here. We can chat, think something through, or build a plan — send it as it is.",
+                    "gru-local-chat"
             );
         }
+
+        String reply = russian
+                ? "Я понял запрос: «" + text + "». Сейчас AI-канал временно работает в резервном режиме, но я не буду молчать. " +
+                  "Могу продолжить разговор, помочь разложить задачу, сравнить варианты или собрать план. " +
+                  "Если хочешь конкретный разбор, добавь цель и главный вопрос."
+                : "I got it: “" + text + "”. The AI provider is temporarily running in fallback mode, but I won’t leave the request unanswered. " +
+                  "I can still help structure the problem, compare options, or build a plan. Add the goal and the main question for a more concrete answer.";
+
+        System.err.println("gru.bot local fallback reason=" + reason);
+        return new BotResponse(reply, "gru-local-chat");
     }
 
     private String extractOutputText(Map<String, Object> response) {
