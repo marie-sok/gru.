@@ -68,15 +68,15 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return "Лёд, снег и северные орбиты"
         case .acidLime: return "Лаймовые капли и кислотный ток"
         case .midnightGold: return "Чёрное золото, короны и звёзды"
-        case .ultravioletUnicorn: return "Единороги, облака и ультрафиолетовые радуги"
-        case .powderPrincess: return "Пудровые пузыри, короны, звёзды и сердца"
-        case .forestWitch: return "Болотная магия, dot-work руны, котлы и шляпы"
-        case .cyberMidnight: return "Киберпанк-полночь, сетка, сканирование и коты"
-        case .blackMoonCat: return "Коты, лунный цикл, лапки и ночное мерцание"
-        case .ironKnight: return "Серебро, сталь, мечи, латы и рыцарские силуэты"
-        case .bloodDragon: return "Кроваво-красные драконы, дым, огонь и искры"
-        case .greenAcidMonster: return "Кислотное болото, монстры, глаза и слизь"
-        case .neonCatDemon: return "Неоновые кошачьи мордочки, огоньки и злое хихиканье"
+        case .ultravioletUnicorn: return "Кото-единороги, мечты и звёздная пыль"
+        case .powderPrincess: return "Коты-принцессы, нежность и блеск"
+        case .forestWitch: return "Коты-ведьмы, лес и таинственные травы"
+        case .cyberMidnight: return "Кибер-коты, город и технологии"
+        case .blackMoonCat: return "Лунные коты, мистика и золотой космос"
+        case .ironKnight: return "Коты-рыцари, честь и сталь"
+        case .bloodDragon: return "Вислоухие котодраконы, огонь и тёмная магия"
+        case .greenAcidMonster: return "Котомонстры, кислота и безумие"
+        case .neonCatDemon: return "Коты-демоны, неон и хаос"
         }
     }
 
@@ -92,7 +92,7 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .powderPrincess: return "crown.fill"
         case .forestWitch: return "leaf.fill"
         case .cyberMidnight: return "cpu.fill"
-        case .blackMoonCat: return "cat.fill"
+        case .blackMoonCat: return "moon.stars.fill"
         case .ironKnight: return "shield.fill"
         case .bloodDragon: return "flame.fill"
         case .greenAcidMonster: return "eye.fill"
@@ -108,15 +108,15 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return Color(red: 0.35, green: 0.78, blue: 1.00)
         case .acidLime: return Color(red: 0.70, green: 1.00, blue: 0.18)
         case .midnightGold: return Color(red: 1.00, green: 0.78, blue: 0.28)
-        case .ultravioletUnicorn: return Color(red: 0.78, green: 0.42, blue: 1.00)
-        case .powderPrincess: return Color(red: 1.00, green: 0.70, blue: 0.82)
-        case .forestWitch: return Color(red: 0.48, green: 0.72, blue: 0.22)
-        case .cyberMidnight: return Color(red: 0.12, green: 0.75, blue: 1.00)
-        case .blackMoonCat: return Color(red: 0.86, green: 0.86, blue: 0.94)
-        case .ironKnight: return Color(red: 0.78, green: 0.84, blue: 0.92)
-        case .bloodDragon: return Color(red: 1.00, green: 0.13, blue: 0.16)
-        case .greenAcidMonster: return Color(red: 0.47, green: 1.00, blue: 0.08)
-        case .neonCatDemon: return Color(red: 1.00, green: 0.12, blue: 0.76)
+        case .ultravioletUnicorn: return Color(red: 0.72, green: 0.28, blue: 1.00)
+        case .powderPrincess: return Color(red: 1.00, green: 0.46, blue: 0.68)
+        case .forestWitch: return Color(red: 0.32, green: 0.92, blue: 0.24)
+        case .cyberMidnight: return Color(red: 0.04, green: 0.62, blue: 1.00)
+        case .blackMoonCat: return Color(red: 1.00, green: 0.78, blue: 0.06)
+        case .ironKnight: return Color(red: 0.76, green: 0.82, blue: 0.92)
+        case .bloodDragon: return Color(red: 1.00, green: 0.08, blue: 0.06)
+        case .greenAcidMonster: return Color(red: 0.43, green: 1.00, blue: 0.05)
+        case .neonCatDemon: return Color(red: 1.00, green: 0.05, blue: 0.38)
         }
     }
 
@@ -128,15 +128,15 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return Color(red: 0.55, green: 0.46, blue: 1.00)
         case .acidLime: return Color(red: 0.08, green: 0.90, blue: 0.70)
         case .midnightGold: return Color(red: 1.00, green: 0.42, blue: 0.15)
-        case .ultravioletUnicorn: return Color(red: 0.45, green: 0.88, blue: 1.00)
-        case .powderPrincess: return Color(red: 1.00, green: 0.90, blue: 0.94)
-        case .forestWitch: return Color(red: 0.72, green: 0.88, blue: 0.35)
-        case .cyberMidnight: return Color(red: 0.55, green: 0.25, blue: 1.00)
-        case .blackMoonCat: return Color(red: 0.58, green: 0.62, blue: 0.74)
-        case .ironKnight: return Color(red: 0.44, green: 0.56, blue: 0.72)
-        case .bloodDragon: return Color(red: 0.78, green: 0.02, blue: 0.04)
-        case .greenAcidMonster: return Color(red: 0.16, green: 0.56, blue: 0.06)
-        case .neonCatDemon: return Color(red: 0.35, green: 0.12, blue: 1.00)
+        case .ultravioletUnicorn: return Color(red: 0.94, green: 0.50, blue: 1.00)
+        case .powderPrincess: return Color(red: 1.00, green: 0.78, blue: 0.88)
+        case .forestWitch: return Color(red: 0.73, green: 0.92, blue: 0.20)
+        case .cyberMidnight: return Color(red: 0.40, green: 0.20, blue: 1.00)
+        case .blackMoonCat: return Color(red: 1.00, green: 0.55, blue: 0.00)
+        case .ironKnight: return Color(red: 0.92, green: 0.14, blue: 0.10)
+        case .bloodDragon: return Color(red: 0.72, green: 0.00, blue: 0.02)
+        case .greenAcidMonster: return Color(red: 0.08, green: 0.55, blue: 0.02)
+        case .neonCatDemon: return Color(red: 0.64, green: 0.04, blue: 1.00)
         }
     }
 
@@ -148,15 +148,15 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return Color(red: 0.010, green: 0.030, blue: 0.060)
         case .acidLime: return Color(red: 0.018, green: 0.034, blue: 0.018)
         case .midnightGold: return Color(red: 0.030, green: 0.024, blue: 0.012)
-        case .ultravioletUnicorn: return Color(red: 0.055, green: 0.018, blue: 0.105)
-        case .powderPrincess: return Color(red: 0.165, green: 0.095, blue: 0.125)
-        case .forestWitch: return Color(red: 0.028, green: 0.060, blue: 0.025)
-        case .cyberMidnight: return Color(red: 0.005, green: 0.012, blue: 0.040)
-        case .blackMoonCat: return Color(red: 0.008, green: 0.009, blue: 0.016)
-        case .ironKnight: return Color(red: 0.026, green: 0.032, blue: 0.042)
-        case .bloodDragon: return Color(red: 0.070, green: 0.005, blue: 0.008)
-        case .greenAcidMonster: return Color(red: 0.008, green: 0.040, blue: 0.006)
-        case .neonCatDemon: return Color(red: 0.026, green: 0.004, blue: 0.034)
+        case .ultravioletUnicorn: return Color(red: 0.026, green: 0.006, blue: 0.065)
+        case .powderPrincess: return Color(red: 0.090, green: 0.028, blue: 0.055)
+        case .forestWitch: return Color(red: 0.008, green: 0.040, blue: 0.012)
+        case .cyberMidnight: return Color(red: 0.002, green: 0.010, blue: 0.030)
+        case .blackMoonCat: return Color(red: 0.003, green: 0.003, blue: 0.003)
+        case .ironKnight: return Color(red: 0.018, green: 0.021, blue: 0.026)
+        case .bloodDragon: return Color(red: 0.035, green: 0.002, blue: 0.004)
+        case .greenAcidMonster: return Color(red: 0.004, green: 0.028, blue: 0.003)
+        case .neonCatDemon: return Color(red: 0.030, green: 0.002, blue: 0.014)
         }
     }
 
@@ -168,15 +168,15 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .arcticSignal: return Color(red: 0.040, green: 0.080, blue: 0.140)
         case .acidLime: return Color(red: 0.060, green: 0.105, blue: 0.055)
         case .midnightGold: return Color(red: 0.100, green: 0.080, blue: 0.040)
-        case .ultravioletUnicorn: return Color(red: 0.120, green: 0.058, blue: 0.190)
-        case .powderPrincess: return Color(red: 0.265, green: 0.150, blue: 0.195)
-        case .forestWitch: return Color(red: 0.070, green: 0.110, blue: 0.055)
-        case .cyberMidnight: return Color(red: 0.025, green: 0.050, blue: 0.110)
-        case .blackMoonCat: return Color(red: 0.050, green: 0.052, blue: 0.072)
-        case .ironKnight: return Color(red: 0.095, green: 0.108, blue: 0.125)
-        case .bloodDragon: return Color(red: 0.145, green: 0.025, blue: 0.032)
-        case .greenAcidMonster: return Color(red: 0.045, green: 0.105, blue: 0.025)
-        case .neonCatDemon: return Color(red: 0.110, green: 0.018, blue: 0.130)
+        case .ultravioletUnicorn: return Color(red: 0.100, green: 0.030, blue: 0.180)
+        case .powderPrincess: return Color(red: 0.220, green: 0.090, blue: 0.145)
+        case .forestWitch: return Color(red: 0.020, green: 0.095, blue: 0.030)
+        case .cyberMidnight: return Color(red: 0.012, green: 0.045, blue: 0.105)
+        case .blackMoonCat: return Color(red: 0.075, green: 0.055, blue: 0.005)
+        case .ironKnight: return Color(red: 0.080, green: 0.090, blue: 0.110)
+        case .bloodDragon: return Color(red: 0.120, green: 0.012, blue: 0.018)
+        case .greenAcidMonster: return Color(red: 0.030, green: 0.110, blue: 0.012)
+        case .neonCatDemon: return Color(red: 0.130, green: 0.010, blue: 0.060)
         }
     }
 
@@ -199,10 +199,10 @@ enum GRUAppTheme: String, CaseIterable, Identifiable {
         case .ultravioletUnicorn: return ["wand.and.stars", "cloud.fill", "sparkles"]
         case .powderPrincess: return ["crown.fill", "heart.fill", "star.fill"]
         case .forestWitch: return ["leaf.fill", "moon.fill", "sparkles"]
-        case .cyberMidnight: return ["cpu.fill", "terminal.fill", "circle.grid.cross.fill"]
-        case .blackMoonCat: return ["cat.fill", "moon.fill", "pawprint.fill"]
+        case .cyberMidnight: return ["cpu.fill", "terminal.fill", "building.2.fill"]
+        case .blackMoonCat: return ["cat.fill", "moon.fill", "star.fill"]
         case .ironKnight: return ["shield.fill", "diamond.fill", "sparkles"]
-        case .bloodDragon: return ["flame.fill", "sparkles", "circle.fill"]
+        case .bloodDragon: return ["flame.fill", "sparkles", "cat.fill"]
         case .greenAcidMonster: return ["eye.fill", "drop.fill", "burst.fill"]
         case .neonCatDemon: return ["cat.fill", "flame.fill", "sparkles"]
         }
