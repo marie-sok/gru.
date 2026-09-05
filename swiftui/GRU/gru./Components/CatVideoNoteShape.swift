@@ -1,188 +1,144 @@
 import SwiftUI
 
-/// Фирменная форма GRU для video note:
-/// почти идеальный круг + небольшие кошачьи ушки сверху.
-struct CatVideoNoteShape: InsettableShape {
-
-    var insetAmount: CGFloat = 0
-
+/// Single continuous cat silhouette used by GRU video notes.
+/// The ears are part of the same curved path as the face: no separate
+/// triangular masks or filled triangle overlays are used.
+struct CatVideoNoteShape: Shape {
     func path(in rect: CGRect) -> Path {
-        let bounds = rect.insetBy(
-            dx: insetAmount,
-            dy: insetAmount
-        )
+        let width = rect.width
+        let height = rect.height
 
-        guard bounds.width > 0, bounds.height > 0 else {
-            return Path()
-        }
+        let topY = height * 0.085
+        let cheekY = height * 0.515
+        let bottomY = height * 0.945
 
-        // Основная часть остаётся круглой.
-        // При bubble 220 x 238 круг получается примерно 220 x 220,
-        // а верхняя зона используется под ушки.
-        let diameter = min(
-            bounds.width,
-            bounds.height * 0.925
-        )
+        let leftX = width * 0.055
+        let rightX = width * 0.945
 
-        let radius = diameter / 2
+        let leftEarOuter = CGPoint(x: width * 0.16, y: height * 0.22)
+        let leftEarTip = CGPoint(x: width * 0.28, y: topY)
+        let leftEarInner = CGPoint(x: width * 0.40, y: height * 0.185)
 
-        let headRect = CGRect(
-            x: bounds.midX - radius,
-            y: bounds.maxY - diameter,
-            width: diameter,
-            height: diameter
-        )
-
-        let cx = headRect.midX
-        let cy = headRect.midY
-        let r = radius
-
-        func point(
-            _ x: CGFloat,
-            _ y: CGFloat
-        ) -> CGPoint {
-            CGPoint(
-                x: cx + r * x,
-                y: cy + r * y
-            )
-        }
+        let rightEarInner = CGPoint(x: width * 0.60, y: height * 0.185)
+        let rightEarTip = CGPoint(x: width * 0.72, y: topY)
+        let rightEarOuter = CGPoint(x: width * 0.84, y: height * 0.22)
 
         var path = Path()
+        path.move(to: CGPoint(x: width * 0.50, y: bottomY))
 
-        path.move(
-            to: point(0.0, 1.0)
-        )
-
-        // Левая нижняя четверть круга.
         path.addCurve(
-            to: point(-1.0, 0.0),
-            control1: point(-0.56, 1.0),
-            control2: point(-1.0, 0.56)
-        )
-
-        // Левая верхняя часть круглой головы.
-        path.addCurve(
-            to: point(-0.82, -0.56),
-            control1: point(-1.0, -0.25),
-            control2: point(-0.94, -0.43)
-        )
-
-        // Левое ухо.
-        path.addCurve(
-            to: CGPoint(
-                x: cx - r * 0.56,
-                y: bounds.minY + max(1, insetAmount)
-            ),
-            control1: point(-0.78, -0.71),
-            control2: CGPoint(
-                x: cx - r * 0.68,
-                y: bounds.minY + r * 0.03
-            )
+            to: CGPoint(x: leftX, y: cheekY),
+            control1: CGPoint(x: width * 0.23, y: bottomY),
+            control2: CGPoint(x: leftX, y: height * 0.76)
         )
 
         path.addCurve(
-            to: point(-0.28, -0.82),
-            control1: CGPoint(
-                x: cx - r * 0.43,
-                y: bounds.minY + r * 0.02
-            ),
-            control2: point(-0.34, -0.74)
-        )
-
-        // Мягкий лоб между ушками.
-        path.addCurve(
-            to: point(0.28, -0.82),
-            control1: point(-0.12, -0.93),
-            control2: point(0.12, -0.93)
-        )
-
-        // Правое ухо.
-        path.addCurve(
-            to: CGPoint(
-                x: cx + r * 0.56,
-                y: bounds.minY + max(1, insetAmount)
-            ),
-            control1: point(0.34, -0.74),
-            control2: CGPoint(
-                x: cx + r * 0.43,
-                y: bounds.minY + r * 0.02
-            )
+            to: leftEarOuter,
+            control1: CGPoint(x: leftX, y: height * 0.36),
+            control2: CGPoint(x: width * 0.09, y: height * 0.25)
         )
 
         path.addCurve(
-            to: point(0.82, -0.56),
-            control1: CGPoint(
-                x: cx + r * 0.68,
-                y: bounds.minY + r * 0.03
-            ),
-            control2: point(0.78, -0.71)
+            to: leftEarTip,
+            control1: CGPoint(x: width * 0.20, y: height * 0.18),
+            control2: CGPoint(x: width * 0.245, y: height * 0.11)
         )
 
-        // Правая верхняя часть.
         path.addCurve(
-            to: point(1.0, 0.0),
-            control1: point(0.94, -0.43),
-            control2: point(1.0, -0.25)
+            to: leftEarInner,
+            control1: CGPoint(x: width * 0.305, y: height * 0.105),
+            control2: CGPoint(x: width * 0.35, y: height * 0.155)
         )
 
-        // Правая нижняя четверть.
         path.addCurve(
-            to: point(0.0, 1.0),
-            control1: point(1.0, 0.56),
-            control2: point(0.56, 1.0)
+            to: rightEarInner,
+            control1: CGPoint(x: width * 0.455, y: height * 0.155),
+            control2: CGPoint(x: width * 0.545, y: height * 0.155)
+        )
+
+        path.addCurve(
+            to: rightEarTip,
+            control1: CGPoint(x: width * 0.65, y: height * 0.155),
+            control2: CGPoint(x: width * 0.695, y: height * 0.105)
+        )
+
+        path.addCurve(
+            to: rightEarOuter,
+            control1: CGPoint(x: width * 0.755, y: height * 0.11),
+            control2: CGPoint(x: width * 0.80, y: height * 0.18)
+        )
+
+        path.addCurve(
+            to: CGPoint(x: rightX, y: cheekY),
+            control1: CGPoint(x: width * 0.91, y: height * 0.25),
+            control2: CGPoint(x: rightX, y: height * 0.36)
+        )
+
+        path.addCurve(
+            to: CGPoint(x: width * 0.50, y: bottomY),
+            control1: CGPoint(x: rightX, y: height * 0.76),
+            control2: CGPoint(x: width * 0.77, y: bottomY)
         )
 
         path.closeSubpath()
-
         return path
-    }
-
-    func inset(
-        by amount: CGFloat
-    ) -> some InsettableShape {
-        var copy = self
-        copy.insetAmount += amount
-        return copy
     }
 }
 
-/// High-contrast inner ear marks keep the GRU cat silhouette readable even
-/// when the camera frame or a dark video makes the outer outline subtle.
+/// Soft inner-ear accents. They are open Bezier strokes rather than
+/// triangles, so camera/video-note UI never shows geometric triangle patches.
 struct CatVideoNoteEarDetails: View {
     let width: CGFloat
 
     var body: some View {
-        HStack(spacing: width * 0.22) {
-            ear
-            ear
-        }
-        .frame(width: width * 0.58, height: width * 0.16)
-        .offset(y: width * 0.035)
-        .allowsHitTesting(false)
-    }
+        ZStack {
+            CatVideoNoteInnerEarShape(side: .left)
+                .stroke(
+                    GRUColors.accentSecondary.opacity(0.42),
+                    style: StrokeStyle(lineWidth: max(1, width * 0.007), lineCap: .round)
+                )
 
-    private var ear: some View {
-        CatVideoNoteEarShape()
-            .fill(GRUColors.accent.opacity(0.30))
-            .overlay {
-                CatVideoNoteEarShape()
-                    .stroke(GRUColors.accent.opacity(0.78), lineWidth: 1.1)
-            }
-            .frame(width: width * 0.13, height: width * 0.11)
-            .shadow(color: GRUColors.accent.opacity(0.55), radius: 4)
+            CatVideoNoteInnerEarShape(side: .right)
+                .stroke(
+                    GRUColors.accentSecondary.opacity(0.42),
+                    style: StrokeStyle(lineWidth: max(1, width * 0.007), lineCap: .round)
+                )
+        }
+        .frame(width: width, height: width * 1.02)
+        .allowsHitTesting(false)
     }
 }
 
-private struct CatVideoNoteEarShape: Shape {
+private struct CatVideoNoteInnerEarShape: Shape {
+    enum Side {
+        case left
+        case right
+    }
+
+    let side: Side
+
     func path(in rect: CGRect) -> Path {
+        let mirrored: (CGFloat) -> CGFloat = { x in
+            side == .left ? x : 1 - x
+        }
+
         var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY),
-            control: CGPoint(x: rect.midX, y: rect.maxY * 0.82)
+        path.move(
+            to: CGPoint(
+                x: rect.width * mirrored(0.205),
+                y: rect.height * 0.205
+            )
         )
-        path.closeSubpath()
+        path.addQuadCurve(
+            to: CGPoint(
+                x: rect.width * mirrored(0.345),
+                y: rect.height * 0.202
+            ),
+            control: CGPoint(
+                x: rect.width * mirrored(0.275),
+                y: rect.height * 0.115
+            )
+        )
         return path
     }
 }
