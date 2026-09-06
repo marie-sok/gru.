@@ -8,33 +8,60 @@ struct DocumentBubble: View {
     @State private var downloadError: String?
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "doc.fill")
-                .font(.title2)
-                .foregroundStyle(GRUColors.accent)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 13) {
+                fileIcon
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(attachment.fileName)
-                    .font(.headline)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(attachment.fileName.isEmpty ? "Документ" : attachment.fileName)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .lineLimit(2)
 
-                Text(fileSize)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(fileTypeLabel)
+                            .font(.system(size: 8, weight: .black, design: .rounded))
+                            .tracking(0.7)
+                            .foregroundStyle(GRUColors.accent)
+
+                        Circle()
+                            .fill(Color.secondary.opacity(0.38))
+                            .frame(width: 3, height: 3)
+
+                        Text(fileSize)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                trailingAction
             }
 
-            Spacer()
-
-            trailingAction
+            if let downloadError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text(downloadError)
+                        .font(.caption2)
+                        .lineLimit(2)
+                }
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
         }
-        .padding()
-        .frame(maxWidth: 280)
-        .background(GRUColors.card)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(13)
+        .frame(width: 286, alignment: .leading)
+        .background(.ultraThinMaterial)
+        .background(GRUColors.card.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(GRUColors.accent.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(GRUColors.neonGradient, lineWidth: 1.0)
         }
+        .shadow(color: GRUColors.accent.opacity(0.12), radius: 10, y: 4)
         .task(id: attachment.localPath) {
             if downloadedURL == nil, let localURL {
                 downloadedURL = localURL
@@ -42,34 +69,97 @@ struct DocumentBubble: View {
         }
     }
 
+    private var fileIcon: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(GRUColors.accent.opacity(0.10))
+                .frame(width: 48, height: 48)
+
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(GRUColors.neonGradient, lineWidth: 1)
+                .frame(width: 48, height: 48)
+
+            Image(systemName: fileSystemIcon)
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(GRUColors.accent)
+        }
+        .shadow(color: GRUColors.accent.opacity(0.18), radius: 7)
+    }
+
     @ViewBuilder
     private var trailingAction: some View {
         if let downloadedURL {
             ShareLink(item: downloadedURL) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3)
-                    .foregroundStyle(GRUColors.accent)
+                actionIcon(systemName: "square.and.arrow.up", accessibilityLabel: "Поделиться документом")
             }
             .buttonStyle(.plain)
         } else if isDownloading {
-            ProgressView()
-                .tint(GRUColors.accent)
+            ZStack {
+                Circle()
+                    .fill(GRUColors.accent.opacity(0.08))
+                    .frame(width: 40, height: 40)
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(GRUColors.accent)
+            }
         } else {
             Button {
                 Task { await download() }
             } label: {
-                Image(systemName: downloadError == nil ? "arrow.down.circle" : "arrow.clockwise.circle")
-                    .font(.title3)
-                    .foregroundStyle(downloadError == nil ? GRUColors.accent : Color.orange)
+                actionIcon(
+                    systemName: downloadError == nil ? "arrow.down" : "arrow.clockwise",
+                    accessibilityLabel: downloadError == nil ? "Скачать документ" : "Повторить загрузку"
+                )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(downloadError == nil ? "Скачать документ" : "Повторить загрузку")
         }
     }
 
+    private func actionIcon(systemName: String, accessibilityLabel: String) -> some View {
+        ZStack {
+            Circle()
+                .fill(GRUColors.accent.opacity(0.10))
+                .frame(width: 40, height: 40)
+            Circle()
+                .stroke(GRUColors.accent.opacity(0.24), lineWidth: 1)
+                .frame(width: 40, height: 40)
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .black))
+                .foregroundStyle(GRUColors.accent)
+        }
+        .accessibilityLabel(accessibilityLabel)
+    }
+
     private var fileSize: String {
-        guard attachment.size > 0 else { return "Документ" }
+        guard attachment.size > 0 else { return "файл" }
         return ByteCountFormatter.string(fromByteCount: attachment.size, countStyle: .file)
+    }
+
+    private var fileExtension: String {
+        URL(fileURLWithPath: attachment.fileName).pathExtension.lowercased()
+    }
+
+    private var fileTypeLabel: String {
+        fileExtension.isEmpty ? "FILE" : fileExtension.uppercased()
+    }
+
+    private var fileSystemIcon: String {
+        switch fileExtension {
+        case "pdf":
+            return "doc.richtext.fill"
+        case "zip", "rar", "7z":
+            return "archivebox.fill"
+        case "txt", "md", "rtf":
+            return "doc.text.fill"
+        case "doc", "docx", "pages":
+            return "doc.fill"
+        case "xls", "xlsx", "numbers", "csv":
+            return "tablecells.fill"
+        case "ppt", "pptx", "key":
+            return "rectangle.on.rectangle.angled"
+        default:
+            return "doc.fill"
+        }
     }
 
     private var localURL: URL? {
