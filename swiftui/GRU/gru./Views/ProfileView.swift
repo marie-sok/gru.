@@ -33,23 +33,24 @@ struct ProfileView: View {
                 GRUAppBackdrop()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 18) {
-                        identityHero
-                        editIdentityCard
+                    VStack(spacing: 14) {
+                        compactProfileHeader
+                        identitySection
                         bioSection
                         privacyNote
-                        Spacer(minLength: 34)
+                        Spacer(minLength: 28)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     GRUNeonIconButton(
                         systemName: "chevron.left",
-                        accessibilityLabel: "Назад",
+                        accessibilityLabel: GRUL10n.text("Назад"),
                         size: 36,
                         iconSize: 14
                     ) {
@@ -58,7 +59,7 @@ struct ProfileView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    Text("Профиль")
+                    Text(GRUL10n.text("Профиль"))
                         .font(.headline)
                 }
             }
@@ -98,206 +99,294 @@ struct ProfileView: View {
             .ignoresSafeArea()
         }
         .confirmationDialog(
-            "Аватар",
+            GRUL10n.text("Аватар"),
             isPresented: $showAvatarSource,
             titleVisibility: .visible
         ) {
-            Button("Выбрать из медиатеки") {
+            Button(GRUL10n.text("Выбрать из медиатеки")) {
                 showAvatarLibrary = true
             }
 
-            Button("Снять камерой") {
+            Button(GRUL10n.text("Снять камерой")) {
                 showAvatarCamera = true
             }
             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
 
             if profile.avatarData != nil {
-                Button("Удалить аватар", role: .destructive) {
+                Button(GRUL10n.text("Удалить аватар"), role: .destructive) {
                     profile.removeAvatar()
                     service.currentUser.avatarData = nil
                 }
             }
 
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         }
     }
 }
 
 private extension ProfileView {
-    var identityHero: some View {
-        ZStack(alignment: .bottom) {
-            GRUSignatureWallpaper(
-                theme: currentTheme,
-                intensity: 0.92,
-                animated: true
-            )
-
-            LinearGradient(
-                colors: [
-                    .clear,
-                    Color.black.opacity(0.24),
-                    Color.black.opacity(0.82)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(spacing: 15) {
-                HStack {
-                    themeBadge
-                    Spacer()
-                    localProfileBadge
-                }
-
-                Spacer(minLength: 4)
-
-                HStack(alignment: .center, spacing: 16) {
-                    Button {
-                        showAvatarSource = true
-                    } label: {
-                        ZStack(alignment: .bottomTrailing) {
-                            avatarImage
-                                .frame(width: 108, height: 108)
-                                .clipShape(Circle())
-                                .overlay {
-                                    Circle()
-                                        .stroke(GRUColors.neonGradient, lineWidth: 2.6)
-                                }
-                                .shadow(color: currentTheme.accent.opacity(0.55), radius: 20)
-                                .shadow(color: currentTheme.secondaryAccent.opacity(0.24), radius: 30)
-
+    var compactProfileHeader: some View {
+        HStack(spacing: 14) {
+            Button {
+                showAvatarSource = true
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    avatarImage
+                        .frame(width: 78, height: 78)
+                        .clipShape(Circle())
+                        .overlay {
                             Circle()
-                                .fill(service.currentUser.isOnline ? currentTheme.accent : Color.secondary)
-                                .frame(width: 18, height: 18)
-                                .overlay {
-                                    Circle().stroke(Color.black.opacity(0.72), lineWidth: 3)
-                                }
-                                .shadow(
-                                    color: service.currentUser.isOnline ? currentTheme.accent.opacity(0.85) : .clear,
-                                    radius: 8
-                                )
-
-                            GRUNeonIcon(
-                                systemName: "camera.fill",
-                                size: 37,
-                                iconSize: 14
-                            )
-                            .offset(x: 5, y: 4)
+                                .stroke(GRUColors.neonGradient, lineWidth: 1.8)
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Изменить аватар")
+                        .shadow(
+                            color: currentTheme.accent.opacity(0.20),
+                            radius: 12
+                        )
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(displayName)
-                            .font(.system(size: 27, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
+                    ZStack {
+                        Circle()
+                            .fill(GRUColors.card)
 
-                        Text("@\(profile.username)")
-                            .font(.subheadline.weight(.semibold))
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(currentTheme.accent)
-
-                        HStack(spacing: 7) {
-                            Circle()
-                                .fill(service.currentUser.isOnline ? currentTheme.accent : Color.secondary.opacity(0.65))
-                                .frame(width: 7, height: 7)
-
-                            Text(service.currentUser.isOnline ? "online" : "offline")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.white.opacity(0.82))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
                     }
+                    .frame(width: 27, height: 27)
+                    .overlay {
+                        Circle()
+                            .stroke(currentTheme.accent.opacity(0.42), lineWidth: 1)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(GRUL10n.text("Изменить аватар"))
 
-                    Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(displayName)
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+
+                if !profile.username.isEmpty {
+                    Text("@\(profile.username)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(currentTheme.accent)
+                        .lineLimit(1)
                 }
 
-                heroMetrics
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(
+                            service.currentUser.isOnline
+                                ? currentTheme.accent
+                                : Color.secondary.opacity(0.55)
+                        )
+                        .frame(width: 6, height: 6)
+
+                    Text(
+                        GRUL10n.text(
+                            service.currentUser.isOnline ? "online" : "offline"
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
             }
-            .padding(16)
+
+            Spacer(minLength: 0)
         }
-        .frame(height: 360)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .stroke(currentTheme.accent.opacity(0.34), lineWidth: 1.2)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(currentTheme.accent.opacity(0.12), lineWidth: 1)
         }
-        .shadow(color: currentTheme.accent.opacity(0.20), radius: 25, y: 12)
     }
 
-    var themeBadge: some View {
-        Label(currentTheme.title, systemImage: currentTheme.icon)
-            .font(.system(size: 10, weight: .black, design: .rounded))
-            .foregroundStyle(currentTheme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(currentTheme.accent.opacity(0.32), lineWidth: 1)
+    var identitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle(
+                icon: "person.text.rectangle.fill",
+                title: "Данные профиля",
+                subtitle: "имя и username"
+            )
+
+            fieldRow(icon: "person.fill", title: "Никнейм") {
+                TextField(GRUL10n.text("Никнейм"), text: $profile.nickname)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.words)
             }
+
+            fieldRow(icon: "at", title: "Username") {
+                TextField("gru.user", text: $profile.username)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+
+            profileRow(
+                icon: "circle.fill",
+                title: "Статус",
+                value: service.currentUser.isOnline ? "online" : "offline"
+            )
+        }
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(currentTheme.accent.opacity(0.12), lineWidth: 1)
+        }
     }
 
-    var localProfileBadge: some View {
-        Label("MY GRU", systemImage: "person.crop.circle.fill")
-            .font(.system(size: 9, weight: .black, design: .rounded))
-            .foregroundStyle(.white.opacity(0.76))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
-            .background(Color.black.opacity(0.28), in: Capsule())
-    }
-
-    var heroMetrics: some View {
-        HStack(spacing: 8) {
-            metricChip(
+    var bioSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            sectionTitle(
                 icon: "quote.bubble.fill",
-                value: "\(profile.bio.count)/160",
-                label: "bio"
+                title: "Био",
+                subtitle: "коротко о себе"
             )
 
-            metricChip(
-                icon: service.currentUser.isOnline ? "bolt.fill" : "moon.fill",
-                value: service.currentUser.isOnline ? "LIVE" : "AWAY",
-                label: "status"
-            )
+            ZStack(alignment: .bottomTrailing) {
+                TextEditor(text: $profile.bio)
+                    .frame(minHeight: 96)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
 
-            metricChip(
-                icon: currentTheme.icon,
-                value: currentTheme.title,
-                label: "theme"
+                Text("\(profile.bio.count)/160")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(
+                        profile.bio.count > 145
+                            ? currentTheme.accent
+                            : .secondary
+                    )
+                    .padding(9)
+            }
+            .background(
+                GRUColors.card.opacity(0.70),
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .stroke(currentTheme.accent.opacity(0.14), lineWidth: 1)
+            }
         }
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
     }
 
-    func metricChip(icon: String, value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(currentTheme.accent)
+    var privacyNote: some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(currentTheme.accent)
+                .frame(width: 34, height: 34)
+                .background(currentTheme.accent.opacity(0.09), in: Circle())
 
-                Text(value)
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(GRUL10n.text("Медиа остаётся в переписках"))
+                    .font(.subheadline.weight(.semibold))
+
+                Text(
+                    GRUL10n.text(
+                        "Голосовые и видео-сообщения не создают отдельную медиатеку gru. на устройстве."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-
-            Text(label.uppercased())
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.46))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        .padding(13)
+        .background(
+            GRUColors.card.opacity(0.56),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+    }
+
+    func sectionTitle(
+        icon: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            GRUNeonIcon(systemName: icon, size: 32, iconSize: 12)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(GRUL10n.text(title))
+                    .font(.headline)
+                Text(GRUL10n.text(subtitle))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
         }
+    }
+
+    func profileRow(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(currentTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(currentTheme.accent.opacity(0.08), in: Circle())
+
+            Text(GRUL10n.text(title))
+                .font(.subheadline.weight(.semibold))
+
+            Spacer()
+
+            Text(GRUL10n.text(value))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 11)
+        .frame(height: 48)
+        .background(
+            GRUColors.card.opacity(0.62),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+    }
+
+    func fieldRow<Content: View>(
+        icon: String,
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(currentTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(currentTheme.accent.opacity(0.08), in: Circle())
+
+            Text(GRUL10n.text(title))
+                .font(.subheadline.weight(.semibold))
+
+            Spacer()
+
+            content()
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 170)
+        }
+        .padding(.horizontal, 11)
+        .frame(minHeight: 48)
+        .background(
+            GRUColors.card.opacity(0.62),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
     }
 
     @ViewBuilder
@@ -313,9 +402,9 @@ private extension ProfileView {
                     .fill(
                         LinearGradient(
                             colors: [
-                                currentTheme.accent.opacity(0.52),
+                                currentTheme.accent.opacity(0.44),
                                 currentTheme.card,
-                                currentTheme.secondaryAccent.opacity(0.48)
+                                currentTheme.secondaryAccent.opacity(0.36)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -323,155 +412,9 @@ private extension ProfileView {
                     )
 
                 Image(systemName: "person.fill")
-                    .font(.system(size: 42, weight: .black))
-                    .foregroundStyle(.white.opacity(0.94))
+                    .font(.system(size: 31, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.92))
             }
-        }
-    }
-
-    var editIdentityCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            sectionTitle(
-                icon: "slider.horizontal.3",
-                title: "Identity",
-                subtitle: "локальные данные профиля на этом устройстве"
-            )
-
-            fieldRow(icon: "person.text.rectangle.fill", title: "Никнейм") {
-                TextField("Никнейм", text: $profile.nickname)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.words)
-            }
-
-            fieldRow(icon: "at", title: "Username") {
-                TextField("gru.user", text: $profile.username)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            profileRow(
-                icon: "circle.fill",
-                title: "Статус",
-                value: service.currentUser.isOnline ? "Online" : "Offline"
-            )
-        }
-        .padding(15)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(currentTheme.accent.opacity(0.16), lineWidth: 1)
-        }
-    }
-
-    var bioSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(
-                icon: "quote.bubble.fill",
-                title: "Био",
-                subtitle: "коротко о себе"
-            )
-
-            ZStack(alignment: .bottomTrailing) {
-                TextEditor(text: $profile.bio)
-                    .frame(minHeight: 112)
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-
-                Text("\(profile.bio.count)/160")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(profile.bio.count > 145 ? currentTheme.accent : .secondary)
-                    .padding(10)
-            }
-            .background(GRUColors.card.opacity(0.76))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(currentTheme.accent.opacity(0.20), lineWidth: 1)
-            }
-        }
-        .padding(15)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    var privacyNote: some View {
-        HStack(alignment: .top, spacing: 12) {
-            GRUNeonIcon(
-                systemName: "lock.shield.fill",
-                size: 38,
-                iconSize: 15
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Медиа остаётся в переписках")
-                    .font(.subheadline.weight(.bold))
-
-                Text("Голосовые и видео-сообщения не создают отдельную медиатеку gru. на устройстве.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(15)
-        .background(GRUColors.card.opacity(0.66))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(currentTheme.accent.opacity(0.12), lineWidth: 1)
-        }
-    }
-
-    func sectionTitle(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 10) {
-            GRUNeonIcon(systemName: icon, size: 34, iconSize: 13)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-    }
-
-    func profileRow(icon: String, title: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            GRUNeonIcon(systemName: icon, size: 36, iconSize: 14)
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Spacer()
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(service.currentUser.isOnline ? currentTheme.accent : .secondary)
-        }
-        .padding(12)
-        .background(GRUColors.card.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-    }
-
-    func fieldRow<Content: View>(
-        icon: String,
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(spacing: 12) {
-            GRUNeonIcon(systemName: icon, size: 36, iconSize: 14)
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Spacer()
-            content()
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 170)
-        }
-        .padding(12)
-        .background(GRUColors.card.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(currentTheme.accent.opacity(0.08), lineWidth: 1)
         }
     }
 
