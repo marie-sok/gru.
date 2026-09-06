@@ -49,7 +49,8 @@ struct ImageBubble: View {
     }
 
     private var localImage: UIImage? {
-        guard let path = attachment.localPath, !path.isEmpty else {
+        guard let path = attachment.localPath,
+              !path.isEmpty else {
             return nil
         }
         return UIImage(contentsOfFile: path)
@@ -115,7 +116,9 @@ struct ImageBubble: View {
         .fullScreenCover(isPresented: $showFullScreen) {
             FullScreenImageView(image: image)
         }
-        .accessibilityLabel("Фото. Нажми, чтобы открыть на весь экран")
+        .accessibilityLabel(
+            GRUL10n.text("Фото. Нажми, чтобы открыть на весь экран")
+        )
     }
 
     private var mediaBadge: some View {
@@ -132,7 +135,8 @@ struct ImageBubble: View {
         .frame(height: 23)
         .background(.black.opacity(0.38), in: Capsule())
         .overlay {
-            Capsule().stroke(Color.white.opacity(0.13), lineWidth: 0.7)
+            Capsule()
+                .stroke(Color.white.opacity(0.13), lineWidth: 0.7)
         }
     }
 
@@ -143,7 +147,9 @@ struct ImageBubble: View {
                     LinearGradient(
                         colors: [
                             GRUColors.card,
-                            GRUColors.accent.opacity(loadingPulse ? 0.18 : 0.07),
+                            GRUColors.accent.opacity(
+                                loadingPulse ? 0.18 : 0.07
+                            ),
                             GRUColors.card
                         ],
                         startPoint: .topLeading,
@@ -161,13 +167,20 @@ struct ImageBubble: View {
                         .foregroundStyle(GRUColors.accent)
                 }
 
-                Text(isLoadingRemote ? "Загружаем фото…" : "Фото")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text(
+                    GRUL10n.text(
+                        isLoadingRemote ? "Загружаем фото…" : "Фото"
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
+            withAnimation(
+                .easeInOut(duration: 1.3)
+                    .repeatForever(autoreverses: true)
+            ) {
                 loadingPulse = true
             }
         }
@@ -188,8 +201,10 @@ struct ImageBubble: View {
             return
         }
 
-        guard let remoteURL = attachment.remoteURL, !remoteURL.isEmpty,
-              let token = TokenStorage.shared.token, !token.isEmpty
+        guard let remoteURL = attachment.remoteURL,
+              !remoteURL.isEmpty,
+              let token = TokenStorage.shared.token,
+              !token.isEmpty
         else {
             return
         }
@@ -198,7 +213,10 @@ struct ImageBubble: View {
         defer { isLoadingRemote = false }
 
         do {
-            let data = try await APIClient.shared.download(path: remoteURL, token: token)
+            let data = try await APIClient.shared.download(
+                path: remoteURL,
+                token: token
+            )
             guard let image = UIImage(data: data) else { return }
 
             MediaCacheService.shared.store(image, for: remoteURL)
@@ -206,7 +224,10 @@ struct ImageBubble: View {
 
             remoteImage = image
         } catch {
-            print("❌ Remote image load error for \(attachment.fileName):", error.localizedDescription)
+            print(
+                "❌ Remote image load error for \(attachment.fileName):",
+                error.localizedDescription
+            )
         }
     }
 }
