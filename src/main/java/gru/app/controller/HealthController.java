@@ -29,10 +29,7 @@ public class HealthController {
     private final String port;
     private final ExecutorService readinessExecutor;
 
-    public HealthController(
-            MongoTemplate mongoTemplate,
-            @Value("${server.port:8081}") String port
-    ) {
+    public HealthController(MongoTemplate mongoTemplate, @Value("${server.port:8081}") String port) {
         this.mongoTemplate = mongoTemplate;
         this.port = port;
         this.readinessExecutor = Executors.newSingleThreadExecutor(new DaemonThreadFactory());
@@ -49,7 +46,6 @@ public class HealthController {
     @GetMapping("/ready")
     public ResponseEntity<Map<String, Object>> ready() {
         Future<DatabaseProbe> ping = readinessExecutor.submit(databasePing());
-
         DatabaseProbe probe;
 
         try {
@@ -79,7 +75,7 @@ public class HealthController {
         return () -> {
             try {
                 mongoTemplate.getDb().runCommand(new Document("ping", 1));
-                return DatabaseProbe.ready();
+                return DatabaseProbe.success();
             } catch (RuntimeException error) {
                 return DatabaseProbe.failed(classifyDatabaseError(error));
             }
@@ -88,46 +84,29 @@ public class HealthController {
 
     private String classifyDatabaseError(Throwable error) {
         Throwable current = error;
-
         while (current != null) {
             String className = current.getClass().getName().toLowerCase(Locale.ROOT);
-            String message = current.getMessage() == null
-                    ? ""
-                    : current.getMessage().toLowerCase(Locale.ROOT);
+            String message = current.getMessage() == null ? "" : current.getMessage().toLowerCase(Locale.ROOT);
 
-            if (message.contains("authentication failed")
-                    || message.contains("bad auth")
-                    || message.contains("auth failed")
-                    || message.contains("code 8000")
+            if (message.contains("authentication failed") || message.contains("bad auth")
+                    || message.contains("auth failed") || message.contains("code 8000")
                     || className.contains("mongosecurityexception")) {
                 return "auth_failed";
             }
-
-            if (className.contains("unknownhostexception")
-                    || message.contains("unknown host")
-                    || message.contains("querysrv")
-                    || message.contains("srv lookup")
-                    || message.contains("dns")) {
+            if (className.contains("unknownhostexception") || message.contains("unknown host")
+                    || message.contains("querysrv") || message.contains("srv lookup") || message.contains("dns")) {
                 return "dns";
             }
-
-            if (className.contains("timeout")
-                    || message.contains("timed out")
-                    || message.contains("timeout")) {
+            if (className.contains("timeout") || message.contains("timed out") || message.contains("timeout")) {
                 return "timeout";
             }
-
-            if (className.contains("mongosocket")
-                    || className.contains("connectexception")
-                    || message.contains("connection refused")
-                    || message.contains("connection reset")
+            if (className.contains("mongosocket") || className.contains("connectexception")
+                    || message.contains("connection refused") || message.contains("connection reset")
                     || message.contains("network is unreachable")) {
                 return "network";
             }
-
             current = current.getCause();
         }
-
         return "unknown";
     }
 
@@ -140,7 +119,7 @@ public class HealthController {
     }
 
     private record DatabaseProbe(boolean ready, String reason) {
-        private static DatabaseProbe ready() {
+        private static DatabaseProbe success() {
             return new DatabaseProbe(true, "ok");
         }
 
