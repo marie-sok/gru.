@@ -1,17 +1,24 @@
+import Foundation
 import SwiftUI
 
 /// Permanent edge-to-edge GRU wallpaper.
-/// Character artwork is always static. Motion is limited to tiny decorative
-/// details so the wallpaper feels alive without distorting or re-framing cats.
+/// The approved full-screen artwork remains the visual anchor, while a light
+/// field of tiny theme-specific creatures and decoration adds motion across the
+/// whole screen. Motion automatically stops for Reduce Motion, Low Power Mode,
+/// and while the app is inactive.
 struct GRUIllustratedWallpaper: View {
     let theme: GRUAppTheme
     var intensity: Double = 1
     var animated = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     private var shouldAnimate: Bool {
-        animated && !reduceMotion
+        animated
+            && !reduceMotion
+            && scenePhase == .active
+            && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
     var body: some View {
@@ -36,6 +43,12 @@ struct GRUIllustratedWallpaper: View {
                     ],
                     startPoint: .top,
                     endPoint: .bottom
+                )
+
+                GRUMicroDoodleOverlay(
+                    theme: theme,
+                    intensity: min(max(intensity, 0), 1) * 0.82,
+                    animated: shouldAnimate
                 )
 
                 if shouldAnimate {
