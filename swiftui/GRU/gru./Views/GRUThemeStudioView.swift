@@ -33,9 +33,6 @@ struct GRUThemeStudioView: View {
         .navigationTitle("Theme Studio")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if !GRUThemePolicy.allowed.contains(selectedTheme) {
-                themeRaw = GRUAppTheme.blackMoonCat.rawValue
-            }
             animationIntensity = GRUAppearanceSettings.clampedIntensity(animationIntensity)
         }
     }
@@ -111,7 +108,7 @@ private extension GRUThemeStudioView {
 
                     HStack {
                         Spacer(minLength: 58)
-                        previewBubble("и акцент теперь один на весь UI", outgoing: true)
+                        previewBubble("акцент теперь один на весь UI", outgoing: true)
                     }
                 }
             }
