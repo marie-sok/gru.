@@ -298,6 +298,14 @@ private extension GRUReleaseSettingsView {
 
 @MainActor
 struct GRUReleaseThemesView: View {
+    @State private var showFullscreenTheme = false
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+    private var motionEnabled: Bool {
+        dynamicBackground && !reduceMotion && !systemReduceMotion && !lowPower
+    }
+
     @AppStorage(GRUTheme.selectionKey)
     private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
 
@@ -321,6 +329,11 @@ struct GRUReleaseThemesView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 livePreview
+                Button {
+                    showFullscreenTheme = true
+                } label: {
+                    Label("На весь экран", systemImage: "arrow.up.left.and.arrow.down.right")
+                }
                 motionControls
 
                 LazyVGrid(columns: columns, spacing: 10) {
@@ -336,6 +349,25 @@ struct GRUReleaseThemesView: View {
         .background(GRUAppBackdrop())
         .navigationTitle("Темы")
         .navigationBarTitleDisplayMode(.inline)
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in
+            lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+        .fullScreenCover(isPresented: $showFullscreenTheme) {
+            ZStack(alignment: .topTrailing) {
+                GRUSignatureWallpaper(theme: selectedTheme, animated: motionEnabled)
+                    .ignoresSafeArea()
+                Button {
+                    showFullscreenTheme = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.headline)
+                        .padding(14)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("Закрыть просмотр темы")
+                .padding()
+            }
+        }
         .onAppear {
             GRUThemePolicy.migrateIfNeeded()
         }
@@ -363,7 +395,7 @@ private extension GRUReleaseThemesView {
                     Circle()
                         .fill(selectedTheme.accent)
                         .frame(width: 7, height: 7)
-                    Text(dynamicBackground && !reduceMotion ? "LIVE" : "STATIC")
+                    Text(motionEnabled ? "LIVE" : "STATIC")
                         .font(.system(size: 10, weight: .black, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(.white.opacity(0.75))

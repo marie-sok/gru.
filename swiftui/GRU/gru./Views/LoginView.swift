@@ -5,10 +5,15 @@ struct LoginView: View {
 
     @State private var viewModel = LoginViewModel()
     @State private var isRegister = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case phone, password, nickname
+    }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            GRUAppBackdrop()
 
             VStack(spacing: 24) {
                 Spacer()
@@ -19,6 +24,9 @@ struct LoginView: View {
 
                 VStack(spacing: 16) {
                     TextField("Phone", text: $viewModel.phone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.username)
+                        .focused($focusedField, equals: .phone)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .padding()
@@ -27,6 +35,8 @@ struct LoginView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     SecureField("Password", text: $viewModel.password)
+                        .textContentType(isRegister ? .newPassword : .password)
+                        .focused($focusedField, equals: .password)
                         .padding()
                         .background(Color.white.opacity(0.08))
                         .foregroundStyle(.white)
@@ -34,6 +44,9 @@ struct LoginView: View {
 
                     if isRegister {
                         TextField("Nickname", text: $viewModel.nickname)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($focusedField, equals: .nickname)
                             .padding()
                             .background(Color.white.opacity(0.08))
                             .foregroundStyle(.white)
@@ -47,6 +60,7 @@ struct LoginView: View {
                 }
 
                 Button {
+                    focusedField = nil
                     Task {
                         let didAuthenticate: Bool
                         if isRegister {
@@ -70,8 +84,10 @@ struct LoginView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(viewModel.loading)
 
                 Button {
+                    focusedField = nil
                     isRegister.toggle()
                 } label: {
                     Text(
@@ -86,6 +102,7 @@ struct LoginView: View {
             }
             .padding(.horizontal, 24)
         }
+        .onDisappear { focusedField = nil }
     }
 }
 

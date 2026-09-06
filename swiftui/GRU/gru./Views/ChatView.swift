@@ -74,6 +74,7 @@ struct ChatView: View {
                 }
             }
             .blur(radius: wallpaperBlur ? 7 : 0)
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
