@@ -13,9 +13,13 @@ struct DocumentBubble: View {
                 fileIcon
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(attachment.fileName.isEmpty ? "Документ" : attachment.fileName)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .lineLimit(2)
+                    Text(
+                        attachment.fileName.isEmpty
+                            ? GRUL10n.text("Документ")
+                            : attachment.fileName
+                    )
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .lineLimit(2)
 
                     HStack(spacing: 6) {
                         Text(fileTypeLabel)
@@ -42,6 +46,7 @@ struct DocumentBubble: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 9, weight: .bold))
+
                     Text(downloadError)
                         .font(.caption2)
                         .lineLimit(2)
@@ -49,7 +54,13 @@ struct DocumentBubble: View {
                 .foregroundStyle(.orange)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
-                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(
+                    Color.orange.opacity(0.08),
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
             }
         }
         .padding(13)
@@ -90,53 +101,76 @@ struct DocumentBubble: View {
     private var trailingAction: some View {
         if let downloadedURL {
             ShareLink(item: downloadedURL) {
-                actionIcon(systemName: "square.and.arrow.up", accessibilityLabel: "Поделиться документом")
+                actionIcon(
+                    systemName: "square.and.arrow.up",
+                    accessibilityLabel: "Поделиться документом"
+                )
             }
             .buttonStyle(.plain)
+
         } else if isDownloading {
             ZStack {
                 Circle()
                     .fill(GRUColors.accent.opacity(0.08))
                     .frame(width: 40, height: 40)
+
                 ProgressView()
                     .controlSize(.small)
                     .tint(GRUColors.accent)
             }
+
         } else {
             Button {
                 Task { await download() }
             } label: {
                 actionIcon(
-                    systemName: downloadError == nil ? "arrow.down" : "arrow.clockwise",
-                    accessibilityLabel: downloadError == nil ? "Скачать документ" : "Повторить загрузку"
+                    systemName: downloadError == nil
+                        ? "arrow.down"
+                        : "arrow.clockwise",
+                    accessibilityLabel: downloadError == nil
+                        ? "Скачать документ"
+                        : "Повторить загрузку"
                 )
             }
             .buttonStyle(.plain)
         }
     }
 
-    private func actionIcon(systemName: String, accessibilityLabel: String) -> some View {
+    private func actionIcon(
+        systemName: String,
+        accessibilityLabel: String
+    ) -> some View {
         ZStack {
             Circle()
                 .fill(GRUColors.accent.opacity(0.10))
                 .frame(width: 40, height: 40)
+
             Circle()
                 .stroke(GRUColors.accent.opacity(0.24), lineWidth: 1)
                 .frame(width: 40, height: 40)
+
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .black))
                 .foregroundStyle(GRUColors.accent)
         }
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(GRUL10n.text(accessibilityLabel))
     }
 
     private var fileSize: String {
-        guard attachment.size > 0 else { return "файл" }
-        return ByteCountFormatter.string(fromByteCount: attachment.size, countStyle: .file)
+        guard attachment.size > 0 else {
+            return GRUL10n.text("файл")
+        }
+
+        return ByteCountFormatter.string(
+            fromByteCount: attachment.size,
+            countStyle: .file
+        )
     }
 
     private var fileExtension: String {
-        URL(fileURLWithPath: attachment.fileName).pathExtension.lowercased()
+        URL(fileURLWithPath: attachment.fileName)
+            .pathExtension
+            .lowercased()
     }
 
     private var fileTypeLabel: String {
@@ -170,6 +204,7 @@ struct DocumentBubble: View {
         else {
             return nil
         }
+
         return URL(fileURLWithPath: path)
     }
 
@@ -186,7 +221,7 @@ struct DocumentBubble: View {
             let token = TokenStorage.shared.token,
             !token.isEmpty
         else {
-            downloadError = "Файл недоступен"
+            downloadError = GRUL10n.text("Файл недоступен")
             return
         }
 
@@ -195,14 +230,32 @@ struct DocumentBubble: View {
         defer { isDownloading = false }
 
         do {
-            let data = try await APIClient.shared.download(path: remotePath, token: token)
-            let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("GRUDocuments", isDirectory: true)
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let safeName = attachment.fileName.replacingOccurrences(of: "/", with: "_")
-            let url = folder.appendingPathComponent("\(attachment.id.uuidString)-\(safeName)")
+            let data = try await APIClient.shared.download(
+                path: remotePath,
+                token: token
+            )
+
+            let folder = FileManager.default.urls(
+                for: .cachesDirectory,
+                in: .userDomainMask
+            )[0]
+            .appendingPathComponent("GRUDocuments", isDirectory: true)
+
+            try FileManager.default.createDirectory(
+                at: folder,
+                withIntermediateDirectories: true
+            )
+
+            let safeName = attachment.fileName
+                .replacingOccurrences(of: "/", with: "_")
+
+            let url = folder.appendingPathComponent(
+                "\(attachment.id.uuidString)-\(safeName)"
+            )
+
             try data.write(to: url, options: .atomic)
             downloadedURL = url
+
         } catch {
             downloadError = error.localizedDescription
             print("❌ Document download error:", error)
