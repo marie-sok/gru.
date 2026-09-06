@@ -30,7 +30,7 @@ struct GRUThemeStudioView: View {
             .padding(.top, 10)
         }
         .background(GRUAppBackdrop())
-        .navigationTitle("Theme Studio")
+        .navigationTitle(GRUL10n.text("Theme Studio"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             animationIntensity = GRUAppearanceSettings.clampedIntensity(animationIntensity)
@@ -59,12 +59,17 @@ private extension GRUThemeStudioView {
 
             VStack(spacing: 12) {
                 HStack {
-                    Label("LIVE", systemImage: dynamicBackground ? "waveform.path.ecg" : "pause.fill")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(selectedTheme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
+                    Label(
+                        "LIVE",
+                        systemImage: dynamicBackground
+                            ? "waveform.path.ecg"
+                            : "pause.fill"
+                    )
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(selectedTheme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: Capsule())
 
                     Spacer()
 
@@ -84,7 +89,10 @@ private extension GRUThemeStudioView {
                         }
                         .overlay {
                             Circle()
-                                .stroke(selectedTheme.accent.opacity(0.45), lineWidth: 1)
+                                .stroke(
+                                    selectedTheme.accent.opacity(0.45),
+                                    lineWidth: 1
+                                )
                         }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -92,7 +100,7 @@ private extension GRUThemeStudioView {
                             .font(.system(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
 
-                        Text("полноэкранная тема gru.")
+                        Text(GRUL10n.text("полноэкранная тема gru."))
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.58))
                     }
@@ -108,7 +116,10 @@ private extension GRUThemeStudioView {
 
                     HStack {
                         Spacer(minLength: 58)
-                        previewBubble("акцент теперь один на весь UI", outgoing: true)
+                        previewBubble(
+                            "акцент теперь один на весь UI",
+                            outgoing: true
+                        )
                     }
                 }
             }
@@ -120,19 +131,33 @@ private extension GRUThemeStudioView {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(selectedTheme.accent.opacity(0.36), lineWidth: 1.2)
         }
-        .shadow(color: selectedTheme.accent.opacity(0.24), radius: 24, y: 12)
-        .animation(.spring(response: 0.34, dampingFraction: 0.84), value: themeRaw)
+        .shadow(
+            color: selectedTheme.accent.opacity(0.24),
+            radius: 24,
+            y: 12
+        )
+        .animation(
+            .spring(response: 0.34, dampingFraction: 0.84),
+            value: themeRaw
+        )
     }
 
     var motionControls: some View {
         VStack(spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Движение темы")
+                    Text(GRUL10n.text("Движение темы"))
                         .font(.headline)
-                    Text(dynamicBackground ? "микро-анимация активна" : "фон остаётся статичным")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                    Text(
+                        GRUL10n.text(
+                            dynamicBackground
+                                ? "микро-анимация активна"
+                                : "фон остаётся статичным"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -144,29 +169,46 @@ private extension GRUThemeStudioView {
 
             VStack(spacing: 8) {
                 HStack {
-                    Text("Спокойно")
+                    Text(GRUL10n.text("Спокойно"))
                     Spacer()
-                    Text("Интенсивность \(Int(animationIntensity * 100))%")
-                        .fontWeight(.semibold)
+
+                    Text(
+                        GRUL10n.format(
+                            "Интенсивность %d%%",
+                            Int(animationIntensity * 100)
+                        )
+                    )
+                    .fontWeight(.semibold)
+
                     Spacer()
-                    Text("Живо")
+                    Text(GRUL10n.text("Живо"))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
-                Slider(value: $animationIntensity, in: 0...1, step: 0.05)
-                    .tint(selectedTheme.accent)
-                    .disabled(!dynamicBackground)
+                Slider(
+                    value: $animationIntensity,
+                    in: 0...1,
+                    step: 0.05
+                )
+                .tint(selectedTheme.accent)
+                .disabled(!dynamicBackground)
             }
 
             HStack(spacing: 10) {
                 presetButton("Soft", value: 0.35)
-                presetButton("GRU", value: GRUAppearanceSettings.defaultAnimationIntensity)
+                presetButton(
+                    "GRU",
+                    value: GRUAppearanceSettings.defaultAnimationIntensity
+                )
                 presetButton("Max", value: 1.0)
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(selectedTheme.accent.opacity(0.18), lineWidth: 1)
@@ -176,12 +218,19 @@ private extension GRUThemeStudioView {
     var themeRail: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Коллекция")
+                Text(GRUL10n.text("Коллекция"))
                     .font(.headline)
+
                 Spacer()
-                Text("\(GRUThemePolicy.allowed.count) тем")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                Text(
+                    GRUL10n.format(
+                        "%d тем",
+                        GRUThemePolicy.allowed.count
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -197,21 +246,40 @@ private extension GRUThemeStudioView {
 
     var chromePreview: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Акцент интерфейса")
+            Text(GRUL10n.text("Акцент интерфейса"))
                 .font(.headline)
 
             HStack(spacing: 10) {
-                chromeChip(icon: "person.2.fill", title: "Люди", active: false)
-                chromeChip(icon: "envelope.fill", title: "Чаты", active: true)
-                chromeChip(icon: "slider.horizontal.3", title: "Настройки", active: false)
+                chromeChip(
+                    icon: "person.2.fill",
+                    title: "Люди",
+                    active: false
+                )
+                chromeChip(
+                    icon: "envelope.fill",
+                    title: "Чаты",
+                    active: true
+                )
+                chromeChip(
+                    icon: "slider.horizontal.3",
+                    title: "Настройки",
+                    active: false
+                )
             }
 
-            Text("Tab bar, кнопки, статусы, chat header и исходящие сообщения используют accent выбранной темы.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                GRUL10n.text(
+                    "Tab bar, кнопки, статусы, chat header и исходящие сообщения используют accent выбранной темы."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(16)
-        .background(GRUColors.card.opacity(0.72), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(
+            GRUColors.card.opacity(0.72),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(selectedTheme.accent.opacity(0.16), lineWidth: 1)
@@ -219,7 +287,7 @@ private extension GRUThemeStudioView {
     }
 
     func previewBubble(_ text: String, outgoing: Bool) -> some View {
-        Text(text)
+        Text(GRUL10n.text(text))
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(.white.opacity(0.94))
             .padding(.horizontal, 11)
@@ -233,7 +301,9 @@ private extension GRUThemeStudioView {
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(
-                        outgoing ? selectedTheme.accent.opacity(0.42) : Color.white.opacity(0.07),
+                        outgoing
+                            ? selectedTheme.accent.opacity(0.42)
+                            : Color.white.opacity(0.07),
                         lineWidth: 0.8
                     )
             }
@@ -247,18 +317,22 @@ private extension GRUThemeStudioView {
             dynamicBackground = true
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
-            Text(title)
+            Text(GRUL10n.text(title))
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
                 .background(
-                    isSelected ? selectedTheme.accent.opacity(0.17) : Color.white.opacity(0.045),
+                    isSelected
+                        ? selectedTheme.accent.opacity(0.17)
+                        : Color.white.opacity(0.045),
                     in: Capsule()
                 )
                 .overlay {
                     Capsule()
                         .stroke(
-                            isSelected ? selectedTheme.accent.opacity(0.50) : Color.white.opacity(0.06),
+                            isSelected
+                                ? selectedTheme.accent.opacity(0.50)
+                                : Color.white.opacity(0.06),
                             lineWidth: 1
                         )
                 }
@@ -274,16 +348,22 @@ private extension GRUThemeStudioView {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                GRUSignatureWallpaper(theme: theme, intensity: 0.86, animated: false)
-                    .frame(width: 116, height: 164)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(
-                                active ? theme.accent : theme.accent.opacity(0.18),
-                                lineWidth: active ? 2 : 1
-                            )
-                    }
+                GRUSignatureWallpaper(
+                    theme: theme,
+                    intensity: 0.86,
+                    animated: false
+                )
+                .frame(width: 116, height: 164)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(
+                            active
+                                ? theme.accent
+                                : theme.accent.opacity(0.18),
+                            lineWidth: active ? 2 : 1
+                        )
+                }
 
                 Text(studioTitle(theme))
                     .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -294,23 +374,39 @@ private extension GRUThemeStudioView {
                     Circle()
                         .fill(theme.accent)
                         .frame(width: 6, height: 6)
-                    Text(active ? "выбрана" : "тап для выбора")
-                        .font(.caption2)
-                        .foregroundStyle(active ? theme.accent : .secondary)
+
+                    Text(
+                        GRUL10n.text(
+                            active ? "выбрана" : "тап для выбора"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(active ? theme.accent : .secondary)
                 }
             }
             .frame(width: 116, alignment: .leading)
         }
         .buttonStyle(.plain)
         .scaleEffect(active ? 1.0 : 0.97)
-        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: active)
+        .animation(
+            .spring(response: 0.28, dampingFraction: 0.82),
+            value: active
+        )
     }
 
-    func chromeChip(icon: String, title: String, active: Bool) -> some View {
+    func chromeChip(
+        icon: String,
+        title: String,
+        active: Bool
+    ) -> some View {
         VStack(spacing: 7) {
             ZStack {
                 Circle()
-                    .fill(active ? selectedTheme.accent.opacity(0.18) : Color.white.opacity(0.04))
+                    .fill(
+                        active
+                            ? selectedTheme.accent.opacity(0.18)
+                            : Color.white.opacity(0.04)
+                    )
                     .frame(width: 42, height: 42)
 
                 Image(systemName: icon)
@@ -319,11 +415,21 @@ private extension GRUThemeStudioView {
             }
             .overlay {
                 Circle()
-                    .stroke(active ? selectedTheme.accent.opacity(0.48) : Color.white.opacity(0.05), lineWidth: 1)
+                    .stroke(
+                        active
+                            ? selectedTheme.accent.opacity(0.48)
+                            : Color.white.opacity(0.05),
+                        lineWidth: 1
+                    )
             }
-            .shadow(color: active ? selectedTheme.accent.opacity(0.26) : .clear, radius: 9)
+            .shadow(
+                color: active
+                    ? selectedTheme.accent.opacity(0.26)
+                    : .clear,
+                radius: 9
+            )
 
-            Text(title)
+            Text(GRUL10n.text(title))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(active ? GRUColors.text : .secondary)
         }
