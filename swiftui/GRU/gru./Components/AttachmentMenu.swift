@@ -102,7 +102,7 @@ struct AttachmentMenu: View {
                     .tracking(1.1)
                     .foregroundStyle(GRUColors.accent)
 
-                Text("Добавить в сообщение")
+                Text(GRUL10n.text("Добавить в сообщение"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -145,11 +145,11 @@ struct AttachmentMenu: View {
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(GRUL10n.text(title))
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(GRUColors.text)
 
-                    Text(subtitle)
+                    Text(GRUL10n.text(subtitle))
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
