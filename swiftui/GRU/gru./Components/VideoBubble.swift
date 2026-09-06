@@ -9,7 +9,9 @@ struct VideoBubble: View {
     @State private var isLoading = false
     @State private var loadError: String?
     @State private var loadingPulse = false
-    @AppStorage("gru.settings.chats.autoplayVideo") private var autoplay = true
+
+    @AppStorage("gru.settings.chats.autoplayVideo")
+    private var autoplay = true
 
     private let width: CGFloat = 240
     private let height: CGFloat = 220
@@ -19,7 +21,11 @@ struct VideoBubble: View {
             videoSurface
 
             LinearGradient(
-                colors: [Color.black.opacity(0.28), Color.clear, Color.black.opacity(0.34)],
+                colors: [
+                    Color.black.opacity(0.28),
+                    Color.clear,
+                    Color.black.opacity(0.34)
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -38,7 +44,10 @@ struct VideoBubble: View {
             await preparePlayerIfNeeded()
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true)) {
+            withAnimation(
+                .easeInOut(duration: 1.25)
+                    .repeatForever(autoreverses: true)
+            ) {
                 loadingPulse = true
             }
         }
@@ -58,7 +67,9 @@ struct VideoBubble: View {
                     LinearGradient(
                         colors: [
                             GRUColors.card,
-                            GRUColors.accent.opacity(isLoading && loadingPulse ? 0.18 : 0.06),
+                            GRUColors.accent.opacity(
+                                isLoading && loadingPulse ? 0.18 : 0.06
+                            ),
                             GRUColors.card
                         ],
                         startPoint: .topLeading,
@@ -83,22 +94,38 @@ struct VideoBubble: View {
                     Circle()
                         .fill(GRUColors.accent.opacity(0.10))
                         .frame(width: 56, height: 56)
+
                     Circle()
                         .stroke(GRUColors.neonGradient, lineWidth: 1.2)
                         .frame(width: 56, height: 56)
-                    Image(systemName: loadError == nil ? "play.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundStyle(loadError == nil ? GRUColors.accent : Color.orange)
-                        .offset(x: loadError == nil ? 1 : 0)
+
+                    Image(
+                        systemName: loadError == nil
+                            ? "play.fill"
+                            : "exclamationmark.triangle.fill"
+                    )
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundStyle(
+                        loadError == nil
+                            ? GRUColors.accent
+                            : Color.orange
+                    )
+                    .offset(x: loadError == nil ? 1 : 0)
                 }
 
-                Text(loadError == nil ? "Видео" : "Не удалось загрузить")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text(
+                    GRUL10n.text(
+                        loadError == nil ? "Видео" : "Не удалось загрузить"
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
 
                 if loadError != nil {
-                    Button("Повторить") {
-                        Task { await preparePlayerIfNeeded(force: true) }
+                    Button(GRUL10n.text("Повторить")) {
+                        Task {
+                            await preparePlayerIfNeeded(force: true)
+                        }
                     }
                     .font(.caption2.bold())
                     .buttonStyle(.borderless)
@@ -114,6 +141,7 @@ struct VideoBubble: View {
                 HStack(spacing: 5) {
                     Image(systemName: "video.fill")
                         .font(.system(size: 9, weight: .black))
+
                     Text("VIDEO")
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.8)
@@ -126,12 +154,17 @@ struct VideoBubble: View {
                 Spacer()
 
                 if attachment.size > 0 {
-                    Text(ByteCountFormatter.string(fromByteCount: attachment.size, countStyle: .file))
-                        .font(.system(size: 8, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.82))
-                        .padding(.horizontal, 8)
-                        .frame(height: 23)
-                        .background(.black.opacity(0.34), in: Capsule())
+                    Text(
+                        ByteCountFormatter.string(
+                            fromByteCount: attachment.size,
+                            countStyle: .file
+                        )
+                    )
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .padding(.horizontal, 8)
+                    .frame(height: 23)
+                    .background(.black.opacity(0.34), in: Capsule())
                 }
             }
 
@@ -146,6 +179,7 @@ struct VideoBubble: View {
                         .padding(.horizontal, 8)
                         .frame(height: 23)
                         .background(.black.opacity(0.34), in: Capsule())
+
                     Spacer()
                 }
             }
@@ -155,8 +189,12 @@ struct VideoBubble: View {
     }
 
     private var loadIdentity: String {
-        [attachment.localPath ?? "", attachment.remoteURL ?? "", attachment.fileName]
-            .joined(separator: "|")
+        [
+            attachment.localPath ?? "",
+            attachment.remoteURL ?? "",
+            attachment.fileName
+        ]
+        .joined(separator: "|")
     }
 
     @MainActor
@@ -189,7 +227,10 @@ struct VideoBubble: View {
         defer { isLoading = false }
 
         do {
-            let data = try await APIClient.shared.download(path: remotePath, token: token)
+            let data = try await APIClient.shared.download(
+                path: remotePath,
+                token: token
+            )
             let url = try cacheVideo(data)
             cachedRemoteURL = url
             installPlayer(url: url)
@@ -203,6 +244,7 @@ struct VideoBubble: View {
     private func installPlayer(url: URL) {
         let created = AVPlayer(url: url)
         player = created
+
         if autoplay {
             created.play()
         }
@@ -216,16 +258,29 @@ struct VideoBubble: View {
         else {
             return nil
         }
+
         return URL(fileURLWithPath: path)
     }
 
     private func cacheVideo(_ data: Data) throws -> URL {
         let ext = URL(fileURLWithPath: attachment.fileName).pathExtension
         let safeExt = ext.isEmpty ? "mp4" : ext
-        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("GRUMedia", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("video-\(attachment.id.uuidString).\(safeExt)")
+
+        let folder = FileManager.default.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        )[0]
+        .appendingPathComponent("GRUMedia", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: folder,
+            withIntermediateDirectories: true
+        )
+
+        let url = folder.appendingPathComponent(
+            "video-\(attachment.id.uuidString).\(safeExt)"
+        )
+
         try data.write(to: url, options: .atomic)
         return url
     }
