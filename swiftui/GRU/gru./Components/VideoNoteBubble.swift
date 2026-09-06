@@ -9,8 +9,12 @@ struct VideoNoteBubble: View {
     @State private var isLoading = false
     @State private var loadError: String?
     @State private var glowPulse = false
-    @AppStorage("gru.settings.chats.videoNoteAutoplay") private var autoplay = true
-    @AppStorage("gru.settings.accessibility.reduceMotion") private var reduceMotion = false
+
+    @AppStorage("gru.settings.chats.videoNoteAutoplay")
+    private var autoplay = true
+
+    @AppStorage("gru.settings.accessibility.reduceMotion")
+    private var reduceMotion = false
 
     private let width: CGFloat = 150
     private let height: CGFloat = 160
@@ -24,7 +28,11 @@ struct VideoNoteBubble: View {
             videoLayer
 
             LinearGradient(
-                colors: [Color.black.opacity(0.18), Color.clear, Color.black.opacity(0.26)],
+                colors: [
+                    Color.black.opacity(0.18),
+                    Color.clear,
+                    Color.black.opacity(0.26)
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -41,7 +49,10 @@ struct VideoNoteBubble: View {
                 .allowsHitTesting(false)
 
             catShape
-                .stroke(GRUColors.neonGradient, lineWidth: isPlaying ? 2.4 : 1.8)
+                .stroke(
+                    GRUColors.neonGradient,
+                    lineWidth: isPlaying ? 2.4 : 1.8
+                )
                 .frame(width: width, height: height)
                 .shadow(
                     color: GRUColors.accent.opacity(glowPulse ? 0.42 : 0.18),
@@ -65,6 +76,7 @@ struct VideoNoteBubble: View {
         }
         .onAppear {
             guard !reduceMotion else { return }
+
             withAnimation(
                 .easeInOut(duration: 1.55)
                     .repeatForever(autoreverses: true)
@@ -72,11 +84,17 @@ struct VideoNoteBubble: View {
                 glowPulse = true
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .AVPlayerItemDidPlayToEndTime
+            )
+        ) { notification in
             guard let currentItem = player?.currentItem,
                   let finishedItem = notification.object as? AVPlayerItem,
                   currentItem === finishedItem
-            else { return }
+            else {
+                return
+            }
 
             isPlaying = false
         }
@@ -84,7 +102,11 @@ struct VideoNoteBubble: View {
             player?.pause()
             isPlaying = false
         }
-        .accessibilityLabel("Кото-кружок. Нажми, чтобы воспроизвести или поставить на паузу")
+        .accessibilityLabel(
+            GRUL10n.text(
+                "Кото-кружок. Нажми, чтобы воспроизвести или поставить на паузу"
+            )
+        )
     }
 
     @ViewBuilder
@@ -144,9 +166,13 @@ struct VideoNoteBubble: View {
                             )
                             .font(.system(size: 24, weight: .semibold))
 
-                            Text(loadError == nil ? "cat note" : "ошибка")
-                                .font(.system(size: 9, weight: .black, design: .rounded))
-                                .tracking(0.6)
+                            Text(
+                                loadError == nil
+                                    ? "cat note"
+                                    : GRUL10n.text("ошибка")
+                            )
+                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .tracking(0.6)
                         }
                     }
                 }
@@ -161,6 +187,7 @@ struct VideoNoteBubble: View {
                 HStack(spacing: 4) {
                     Image(systemName: "pawprint.fill")
                         .font(.system(size: 8, weight: .black))
+
                     Text("CAT NOTE")
                         .font(.system(size: 7, weight: .black, design: .rounded))
                         .tracking(0.7)
@@ -177,6 +204,7 @@ struct VideoNoteBubble: View {
                         Circle()
                             .fill(GRUColors.accent)
                             .frame(width: 5, height: 5)
+
                         Text("LIVE")
                             .font(.system(size: 7, weight: .black, design: .rounded))
                             .tracking(0.6)
@@ -192,6 +220,7 @@ struct VideoNoteBubble: View {
 
             HStack {
                 Spacer()
+
                 if let durationText {
                     Text(durationText)
                         .font(.system(size: 9, weight: .black, design: .rounded))
@@ -296,7 +325,11 @@ struct VideoNoteBubble: View {
             .first!
 
         let ext = URL(fileURLWithPath: attachment.fileName).pathExtension
-        let fileName = "remote-cat-note-" + attachment.id.uuidString + (ext.isEmpty ? ".mov" : ".\(ext)")
+        let fileName =
+            "remote-cat-note-"
+            + attachment.id.uuidString
+            + (ext.isEmpty ? ".mov" : ".\(ext)")
+
         let fileURL = directory.appendingPathComponent(fileName)
 
         try data.write(to: fileURL, options: .atomic)
@@ -312,7 +345,8 @@ struct VideoNoteBubble: View {
             return
         }
 
-        if player.currentTime() >= player.currentItem?.duration ?? .positiveInfinity {
+        if player.currentTime()
+            >= player.currentItem?.duration ?? .positiveInfinity {
             player.seek(to: .zero)
         }
 
