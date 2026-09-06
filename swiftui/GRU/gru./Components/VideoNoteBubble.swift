@@ -10,6 +10,7 @@ struct VideoNoteBubble: View {
     @State private var loadError: String?
     @State private var glowPulse = false
     @AppStorage("gru.settings.chats.videoNoteAutoplay") private var autoplay = true
+    @AppStorage("gru.settings.accessibility.reduceMotion") private var reduceMotion = false
 
     private let width: CGFloat = 150
     private let height: CGFloat = 160
@@ -22,21 +23,29 @@ struct VideoNoteBubble: View {
         ZStack {
             videoLayer
 
+            LinearGradient(
+                colors: [Color.black.opacity(0.18), Color.clear, Color.black.opacity(0.26)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(catShape)
+            .allowsHitTesting(false)
+
             catShape
                 .stroke(
-                    GRUColors.accent.opacity(glowPulse ? 0.22 : 0.10),
-                    lineWidth: 5
+                    GRUColors.accent.opacity(glowPulse ? 0.28 : 0.11),
+                    lineWidth: 7
                 )
-                .blur(radius: 6)
+                .blur(radius: 8)
                 .frame(width: width, height: height)
                 .allowsHitTesting(false)
 
             catShape
-                .stroke(GRUColors.neonGradient, lineWidth: 1.8)
+                .stroke(GRUColors.neonGradient, lineWidth: isPlaying ? 2.4 : 1.8)
                 .frame(width: width, height: height)
                 .shadow(
-                    color: GRUColors.accent.opacity(glowPulse ? 0.34 : 0.16),
-                    radius: glowPulse ? 11 : 6
+                    color: GRUColors.accent.opacity(glowPulse ? 0.42 : 0.18),
+                    radius: glowPulse ? 14 : 7
                 )
                 .allowsHitTesting(false)
 
@@ -44,7 +53,7 @@ struct VideoNoteBubble: View {
                 playButton
             }
 
-            durationOverlay
+            chromeOverlay
         }
         .frame(width: width, height: height)
         .contentShape(catShape)
@@ -55,17 +64,27 @@ struct VideoNoteBubble: View {
             await preparePlayerIfNeeded()
         }
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(
-                .easeInOut(duration: 1.7)
+                .easeInOut(duration: 1.55)
                     .repeatForever(autoreverses: true)
             ) {
                 glowPulse = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
+            guard let currentItem = player?.currentItem,
+                  let finishedItem = notification.object as? AVPlayerItem,
+                  currentItem === finishedItem
+            else { return }
+
+            isPlaying = false
+        }
         .onDisappear {
             player?.pause()
             isPlaying = false
         }
+        .accessibilityLabel("Кото-кружок. Нажми, чтобы воспроизвести или поставить на паузу")
     }
 
     @ViewBuilder
@@ -82,15 +101,20 @@ struct VideoNoteBubble: View {
     private var playButton: some View {
         ZStack {
             Circle()
-                .fill(.black.opacity(0.42))
-                .frame(width: 40, height: 40)
+                .fill(.black.opacity(0.48))
+                .frame(width: 46, height: 46)
+
+            Circle()
+                .stroke(GRUColors.neonGradient, lineWidth: 1.2)
+                .frame(width: 46, height: 46)
 
             Image(systemName: "play.fill")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 15, weight: .black))
                 .foregroundStyle(.white)
-                .offset(x: 1)
+                .offset(x: 1.5)
         }
         .offset(y: 4)
+        .shadow(color: GRUColors.accent.opacity(0.24), radius: 10)
     }
 
     private var placeholder: some View {
@@ -99,7 +123,7 @@ struct VideoNoteBubble: View {
                 LinearGradient(
                     colors: [
                         GRUColors.card,
-                        GRUColors.accent.opacity(0.13)
+                        GRUColors.accent.opacity(glowPulse ? 0.17 : 0.08)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -112,12 +136,18 @@ struct VideoNoteBubble: View {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Image(
-                            systemName: loadError == nil
-                                ? "play.fill"
-                                : "exclamationmark.circle.fill"
-                        )
-                        .font(.system(size: 24, weight: .semibold))
+                        VStack(spacing: 7) {
+                            Image(
+                                systemName: loadError == nil
+                                    ? "pawprint.fill"
+                                    : "exclamationmark.circle.fill"
+                            )
+                            .font(.system(size: 24, weight: .semibold))
+
+                            Text(loadError == nil ? "cat note" : "ошибка")
+                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .tracking(0.6)
+                        }
                     }
                 }
                 .foregroundStyle(.white.opacity(0.84))
@@ -125,24 +155,57 @@ struct VideoNoteBubble: View {
             }
     }
 
-    private var durationOverlay: some View {
+    private var chromeOverlay: some View {
         VStack {
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "pawprint.fill")
+                        .font(.system(size: 8, weight: .black))
+                    Text("CAT NOTE")
+                        .font(.system(size: 7, weight: .black, design: .rounded))
+                        .tracking(0.7)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .frame(height: 21)
+                .background(.black.opacity(0.42), in: Capsule())
+
+                Spacer()
+
+                if isPlaying {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(GRUColors.accent)
+                            .frame(width: 5, height: 5)
+                        Text("LIVE")
+                            .font(.system(size: 7, weight: .black, design: .rounded))
+                            .tracking(0.6)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .frame(height: 21)
+                    .background(.black.opacity(0.42), in: Capsule())
+                }
+            }
+
             Spacer()
+
             HStack {
                 Spacer()
                 if let durationText {
                     Text(durationText)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.system(size: 9, weight: .black, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .frame(height: 22)
-                        .background(.black.opacity(0.44), in: Capsule())
-                        .padding(.trailing, 13)
-                        .padding(.bottom, 10)
+                        .background(.black.opacity(0.48), in: Capsule())
                 }
             }
         }
+        .padding(.horizontal, 11)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
         .frame(width: width, height: height)
         .allowsHitTesting(false)
     }
