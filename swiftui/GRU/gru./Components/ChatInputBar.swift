@@ -15,7 +15,14 @@ private enum GRURecordMode: Equatable {
     var title: String {
         switch self {
         case .voice: return "голосовое"
-        case .videoNote: return "видео"
+        case .videoNote: return "кото-кружок"
+        }
+    }
+
+    var compactTitle: String {
+        switch self {
+        case .voice: return "VOICE"
+        case .videoNote: return "CAT NOTE"
         }
     }
 }
@@ -29,7 +36,6 @@ struct ChatInputBar: View {
     var onAttachment: (AttachmentAction) -> Void
     var onAudioRecorded: (VoiceAudioRecording) -> Void = { _ in }
 
-    // Telegram-style video-note lifecycle.
     var onVideoNoteStarted: () -> Void = {}
     var onVideoNoteReleased: () -> Void = {}
     var onVideoNoteCancelled: () -> Void = {}
@@ -38,6 +44,7 @@ struct ChatInputBar: View {
     @State private var showMenu = false
     @State private var isSending = false
     @StateObject private var audioRecorder = VoiceAudioRecorderModel()
+    @FocusState private var composerFocused: Bool
 
     @AppStorage("gru.settings.chats.sendByReturn") private var sendByReturn = false
     @AppStorage("gru.settings.accessibility.haptics") private var hapticsEnabled = true
@@ -79,6 +86,13 @@ struct ChatInputBar: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            if !canSend, !recordingUIVisible, !showMenu {
+                recordModeHint
+                    .padding(.horizontal, 60)
+                    .padding(.top, 6)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             HStack(spacing: 10) {
                 attachmentButton
 
@@ -104,8 +118,20 @@ struct ChatInputBar: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(.ultraThinMaterial)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(GRUColors.neonGradient)
+                    .frame(height: 0.8)
+                    .opacity(composerFocused || recordingUIVisible ? 0.56 : 0.18)
+            }
+            .shadow(
+                color: GRUColors.accent.opacity(composerFocused || recordingUIVisible ? 0.12 : 0.04),
+                radius: 18,
+                y: -4
+            )
             .animation(.spring(response: 0.25, dampingFraction: 0.82), value: recordingUIVisible)
             .animation(.easeInOut(duration: 0.16), value: canSend)
+            .animation(.easeInOut(duration: 0.18), value: composerFocused)
         }
         .onDisappear {
             holdTask?.cancel()
@@ -117,8 +143,6 @@ struct ChatInputBar: View {
             }
         }
     }
-
-    // MARK: - Attachments
 
     private var attachmentButton: some View {
         Button {
@@ -134,15 +158,17 @@ struct ChatInputBar: View {
                 iconSize: 18,
                 isActive: !recordingUIVisible
             )
+            .rotationEffect(.degrees(showMenu ? 90 : 0))
+            .scaleEffect(showMenu ? 0.96 : 1)
         }
         .buttonStyle(.plain)
         .disabled(recordingUIVisible)
+        .animation(.spring(response: 0.28, dampingFraction: 0.74), value: showMenu)
     }
-
-    // MARK: - Text
 
     private var textField: some View {
         TextField("Сообщение", text: $text, axis: .vertical)
+            .focused($composerFocused)
             .textFieldStyle(.plain)
             .submitLabel(sendByReturn ? .send : .return)
             .onSubmit {
@@ -153,34 +179,56 @@ struct ChatInputBar: View {
             .lineLimit(1...6)
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
-            .background(GRUColors.card)
-            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 21, style: .continuous)
+                    .fill(GRUColors.card.opacity(composerFocused ? 0.98 : 0.90))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 21, style: .continuous)
+                    .stroke(
+                        composerFocused
+                            ? GRUColors.neonGradient
+                            : LinearGradient(
+                                colors: [GRUColors.accent.opacity(0.11), Color.white.opacity(0.03)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: composerFocused ? 1.05 : 0.75
+                    )
+            }
+            .shadow(color: GRUColors.accent.opacity(composerFocused ? 0.11 : 0.02), radius: 9)
     }
-
-    // MARK: - Recording UI
 
     private var recordingStrip: some View {
         HStack(spacing: 9) {
-            Image(systemName: recordingStripIcon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(cancelRecording ? Color.red : GRUColors.accent)
-                .frame(width: 20)
+            ZStack {
+                Circle()
+                    .fill((cancelRecording ? Color.red : GRUColors.accent).opacity(0.10))
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: recordingStripIcon)
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(cancelRecording ? Color.red : GRUColors.accent)
+            }
 
             if cancelRecording {
                 Text("Отпусти — отменим")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.red)
                     .lineLimit(1)
-
                 Spacer(minLength: 0)
             } else if recordingLocked {
-                Text("Запись зафиксирована")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(GRUColors.accent)
-                    .lineLimit(1)
-
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Запись зафиксирована")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(GRUColors.accent)
+                        .lineLimit(1)
+                    Text(recordMode.compactTitle)
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .tracking(0.7)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer(minLength: 0)
-
                 if recordMode == .voice {
                     Text(audioRecorder.elapsedText)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -188,39 +236,42 @@ struct ChatInputBar: View {
                         .foregroundStyle(.secondary)
                 }
             } else if recordMode == .voice {
-                VoiceWaveform(
-                    samples: audioRecorder.waveform,
-                    progress: 1,
-                    barWidth: 2.5,
-                    spacing: 1.8
-                )
-                .frame(minWidth: 62, maxWidth: .infinity)
-                .frame(height: 28)
-
+                VoiceWaveform(samples: audioRecorder.waveform, progress: 1, barWidth: 2.5, spacing: 1.8)
+                    .frame(minWidth: 62, maxWidth: .infinity)
+                    .frame(height: 28)
                 Text(audioRecorder.elapsedText)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             } else {
-                Text("Отпусти для отправки")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Отпусти для отправки")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text("CAT NOTE")
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .tracking(0.7)
+                        .foregroundStyle(GRUColors.accent)
+                }
                 Spacer(minLength: 0)
             }
         }
-        .padding(.horizontal, 13)
-        .frame(minHeight: 42)
-        .background(GRUColors.card)
+        .padding(.horizontal, 10)
+        .frame(minHeight: 44)
+        .background(GRUColors.card.opacity(0.96))
         .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 21, style: .continuous)
                 .stroke(
-                    cancelRecording ? Color.red.opacity(0.42) : GRUColors.accent.opacity(0.20),
+                    cancelRecording
+                        ? LinearGradient(colors: [Color.red.opacity(0.72), Color.orange.opacity(0.44)], startPoint: .leading, endPoint: .trailing)
+                        : GRUColors.neonGradient,
                     lineWidth: 1
                 )
+                .opacity(cancelRecording ? 1 : 0.42)
         }
+        .shadow(color: (cancelRecording ? Color.red : GRUColors.accent).opacity(0.12), radius: 9)
     }
 
     private var recordingStripIcon: String {
@@ -229,8 +280,6 @@ struct ChatInputBar: View {
         return recordMode == .voice ? "waveform" : "video.fill"
     }
 
-    // MARK: - Send
-
     private var sendButton: some View {
         Button {
             sendMessage()
@@ -238,6 +287,7 @@ struct ChatInputBar: View {
             GRUNeonIcon(systemName: "envelope.fill", size: 42, iconSize: 20)
                 .scaleEffect(isSending ? 0.82 : 1)
                 .rotationEffect(.degrees(isSending ? -7 : 0))
+                .shadow(color: GRUColors.accent.opacity(isSending ? 0.56 : 0.20), radius: isSending ? 12 : 6)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Отправить")
@@ -247,41 +297,39 @@ struct ChatInputBar: View {
         Button {
             finishLockedVoiceRecording()
         } label: {
-            GRUNeonIcon(systemName: "paperplane.fill", size: 42, iconSize: 18)
+            GRUNeonIcon(systemName: "envelope.fill", size: 42, iconSize: 19)
+                .shadow(color: GRUColors.accent.opacity(0.28), radius: 8)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Отправить голосовое")
     }
 
     private var recordModeHint: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             Image(systemName: recordMode.badgeIcon)
-                .font(.system(size: 11, weight: .black))
+                .font(.system(size: 9, weight: .black))
                 .foregroundStyle(GRUColors.accent)
-
-            Text("двойной тап — режим")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-
+            Text(recordMode.compactTitle)
+                .font(.system(size: 8, weight: .black, design: .rounded))
+                .tracking(0.7)
+                .foregroundStyle(GRUColors.accent)
             Circle()
                 .fill(Color.secondary.opacity(0.38))
                 .frame(width: 3, height: 3)
-
-            Text("удержание — запись")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+            Text("2× режим • удерживать запись")
+                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
-
+                .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 27)
-        .background(GRUColors.card.opacity(0.72), in: Capsule())
+        .padding(.horizontal, 10)
+        .frame(height: 25)
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(GRUColors.card.opacity(0.58), in: Capsule())
         .overlay {
-            Capsule().stroke(GRUColors.accent.opacity(0.13), lineWidth: 1)
+            Capsule().stroke(GRUColors.accent.opacity(0.14), lineWidth: 1)
         }
     }
-
-    // MARK: - Telegram-style record button
 
     private var recordingButton: some View {
         GRUNeonIcon(
@@ -290,14 +338,11 @@ struct ChatInputBar: View {
             iconSize: didStartRecordingGesture ? 20 : 18,
             isActive: !cancelRecording
         )
-        .overlay {
-            recordingButtonOutline
-        }
+        .overlay { recordingButtonOutline }
         .overlay(alignment: .bottomTrailing) {
             ZStack {
                 Circle().fill(GRUColors.card)
                 Circle().stroke(GRUColors.accent, lineWidth: 1)
-
                 Image(systemName: recordMode.badgeIcon)
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
@@ -319,19 +364,14 @@ struct ChatInputBar: View {
         .simultaneousGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    guard !canSend,
-                          !audioRecorder.isRecording,
-                          !audioRecorder.isPreparing,
-                          !recordingLocked else { return }
+                    guard !canSend, !audioRecorder.isRecording, !audioRecorder.isPreparing, !recordingLocked else { return }
                     toggleRecordMode()
                 }
         )
         .animation(.spring(response: 0.22, dampingFraction: 0.72), value: touchActive)
         .animation(.easeInOut(duration: 0.12), value: cancelRecording)
         .animation(.spring(response: 0.24, dampingFraction: 0.72), value: recordMode)
-        .accessibilityLabel(
-            "Двойной тап переключает режим записи. Удерживай для записи. Свайп влево отменяет, вверх фиксирует."
-        )
+        .accessibilityLabel("Двойной тап переключает режим записи. Удерживай для записи. Свайп влево отменяет, вверх фиксирует.")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -351,24 +391,19 @@ struct ChatInputBar: View {
     private var recordGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { value in
-                if !touchActive {
-                    beginRecordTouch()
-                }
-
+                if !touchActive { beginRecordTouch() }
                 guard didStartRecordingGesture else { return }
                 updateRecordDrag(value.translation)
             }
             .onEnded { value in
                 holdTask?.cancel()
                 holdTask = nil
-
                 guard didStartRecordingGesture else {
                     touchActive = false
                     cancelRecording = false
                     recordingLocked = false
                     return
                 }
-
                 updateRecordDrag(value.translation)
                 finishRecordGesture()
             }
@@ -376,20 +411,14 @@ struct ChatInputBar: View {
 
     private func beginRecordTouch() {
         guard !canSend, !touchActive else { return }
-
-        withAnimation(.easeOut(duration: 0.12)) {
-            showMenu = false
-        }
-
+        withAnimation(.easeOut(duration: 0.12)) { showMenu = false }
         touchActive = true
         didStartRecordingGesture = false
         cancelRecording = false
         recordingLocked = false
-
         holdTask?.cancel()
         holdTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: holdDelayNanoseconds)
-
             guard !Task.isCancelled, touchActive, !canSend else { return }
             beginSelectedRecordingAfterHold()
         }
@@ -397,30 +426,25 @@ struct ChatInputBar: View {
 
     private func beginSelectedRecordingAfterHold() {
         guard touchActive, !didStartRecordingGesture, !canSend else { return }
-
         didStartRecordingGesture = true
-
+        composerFocused = false
         if hapticsEnabled { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
 
         switch recordMode {
         case .voice:
             Task { @MainActor in
                 let started = await audioRecorder.startRecordingForHold()
-
                 guard started else {
                     resetGestureState()
                     return
                 }
-
                 guard touchActive || recordingLocked else {
                     audioRecorder.cancel()
                     resetGestureState()
                     return
                 }
-
                 isInlineVoiceRecording = true
             }
-
         case .videoNote:
             onVideoNoteStarted()
         }
@@ -428,58 +452,38 @@ struct ChatInputBar: View {
 
     private func updateRecordDrag(_ translation: CGSize) {
         guard didStartRecordingGesture else { return }
-
         let horizontalCancel = translation.width <= cancelThreshold
-        let verticalLock =
-            translation.height <= lockThreshold &&
-            abs(translation.height) > abs(translation.width)
+        let verticalLock = translation.height <= lockThreshold && abs(translation.height) > abs(translation.width)
 
         if horizontalCancel {
-            if !cancelRecording {
-                if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-            }
-
+            if !cancelRecording, hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             cancelRecording = true
             recordingLocked = false
             return
         }
 
         cancelRecording = false
-
         if verticalLock, !recordingLocked {
             recordingLocked = true
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-
-            if recordMode == .videoNote {
-                onVideoNoteLocked()
-            }
+            if recordMode == .videoNote { onVideoNoteLocked() }
         }
     }
 
     private func finishRecordGesture() {
         touchActive = false
-
         if cancelRecording {
             cancelSelectedRecording()
             resetGestureState()
             return
         }
-
         if recordingLocked {
-            // Voice continues inline. Video recorder remains open and
-            // provides its own send/cancel controls.
             didStartRecordingGesture = false
-
-            if recordMode == .videoNote {
-                resetGestureState(keepLock: false)
-            }
+            if recordMode == .videoNote { resetGestureState(keepLock: false) }
             return
         }
-
         switch recordMode {
-        case .voice:
-            finishVoiceRecordingAndSend()
-
+        case .voice: finishVoiceRecordingAndSend()
         case .videoNote:
             onVideoNoteReleased()
             resetGestureState()
@@ -491,7 +495,6 @@ struct ChatInputBar: View {
         case .voice:
             audioRecorder.cancel()
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
-
         case .videoNote:
             onVideoNoteCancelled()
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
@@ -499,29 +502,21 @@ struct ChatInputBar: View {
     }
 
     private func finishVoiceRecordingAndSend() {
-        if audioRecorder.isPreparing,
-           !isInlineVoiceRecording,
-           !audioRecorder.isRecording {
+        if audioRecorder.isPreparing, !isInlineVoiceRecording, !audioRecorder.isRecording {
             audioRecorder.cancel()
             resetGestureState()
             return
         }
-
         guard isInlineVoiceRecording || audioRecorder.isRecording else {
             resetGestureState()
             return
         }
-
-        if audioRecorder.isRecording {
-            audioRecorder.stopRecording()
-        }
-
+        if audioRecorder.isRecording { audioRecorder.stopRecording() }
         guard let recording = audioRecorder.recording else {
             audioRecorder.shutdown()
             resetGestureState()
             return
         }
-
         if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
         onAudioRecorded(recording)
         audioRecorder.shutdown()
@@ -541,7 +536,6 @@ struct ChatInputBar: View {
         didStartRecordingGesture = false
         isInlineVoiceRecording = keepLock && recordMode == .voice
         cancelRecording = false
-
         if !keepLock {
             recordingLocked = false
             isInlineVoiceRecording = false
@@ -549,37 +543,22 @@ struct ChatInputBar: View {
     }
 
     private func toggleRecordMode() {
-        guard !canSend,
-              !audioRecorder.isRecording,
-              !audioRecorder.isPreparing,
-              !recordingLocked
-        else {
-            return
-        }
-
+        guard !canSend, !audioRecorder.isRecording, !audioRecorder.isPreparing, !recordingLocked else { return }
         withAnimation(.spring(response: 0.24, dampingFraction: 0.72)) {
             recordMode = recordMode == .voice ? .videoNote : .voice
         }
-
         if hapticsEnabled { UISelectionFeedbackGenerator().selectionChanged() }
     }
 
-    // MARK: - Text send
-
     private func sendMessage() {
         guard canSend else { return }
-
-        withAnimation(.spring(response: 0.20, dampingFraction: 0.60)) {
-            isSending = true
-        }
-
+        composerFocused = true
+        withAnimation(.spring(response: 0.20, dampingFraction: 0.60)) { isSending = true }
+        if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         onSend()
         sendTrigger.toggle()
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                isSending = false
-            }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) { isSending = false }
         }
     }
 }

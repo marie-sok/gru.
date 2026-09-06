@@ -6,11 +6,23 @@ struct ContactsView: View {
     @StateObject private var vm = ContactsViewModel()
     @Bindable private var service = ChatService.shared
 
+    @AppStorage(GRUTheme.selectionKey)
+    private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
+
     @State private var showingNewChat = false
     @State private var gruSearchResults: [UserSearchDTO] = []
     @State private var isSearchingGRU = false
     @State private var creatingUserID: String?
+    @State private var selectedChat: Chat?
+    @State private var showSelectedChat = false
+
+    @FocusState private var searchFocused: Bool
     @Environment(\.openURL) private var openURL
+
+    private var currentTheme: GRUAppTheme {
+        let selected = GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
+        return GRUThemePolicy.allowed.contains(selected) ? selected : .blackMoonCat
+    }
 
     var body: some View {
         NavigationStack {
@@ -18,47 +30,73 @@ struct ContactsView: View {
                 GRUAppBackdrop()
 
                 ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 18) {
+                    LazyVStack(spacing: 16) {
                         GRUAgentCard()
                         searchField
 
                         if isSearchingGRU {
-                            ProgressView("Ищем в gru.…")
-                                .tint(GRUColors.accent)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                    .tint(currentTheme.accent)
+
+                                Text(GRUL10n.text("Ищем людей в gru.…"))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
                         }
 
                         if !gruSearchResults.isEmpty {
-                            sectionHeader("Найдено в gru.", icon: "sparkles")
+                            sectionHeader(
+                                "Найдено в gru.",
+                                subtitle: "можно сразу открыть чат",
+                                icon: "sparkles"
+                            )
                             gruSearchSection
                         }
 
                         if !filteredGRUContacts.isEmpty {
-                            sectionHeader("Мои контакты gru.", icon: "bolt.horizontal.circle.fill")
+                            sectionHeader(
+                                "Мои контакты gru.",
+                                subtitle: "люди из твоих переписок",
+                                icon: "bolt.horizontal.circle.fill"
+                            )
                             gruContactsSection
                         }
 
-                        sectionHeader("Телефонная книга", icon: "person.crop.circle.badge.plus")
+                        sectionHeader(
+                            "Телефонная книга",
+                            subtitle: "контакты iPhone и приглашения",
+                            icon: "person.crop.circle.badge.plus"
+                        )
                         phoneBookSection
 
                         Spacer(minLength: 120)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.top, 10)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Люди")
+            .navigationTitle(GRUL10n.text("Люди"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     GRUNeonIconButton(
                         systemName: "envelope.badge.fill",
-                        accessibilityLabel: "Новый чат",
+                        accessibilityLabel: GRUL10n.text("Новый чат"),
                         size: 38,
                         iconSize: 15
                     ) {
                         showingNewChat = true
                     }
+                }
+            }
+            .navigationDestination(isPresented: $showSelectedChat) {
+                if let selectedChat {
+                    ChatView(chat: selectedChat)
                 }
             }
         }
@@ -78,125 +116,270 @@ struct ContactsView: View {
 private extension ContactsView {
     var searchField: some View {
         HStack(spacing: 10) {
-            GRUNeonIcon(systemName: "magnifyingglass", size: 34, iconSize: 14)
+            GRUNeonIcon(
+                systemName: searchFocused
+                    ? "sparkle.magnifyingglass"
+                    : "magnifyingglass",
+                size: 36,
+                iconSize: 14
+            )
 
-            TextField("Имя или номер", text: $vm.searchText)
-                .textFieldStyle(.plain)
+            TextField(
+                GRUL10n.text("Имя, никнейм или номер"),
+                text: $vm.searchText
+            )
+            .textFieldStyle(.plain)
+            .focused($searchFocused)
+            .submitLabel(.search)
 
             if !vm.searchText.isEmpty {
                 Button {
-                    vm.searchText = ""
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        vm.searchText = ""
+                    }
                 } label: {
-                    GRUNeonIcon(systemName: "xmark", size: 30, iconSize: 12)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(GRUL10n.text("Очистить поиск"))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(GRUColors.card)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 21, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(GRUColors.accent.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .stroke(
+                    currentTheme.accent.opacity(searchFocused ? 0.52 : 0.12),
+                    lineWidth: searchFocused ? 1.4 : 1
+                )
         }
+        .shadow(
+            color: searchFocused
+                ? currentTheme.accent.opacity(0.20)
+                : .clear,
+            radius: 13
+        )
+        .animation(.easeOut(duration: 0.18), value: searchFocused)
     }
 
-    func sectionHeader(_ title: String, icon: String) -> some View {
+    func sectionHeader(
+        _ title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
         HStack(spacing: 10) {
-            GRUNeonIcon(systemName: icon, size: 32, iconSize: 13)
-            Text(title)
-                .font(.headline)
+            GRUNeonIcon(systemName: icon, size: 34, iconSize: 13)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(GRUL10n.text(title))
+                    .font(.headline)
+
+                Text(GRUL10n.text(subtitle))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             Spacer()
         }
+        .padding(.top, 2)
     }
 
     var gruContactsSection: some View {
         VStack(spacing: 10) {
             ForEach(filteredGRUContacts) { user in
-                HStack(spacing: 12) {
-                    userAvatar(user)
+                Button {
+                    createChat(with: user)
+                } label: {
+                    HStack(spacing: 12) {
+                        AvatarView(user: user, size: 50)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(user.displayName)
-                            .font(.body.weight(.semibold))
-                        Text("@\(user.username)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(user.displayName)
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(GRUColors.text)
+                                .lineLimit(1)
 
-                    Spacer()
+                            if !user.username.isEmpty {
+                                Text("@\(user.username)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
 
-                    Circle()
-                        .fill(user.isOnline ? GRUColors.accent : Color.secondary.opacity(0.35))
-                        .frame(width: 8, height: 8)
-                        .shadow(
-                            color: user.isOnline ? GRUColors.accent.opacity(0.70) : .clear,
-                            radius: 5
+                        Spacer(minLength: 4)
+
+                        presencePill(user.isOnline)
+
+                        GRUNeonIcon(
+                            systemName: "envelope.fill",
+                            size: 38,
+                            iconSize: 14
                         )
-
-                    Button {
-                        createChat(with: user)
-                    } label: {
-                        GRUNeonIcon(systemName: "envelope.fill", size: 36, iconSize: 14)
                     }
-                    .buttonStyle(.plain)
+                    .padding(12)
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(
+                            user.isOnline
+                                ? currentTheme.accent.opacity(0.16)
+                                : Color.white.opacity(0.045),
+                            lineWidth: 1
+                        )
+                    }
                 }
-                .padding(12)
-                .background(GRUColors.card.opacity(0.88))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    GRUL10n.format(
+                        "Открыть чат с %@",
+                        user.displayName
+                    )
+                )
             }
         }
+    }
+
+    func presencePill(_ online: Bool) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(
+                    online
+                        ? currentTheme.accent
+                        : Color.secondary.opacity(0.55)
+                )
+                .frame(width: 6, height: 6)
+                .shadow(
+                    color: online
+                        ? currentTheme.accent.opacity(0.8)
+                        : .clear,
+                    radius: 5
+                )
+
+            Text(GRUL10n.text(online ? "online" : "offline"))
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(online ? currentTheme.accent : .secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            online
+                ? currentTheme.accent.opacity(0.09)
+                : Color.white.opacity(0.035),
+            in: Capsule()
+        )
     }
 
     var gruSearchSection: some View {
         VStack(spacing: 10) {
             ForEach(gruSearchResults) { user in
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(GRUColors.accent.opacity(0.12))
-                        Text(String(user.nickname.prefix(1)).uppercased())
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(GRUColors.accent)
-                    }
-                    .frame(width: 42, height: 42)
-                    .overlay {
-                        Circle().stroke(GRUColors.neonGradient, lineWidth: 1)
-                    }
-                    .shadow(color: GRUColors.accent.opacity(0.22), radius: 8)
+                Button {
+                    createServerChat(with: user)
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            currentTheme.accent.opacity(0.52),
+                                            currentTheme.card,
+                                            currentTheme.secondaryAccent.opacity(0.42)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(user.nickname)
-                            .font(.body.weight(.semibold))
-                        Text("Пользователь gru.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                            Text(String(user.nickname.prefix(1)).uppercased())
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight: .black,
+                                        design: .rounded
+                                    )
+                                )
+                                .foregroundStyle(.white)
+                        }
+                        .frame(width: 50, height: 50)
+                        .overlay {
+                            Circle()
+                                .stroke(GRUColors.neonGradient, lineWidth: 1.2)
+                        }
+                        .shadow(
+                            color: currentTheme.accent.opacity(0.22),
+                            radius: 9
+                        )
 
-                    Spacer()
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(user.nickname)
+                                .font(.body.weight(.bold))
+                                .foregroundStyle(GRUColors.text)
+                                .lineLimit(1)
 
-                    Button {
-                        createServerChat(with: user)
-                    } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 9, weight: .bold))
+
+                                Text(GRUL10n.text("в gru."))
+                                    .font(.caption2.weight(.bold))
+                            }
+                            .foregroundStyle(currentTheme.accent)
+                        }
+
+                        Spacer()
+
                         if creatingUserID == user.id {
                             ProgressView()
-                                .tint(GRUColors.accent)
-                                .frame(width: 38, height: 38)
+                                .tint(currentTheme.accent)
+                                .frame(width: 40, height: 40)
                         } else {
                             GRUNeonIcon(
                                 systemName: "envelope.fill",
-                                size: 38,
+                                size: 40,
                                 iconSize: 15
                             )
                         }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(creatingUserID != nil)
+                    .padding(12)
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(currentTheme.accent.opacity(0.13), lineWidth: 1)
+                    }
                 }
-                .padding(12)
-                .background(GRUColors.card.opacity(0.88))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .buttonStyle(.plain)
+                .disabled(creatingUserID != nil)
+                .accessibilityLabel(
+                    GRUL10n.format(
+                        "Начать чат с %@",
+                        user.nickname
+                    )
+                )
             }
         }
     }
@@ -207,47 +390,77 @@ private extension ContactsView {
         case .unknown, .loading:
             HStack(spacing: 12) {
                 ProgressView()
-                    .tint(GRUColors.accent)
-                Text("Загружаем контакты iPhone…")
+                    .tint(currentTheme.accent)
+
+                Text(GRUL10n.text("Загружаем контакты iPhone…"))
                     .foregroundStyle(.secondary)
+
                 Spacer()
             }
             .padding(16)
-            .background(GRUColors.card.opacity(0.82))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
 
         case .denied:
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
-                    GRUNeonIcon(systemName: "person.crop.circle.badge.exclamationmark", size: 38, iconSize: 15)
-                    Text("Доступ к контактам выключен")
+                    GRUNeonIcon(
+                        systemName: "person.crop.circle.badge.exclamationmark",
+                        size: 38,
+                        iconSize: 15
+                    )
+
+                    Text(GRUL10n.text("Доступ к контактам выключен"))
                         .font(.headline)
                 }
 
-                Text("Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(
+                    GRUL10n.text(
+                        "Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-                Button("Открыть Настройки") {
-                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                Button(GRUL10n.text("Открыть Настройки")) {
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                        return
+                    }
                     openURL(url)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(currentTheme.accent)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(GRUColors.card.opacity(0.86))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(currentTheme.accent.opacity(0.14), lineWidth: 1)
+            }
 
         case .granted:
             if vm.filteredPhoneContacts.isEmpty {
-                Text(vm.searchText.isEmpty ? "В телефонной книге нет контактов с номером." : "Ничего не найдено.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(GRUColors.card.opacity(0.76))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(
+                    GRUL10n.text(
+                        vm.searchText.isEmpty
+                            ? "В телефонной книге нет контактов с номером."
+                            : "Ничего не найдено."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(vm.filteredPhoneContacts) { contact in
@@ -258,22 +471,24 @@ private extension ContactsView {
         }
     }
 
-    var filteredGRUContacts: [User] {
+    var allGRUContacts: [User] {
         var seen = Set<String>()
         let currentID = service.currentUser.id
 
-        let all = service.chats
+        return service.chats
             .flatMap(\.users)
             .filter { $0.id != currentID }
             .filter { user in
                 let key = user.serverID ?? user.id.uuidString
                 return seen.insert(key).inserted
             }
+    }
 
+    var filteredGRUContacts: [User] {
         let query = vm.normalizedSearch
-        guard !query.isEmpty else { return all }
+        guard !query.isEmpty else { return allGRUContacts }
 
-        return all.filter {
+        return allGRUContacts.filter {
             $0.displayName.localizedCaseInsensitiveContains(query) ||
             $0.username.localizedCaseInsensitiveContains(query)
         }
@@ -283,23 +498,27 @@ private extension ContactsView {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(GRUColors.accent.opacity(0.10))
+                    .fill(currentTheme.accent.opacity(0.10))
+
                 Text(contact.initials.isEmpty ? "?" : contact.initials)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(GRUColors.accent)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(currentTheme.accent)
             }
-            .frame(width: 42, height: 42)
+            .frame(width: 46, height: 46)
             .overlay {
-                Circle().stroke(GRUColors.accent.opacity(0.22), lineWidth: 1)
+                Circle()
+                    .stroke(currentTheme.accent.opacity(0.22), lineWidth: 1)
             }
-            .shadow(color: GRUColors.accent.opacity(0.12), radius: 6)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(contact.displayName)
                     .font(.body.weight(.semibold))
+                    .lineLimit(1)
+
                 Text(contact.primaryPhone ?? "")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
@@ -307,26 +526,23 @@ private extension ContactsView {
             Button {
                 invite(contact)
             } label: {
-                GRUNeonIcon(systemName: "message.fill", size: 38, iconSize: 15)
+                GRUNeonIcon(
+                    systemName: "message.fill",
+                    size: 40,
+                    iconSize: 15
+                )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Пригласить через Messages")
+            .accessibilityLabel(GRUL10n.text("Пригласить через Messages"))
         }
         .padding(12)
-        .background(GRUColors.card.opacity(0.88))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    func userAvatar(_ user: User) -> some View {
-        ZStack {
-            Circle().fill(GRUColors.accent.opacity(0.10))
-            Text(String(user.displayName.prefix(1)).uppercased())
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(GRUColors.accent)
-        }
-        .frame(width: 42, height: 42)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
         .overlay {
-            Circle().stroke(GRUColors.accent.opacity(0.20), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.045), lineWidth: 1)
         }
     }
 
@@ -389,7 +605,11 @@ private extension ContactsView {
             defer { creatingUserID = nil }
 
             do {
-                _ = try await service.createServerChat(with: user)
+                let chat = try await service.createServerChat(with: user)
+                selectedChat = chat
+                showSelectedChat = true
+                searchFocused = false
+
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
             } catch {
@@ -401,13 +621,17 @@ private extension ContactsView {
     }
 
     func createChat(with user: User) {
-        guard let serverID = user.serverID, !serverID.isEmpty else {
+        guard let serverID = user.serverID,
+              !serverID.isEmpty else {
             service.createChat(username: user.displayName)
             return
         }
 
         createServerChat(
-            with: UserSearchDTO(id: serverID, nickname: user.displayName)
+            with: UserSearchDTO(
+                id: serverID,
+                nickname: user.displayName
+            )
         )
     }
 }

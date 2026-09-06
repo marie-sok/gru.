@@ -4,7 +4,9 @@ import UIKit
 @MainActor
 struct BetaSettingsView: View {
     @State private var showLogoutConfirmation = false
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
+
+    @AppStorage(GRUTheme.selectionKey)
+    private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
 
     var body: some View {
         NavigationStack {
@@ -16,24 +18,26 @@ struct BetaSettingsView: View {
                         BetaSettingsRow(
                             icon: "person.crop.circle.fill",
                             title: "Профиль",
-                            subtitle: "имя • nickname • bio • аватар"
+                            subtitle: "имя • username • bio • аватар"
                         )
                     }
                 }
 
-                Section("Оформление") {
+                Section {
                     NavigationLink {
-                        GRUBetaThemesView()
+                        GRUThemeStudioView()
                     } label: {
                         BetaSettingsRow(
                             icon: currentTheme.icon,
-                            title: "Темы",
-                            subtitle: BetaThemeName.title(for: currentTheme)
+                            title: "Theme Studio",
+                            subtitle: "live preview • движение • accent"
                         )
                     }
+                } header: {
+                    Text(GRUL10n.text("Оформление"))
                 }
 
-                Section("Сообщения") {
+                Section {
                     NavigationLink {
                         GRUBetaChatSettingsView()
                     } label: {
@@ -53,9 +57,11 @@ struct BetaSettingsView: View {
                             subtitle: "звук • превью • badge"
                         )
                     }
+                } header: {
+                    Text(GRUL10n.text("Сообщения"))
                 }
 
-                Section("Конфиденциальность и безопасность") {
+                Section {
                     NavigationLink {
                         GRUBetaPrivacyView()
                     } label: {
@@ -65,9 +71,11 @@ struct BetaSettingsView: View {
                             subtitle: "online • прочтение • biometrics • защита экрана"
                         )
                     }
+                } header: {
+                    Text(GRUL10n.text("Конфиденциальность и безопасность"))
                 }
 
-                Section("Данные") {
+                Section {
                     NavigationLink {
                         GRUBetaDataStorageView()
                     } label: {
@@ -77,9 +85,11 @@ struct BetaSettingsView: View {
                             subtitle: "автозагрузка • трафик • кэш"
                         )
                     }
+                } header: {
+                    Text(GRUL10n.text("Данные"))
                 }
 
-                Section("Устройство") {
+                Section {
                     Button {
                         openSystemSettings()
                     } label: {
@@ -90,9 +100,11 @@ struct BetaSettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                } header: {
+                    Text(GRUL10n.text("Устройство"))
                 }
 
-                Section("Помощь") {
+                Section {
                     NavigationLink {
                         GRUBetaAboutView()
                     } label: {
@@ -102,32 +114,38 @@ struct BetaSettingsView: View {
                             subtitle: "gru. • версия • безопасность"
                         )
                     }
+                } header: {
+                    Text(GRUL10n.text("Помощь"))
                 }
 
                 Section {
                     Button(role: .destructive) {
                         showLogoutConfirmation = true
                     } label: {
-                        Label("Выйти из аккаунта", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(
+                            GRUL10n.text("Выйти из аккаунта"),
+                            systemImage: "rectangle.portrait.and.arrow.right"
+                        )
                     }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(GRUAppBackdrop())
-            .navigationTitle("Настройки")
+            .navigationTitle(GRUL10n.text("Настройки"))
             .navigationBarTitleDisplayMode(.large)
         }
         .confirmationDialog(
-            "Выйти из gru.?",
+            GRUL10n.text("Выйти из gru.?"),
             isPresented: $showLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Выйти", role: .destructive) {
+            Button(GRUL10n.text("Выйти"), role: .destructive) {
                 logout()
             }
-            Button("Отмена", role: .cancel) {}
+
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("Локальный кэш этого аккаунта будет очищен.")
+            Text(GRUL10n.text("Локальный кэш этого аккаунта будет очищен."))
         }
     }
 
@@ -137,7 +155,9 @@ struct BetaSettingsView: View {
     }
 
     private func openSystemSettings() {
-        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        guard let url = URL(string: UIApplication.openSettingsURLString) else {
+            return
+        }
         UIApplication.shared.open(url)
     }
 
@@ -156,23 +176,6 @@ struct BetaSettingsView: View {
     }
 }
 
-private enum BetaThemeName {
-    static func title(for theme: GRUAppTheme) -> String {
-        switch theme {
-        case .blackMoonCat: return "Black Moon Cat"
-        case .neonCatDemon: return "Neon Demon Cat"
-        case .bloodDragon: return "Fold-Eared Cat Dragon"
-        case .forestWitch: return "Forest Witch"
-        case .cyberMidnight: return "Cyber Midnight"
-        case .ultravioletUnicorn: return "Ultraviolet Caticorn"
-        case .powderPrincess: return "Powder Princess"
-        case .greenAcidMonster: return "Green Acid Monster"
-        case .ironKnight: return "Iron Knight"
-        default: return "Black Moon Cat"
-        }
-    }
-}
-
 private struct BetaSettingsRow: View {
     let icon: String
     let title: String
@@ -187,75 +190,16 @@ private struct BetaSettingsRow: View {
                 .background(GRUColors.accent.opacity(0.10), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(GRUL10n.text(title))
                     .font(.body.weight(.semibold))
-                Text(subtitle)
+
+                Text(GRUL10n.text(subtitle))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }
         .padding(.vertical, 2)
-    }
-}
-
-private struct GRUBetaThemesView: View {
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
-
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 12) {
-                ForEach(GRUThemePolicy.allowed) { theme in
-                    Button {
-                        themeRaw = theme.rawValue
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        HStack(spacing: 12) {
-                            GRUSignatureWallpaper(theme: theme, intensity: 1.0, animated: false)
-                                .frame(width: 74, height: 124)
-                                .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                                        .stroke(theme.accent.opacity(0.36), lineWidth: 1)
-                                }
-
-                            Text(BetaThemeName.title(for: theme))
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(GRUColors.text)
-
-                            Spacer(minLength: 4)
-
-                            if theme.rawValue == themeRaw {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundStyle(theme.accent)
-                            }
-                        }
-                        .padding(10)
-                        .background(
-                            GRUColors.card.opacity(0.76),
-                            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-        }
-        .background(GRUAppBackdrop())
-        .navigationTitle("Темы")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            let selected = GRUAppTheme(rawValue: themeRaw)
-            if let selected {
-                if !GRUThemePolicy.allowed.contains(selected) {
-                    themeRaw = GRUAppTheme.blackMoonCat.rawValue
-                }
-            } else {
-                themeRaw = GRUAppTheme.blackMoonCat.rawValue
-            }
-        }
     }
 }
 
@@ -269,22 +213,31 @@ private struct GRUBetaChatSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Отправка") {
-                Toggle("Отправка по Return", isOn: $sendByReturn)
-                Toggle("Свайп для ответа", isOn: $swipeReply)
-                Toggle("Быстрые реакции", isOn: $quickReactions)
+            Section {
+                Toggle(GRUL10n.text("Отправка по Return"), isOn: $sendByReturn)
+                Toggle(GRUL10n.text("Свайп для ответа"), isOn: $swipeReply)
+                Toggle(GRUL10n.text("Быстрые реакции"), isOn: $quickReactions)
+            } header: {
+                Text(GRUL10n.text("Отправка"))
             }
 
-            Section("Интерфейс") {
-                Toggle("Компактные чаты", isOn: $compactMode)
+            Section {
+                Toggle(GRUL10n.text("Компактные чаты"), isOn: $compactMode)
+            } header: {
+                Text(GRUL10n.text("Интерфейс"))
             }
 
-            Section("Медиа") {
-                Toggle("Автовоспроизведение видео", isOn: $autoplayVideo)
-                Toggle("Автовоспроизведение кото-кружков", isOn: $videoNoteAutoplay)
+            Section {
+                Toggle(GRUL10n.text("Автовоспроизведение видео"), isOn: $autoplayVideo)
+                Toggle(
+                    GRUL10n.text("Автовоспроизведение кото-кружков"),
+                    isOn: $videoNoteAutoplay
+                )
+            } header: {
+                Text(GRUL10n.text("Медиа"))
             }
         }
-        .navigationTitle("Чаты")
+        .navigationTitle(GRUL10n.text("Чаты"))
     }
 }
 
@@ -296,21 +249,27 @@ private struct GRUBetaNotificationsView: View {
 
     var body: some View {
         Form {
-            Section("Сообщения") {
-                Toggle("Уведомления", isOn: $notifications)
-                Toggle("Звук", isOn: $sounds)
-                Toggle("Текст сообщения в превью", isOn: $preview)
-                Toggle("Счётчик на иконке", isOn: $badge)
+            Section {
+                Toggle(GRUL10n.text("Уведомления"), isOn: $notifications)
+                Toggle(GRUL10n.text("Звук"), isOn: $sounds)
+                Toggle(GRUL10n.text("Текст сообщения в превью"), isOn: $preview)
+                Toggle(GRUL10n.text("Счётчик на иконке"), isOn: $badge)
+            } header: {
+                Text(GRUL10n.text("Сообщения"))
             }
 
             Section {
-                Button("Открыть настройки уведомлений iOS") {
-                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                Button(GRUL10n.text("Открыть настройки уведомлений iOS")) {
+                    guard let url = URL(
+                        string: UIApplication.openNotificationSettingsURLString
+                    ) else {
+                        return
+                    }
                     UIApplication.shared.open(url)
                 }
             }
         }
-        .navigationTitle("Уведомления")
+        .navigationTitle(GRUL10n.text("Уведомления"))
     }
 }
 
@@ -323,89 +282,117 @@ private struct GRUBetaPrivacyView: View {
 
     var body: some View {
         Form {
-            Section("Приватность") {
-                Toggle("Показывать online", isOn: $showStatus)
-                Toggle("Отчёты о прочтении", isOn: $readReceipts)
-                Toggle("Показывать «печатает…»", isOn: $typing)
+            Section {
+                Toggle(GRUL10n.text("Показывать online"), isOn: $showStatus)
+                Toggle(GRUL10n.text("Отчёты о прочтении"), isOn: $readReceipts)
+                Toggle(GRUL10n.text("Показывать «печатает…»"), isOn: $typing)
+            } header: {
+                Text(GRUL10n.text("Приватность"))
             }
 
             Section {
-                Toggle("Face ID / код устройства", isOn: $biometrics)
-                Toggle("Скрывать приложение в переключателе", isOn: $hideSwitcherPreview)
+                Toggle(GRUL10n.text("Face ID / код устройства"), isOn: $biometrics)
+                Toggle(
+                    GRUL10n.text("Скрывать приложение в переключателе"),
+                    isOn: $hideSwitcherPreview
+                )
 
                 LabeledContent {
-                    Text("Включена")
+                    Text(GRUL10n.text("Включена"))
                         .foregroundStyle(GRUColors.accent)
                 } label: {
-                    Label("Защита экрана", systemImage: "eye.slash.fill")
+                    Label(
+                        GRUL10n.text("Защита экрана"),
+                        systemImage: "eye.slash.fill"
+                    )
                 }
             } header: {
-                Text("Защита приложения")
+                Text(GRUL10n.text("Защита приложения"))
             } footer: {
-                Text("gru. скрывает защищённый контент при захвате экрана и блокирует запись/трансляцию интерфейса.")
+                Text(
+                    GRUL10n.text(
+                        "gru. скрывает защищённый контент при захвате экрана и блокирует запись/трансляцию интерфейса."
+                    )
+                )
             }
         }
-        .navigationTitle("Конфиденциальность")
+        .navigationTitle(GRUL10n.text("Конфиденциальность"))
     }
 }
 
 private struct GRUBetaDataStorageView: View {
     @State private var showClearCache = false
+
     @AppStorage("gru.settings.data.autoPhoto") private var autoPhoto = true
     @AppStorage("gru.settings.data.autoVideo") private var autoVideo = false
     @AppStorage("gru.settings.data.dataSaver") private var dataSaver = false
 
     var body: some View {
         Form {
-            Section("Автозагрузка") {
-                Toggle("Фото", isOn: $autoPhoto)
-                Toggle("Видео", isOn: $autoVideo)
-                Toggle("Экономия трафика", isOn: $dataSaver)
+            Section {
+                Toggle(GRUL10n.text("Фото"), isOn: $autoPhoto)
+                Toggle(GRUL10n.text("Видео"), isOn: $autoVideo)
+                Toggle(GRUL10n.text("Экономия трафика"), isOn: $dataSaver)
+            } header: {
+                Text(GRUL10n.text("Автозагрузка"))
             }
 
             Section {
                 Button(role: .destructive) {
                     showClearCache = true
                 } label: {
-                    Label("Очистить кэш", systemImage: "trash")
+                    Label(GRUL10n.text("Очистить кэш"), systemImage: "trash")
                 }
             } header: {
-                Text("Хранилище")
+                Text(GRUL10n.text("Хранилище"))
             } footer: {
-                Text("История с сервера не удаляется; локальные данные будут загружены заново при необходимости.")
+                Text(
+                    GRUL10n.text(
+                        "История с сервера не удаляется; локальные данные будут загружены заново при необходимости."
+                    )
+                )
             }
         }
-        .navigationTitle("Данные и хранилище")
+        .navigationTitle(GRUL10n.text("Данные и хранилище"))
         .confirmationDialog(
-            "Очистить локальный кэш?",
+            GRUL10n.text("Очистить локальный кэш?"),
             isPresented: $showClearCache,
             titleVisibility: .visible
         ) {
-            Button("Очистить", role: .destructive) {
+            Button(GRUL10n.text("Очистить"), role: .destructive) {
                 CacheStorage.shared.clearCurrentUser()
             }
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         }
     }
 }
 
 private struct GRUBetaAboutView: View {
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.9.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "0.9.0"
     }
 
     var body: some View {
         Form {
             Section {
-                LabeledContent("Приложение", value: "gru.")
-                LabeledContent("Версия", value: version)
+                LabeledContent(GRUL10n.text("Приложение"), value: "gru.")
+                LabeledContent(GRUL10n.text("Версия"), value: version)
             }
 
-            Section("Безопасность") {
-                Label("Защита экрана включена", systemImage: "lock.shield.fill")
-                Label("Сессия защищена авторизацией", systemImage: "key.fill")
+            Section {
+                Label(
+                    GRUL10n.text("Защита экрана включена"),
+                    systemImage: "lock.shield.fill"
+                )
+                Label(
+                    GRUL10n.text("Сессия защищена авторизацией"),
+                    systemImage: "key.fill"
+                )
+            } header: {
+                Text(GRUL10n.text("Безопасность"))
             }
         }
-        .navigationTitle("О приложении")
+        .navigationTitle(GRUL10n.text("О приложении"))
     }
 }
