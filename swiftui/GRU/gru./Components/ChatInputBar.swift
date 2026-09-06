@@ -144,8 +144,6 @@ struct ChatInputBar: View {
         }
     }
 
-    // MARK: - Attachments
-
     private var attachmentButton: some View {
         Button {
             guard !recordingUIVisible else { return }
@@ -167,8 +165,6 @@ struct ChatInputBar: View {
         .disabled(recordingUIVisible)
         .animation(.spring(response: 0.28, dampingFraction: 0.74), value: showMenu)
     }
-
-    // MARK: - Text
 
     private var textField: some View {
         TextField("Сообщение", text: $text, axis: .vertical)
@@ -193,10 +189,7 @@ struct ChatInputBar: View {
                         composerFocused
                             ? GRUColors.neonGradient
                             : LinearGradient(
-                                colors: [
-                                    GRUColors.accent.opacity(0.11),
-                                    Color.white.opacity(0.03)
-                                ],
+                                colors: [GRUColors.accent.opacity(0.11), Color.white.opacity(0.03)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -205,8 +198,6 @@ struct ChatInputBar: View {
             }
             .shadow(color: GRUColors.accent.opacity(composerFocused ? 0.11 : 0.02), radius: 9)
     }
-
-    // MARK: - Recording UI
 
     private var recordingStrip: some View {
         HStack(spacing: 9) {
@@ -225,7 +216,6 @@ struct ChatInputBar: View {
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.red)
                     .lineLimit(1)
-
                 Spacer(minLength: 0)
             } else if recordingLocked {
                 VStack(alignment: .leading, spacing: 1) {
@@ -233,15 +223,12 @@ struct ChatInputBar: View {
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(GRUColors.accent)
                         .lineLimit(1)
-
                     Text(recordMode.compactTitle)
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.7)
                         .foregroundStyle(.secondary)
                 }
-
                 Spacer(minLength: 0)
-
                 if recordMode == .voice {
                     Text(audioRecorder.elapsedText)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -249,15 +236,9 @@ struct ChatInputBar: View {
                         .foregroundStyle(.secondary)
                 }
             } else if recordMode == .voice {
-                VoiceWaveform(
-                    samples: audioRecorder.waveform,
-                    progress: 1,
-                    barWidth: 2.5,
-                    spacing: 1.8
-                )
-                .frame(minWidth: 62, maxWidth: .infinity)
-                .frame(height: 28)
-
+                VoiceWaveform(samples: audioRecorder.waveform, progress: 1, barWidth: 2.5, spacing: 1.8)
+                    .frame(minWidth: 62, maxWidth: .infinity)
+                    .frame(height: 28)
                 Text(audioRecorder.elapsedText)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -268,13 +249,11 @@ struct ChatInputBar: View {
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-
                     Text("CAT NOTE")
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.7)
                         .foregroundStyle(GRUColors.accent)
                 }
-
                 Spacer(minLength: 0)
             }
         }
@@ -286,20 +265,13 @@ struct ChatInputBar: View {
             RoundedRectangle(cornerRadius: 21, style: .continuous)
                 .stroke(
                     cancelRecording
-                        ? LinearGradient(
-                            colors: [Color.red.opacity(0.72), Color.orange.opacity(0.44)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        ? LinearGradient(colors: [Color.red.opacity(0.72), Color.orange.opacity(0.44)], startPoint: .leading, endPoint: .trailing)
                         : GRUColors.neonGradient,
                     lineWidth: 1
                 )
                 .opacity(cancelRecording ? 1 : 0.42)
         }
-        .shadow(
-            color: (cancelRecording ? Color.red : GRUColors.accent).opacity(0.12),
-            radius: 9
-        )
+        .shadow(color: (cancelRecording ? Color.red : GRUColors.accent).opacity(0.12), radius: 9)
     }
 
     private var recordingStripIcon: String {
@@ -307,8 +279,6 @@ struct ChatInputBar: View {
         if recordingLocked { return "lock.fill" }
         return recordMode == .voice ? "waveform" : "video.fill"
     }
-
-    // MARK: - Send
 
     private var sendButton: some View {
         Button {
@@ -339,21 +309,17 @@ struct ChatInputBar: View {
             Image(systemName: recordMode.badgeIcon)
                 .font(.system(size: 9, weight: .black))
                 .foregroundStyle(GRUColors.accent)
-
             Text(recordMode.compactTitle)
                 .font(.system(size: 8, weight: .black, design: .rounded))
                 .tracking(0.7)
                 .foregroundStyle(GRUColors.accent)
-
             Circle()
                 .fill(Color.secondary.opacity(0.38))
                 .frame(width: 3, height: 3)
-
             Text("2× режим • удерживать запись")
                 .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
@@ -365,8 +331,6 @@ struct ChatInputBar: View {
         }
     }
 
-    // MARK: - Record button
-
     private var recordingButton: some View {
         GRUNeonIcon(
             systemName: "pawprint.fill",
@@ -374,14 +338,11 @@ struct ChatInputBar: View {
             iconSize: didStartRecordingGesture ? 20 : 18,
             isActive: !cancelRecording
         )
-        .overlay {
-            recordingButtonOutline
-        }
+        .overlay { recordingButtonOutline }
         .overlay(alignment: .bottomTrailing) {
             ZStack {
                 Circle().fill(GRUColors.card)
                 Circle().stroke(GRUColors.accent, lineWidth: 1)
-
                 Image(systemName: recordMode.badgeIcon)
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
@@ -403,19 +364,14 @@ struct ChatInputBar: View {
         .simultaneousGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    guard !canSend,
-                          !audioRecorder.isRecording,
-                          !audioRecorder.isPreparing,
-                          !recordingLocked else { return }
+                    guard !canSend, !audioRecorder.isRecording, !audioRecorder.isPreparing, !recordingLocked else { return }
                     toggleRecordMode()
                 }
         )
         .animation(.spring(response: 0.22, dampingFraction: 0.72), value: touchActive)
         .animation(.easeInOut(duration: 0.12), value: cancelRecording)
         .animation(.spring(response: 0.24, dampingFraction: 0.72), value: recordMode)
-        .accessibilityLabel(
-            "Двойной тап переключает режим записи. Удерживай для записи. Свайп влево отменяет, вверх фиксирует."
-        )
+        .accessibilityLabel("Двойной тап переключает режим записи. Удерживай для записи. Свайп влево отменяет, вверх фиксирует.")
         .accessibilityAddTraits(.isButton)
     }
 
@@ -435,24 +391,19 @@ struct ChatInputBar: View {
     private var recordGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { value in
-                if !touchActive {
-                    beginRecordTouch()
-                }
-
+                if !touchActive { beginRecordTouch() }
                 guard didStartRecordingGesture else { return }
                 updateRecordDrag(value.translation)
             }
             .onEnded { value in
                 holdTask?.cancel()
                 holdTask = nil
-
                 guard didStartRecordingGesture else {
                     touchActive = false
                     cancelRecording = false
                     recordingLocked = false
                     return
                 }
-
                 updateRecordDrag(value.translation)
                 finishRecordGesture()
             }
@@ -460,20 +411,14 @@ struct ChatInputBar: View {
 
     private func beginRecordTouch() {
         guard !canSend, !touchActive else { return }
-
-        withAnimation(.easeOut(duration: 0.12)) {
-            showMenu = false
-        }
-
+        withAnimation(.easeOut(duration: 0.12)) { showMenu = false }
         touchActive = true
         didStartRecordingGesture = false
         cancelRecording = false
         recordingLocked = false
-
         holdTask?.cancel()
         holdTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: holdDelayNanoseconds)
-
             guard !Task.isCancelled, touchActive, !canSend else { return }
             beginSelectedRecordingAfterHold()
         }
@@ -481,31 +426,25 @@ struct ChatInputBar: View {
 
     private func beginSelectedRecordingAfterHold() {
         guard touchActive, !didStartRecordingGesture, !canSend else { return }
-
         didStartRecordingGesture = true
         composerFocused = false
-
         if hapticsEnabled { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
 
         switch recordMode {
         case .voice:
             Task { @MainActor in
                 let started = await audioRecorder.startRecordingForHold()
-
                 guard started else {
                     resetGestureState()
                     return
                 }
-
                 guard touchActive || recordingLocked else {
                     audioRecorder.cancel()
                     resetGestureState()
                     return
                 }
-
                 isInlineVoiceRecording = true
             }
-
         case .videoNote:
             onVideoNoteStarted()
         }
@@ -513,56 +452,38 @@ struct ChatInputBar: View {
 
     private func updateRecordDrag(_ translation: CGSize) {
         guard didStartRecordingGesture else { return }
-
         let horizontalCancel = translation.width <= cancelThreshold
-        let verticalLock =
-            translation.height <= lockThreshold &&
-            abs(translation.height) > abs(translation.width)
+        let verticalLock = translation.height <= lockThreshold && abs(translation.height) > abs(translation.width)
 
         if horizontalCancel {
-            if !cancelRecording {
-                if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-            }
-
+            if !cancelRecording, hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             cancelRecording = true
             recordingLocked = false
             return
         }
 
         cancelRecording = false
-
         if verticalLock, !recordingLocked {
             recordingLocked = true
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-
-            if recordMode == .videoNote {
-                onVideoNoteLocked()
-            }
+            if recordMode == .videoNote { onVideoNoteLocked() }
         }
     }
 
     private func finishRecordGesture() {
         touchActive = false
-
         if cancelRecording {
             cancelSelectedRecording()
             resetGestureState()
             return
         }
-
         if recordingLocked {
             didStartRecordingGesture = false
-
-            if recordMode == .videoNote {
-                resetGestureState(keepLock: false)
-            }
+            if recordMode == .videoNote { resetGestureState(keepLock: false) }
             return
         }
-
         switch recordMode {
-        case .voice:
-            finishVoiceRecordingAndSend()
-
+        case .voice: finishVoiceRecordingAndSend()
         case .videoNote:
             onVideoNoteReleased()
             resetGestureState()
@@ -574,7 +495,6 @@ struct ChatInputBar: View {
         case .voice:
             audioRecorder.cancel()
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
-
         case .videoNote:
             onVideoNoteCancelled()
             if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
@@ -582,29 +502,21 @@ struct ChatInputBar: View {
     }
 
     private func finishVoiceRecordingAndSend() {
-        if audioRecorder.isPreparing,
-           !isInlineVoiceRecording,
-           !audioRecorder.isRecording {
+        if audioRecorder.isPreparing, !isInlineVoiceRecording, !audioRecorder.isRecording {
             audioRecorder.cancel()
             resetGestureState()
             return
         }
-
         guard isInlineVoiceRecording || audioRecorder.isRecording else {
             resetGestureState()
             return
         }
-
-        if audioRecorder.isRecording {
-            audioRecorder.stopRecording()
-        }
-
+        if audioRecorder.isRecording { audioRecorder.stopRecording() }
         guard let recording = audioRecorder.recording else {
             audioRecorder.shutdown()
             resetGestureState()
             return
         }
-
         if hapticsEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
         onAudioRecorded(recording)
         audioRecorder.shutdown()
@@ -624,7 +536,6 @@ struct ChatInputBar: View {
         didStartRecordingGesture = false
         isInlineVoiceRecording = keepLock && recordMode == .voice
         cancelRecording = false
-
         if !keepLock {
             recordingLocked = false
             isInlineVoiceRecording = false
@@ -632,43 +543,22 @@ struct ChatInputBar: View {
     }
 
     private func toggleRecordMode() {
-        guard !canSend,
-              !audioRecorder.isRecording,
-              !audioRecorder.isPreparing,
-              !recordingLocked
-        else {
-            return
-        }
-
+        guard !canSend, !audioRecorder.isRecording, !audioRecorder.isPreparing, !recordingLocked else { return }
         withAnimation(.spring(response: 0.24, dampingFraction: 0.72)) {
             recordMode = recordMode == .voice ? .videoNote : .voice
         }
-
         if hapticsEnabled { UISelectionFeedbackGenerator().selectionChanged() }
     }
 
-    // MARK: - Text send
-
     private func sendMessage() {
         guard canSend else { return }
-
         composerFocused = true
-
-        withAnimation(.spring(response: 0.20, dampingFraction: 0.60)) {
-            isSending = true
-        }
-
-        if hapticsEnabled {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        }
-
+        withAnimation(.spring(response: 0.20, dampingFraction: 0.60)) { isSending = true }
+        if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         onSend()
         sendTrigger.toggle()
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                isSending = false
-            }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) { isSending = false }
         }
     }
 }
