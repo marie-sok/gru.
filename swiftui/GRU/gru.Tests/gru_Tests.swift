@@ -132,15 +132,18 @@ struct gru_Tests {
     // MARK: - 5. User Model & Avatar Tests
 
     @Test func testUserModelWithAvatar() throws {
+        let avatarData = Data([0x47, 0x52, 0x55])
         let userWithAvatar = User(
             username: "sarah",
             displayName: "Sarah Connor",
             isOnline: true,
-            avatarURL: "https://example.com/avatar.jpg"
+            avatarURL: "https://example.com/avatar.jpg",
+            avatarData: avatarData
         )
 
         #expect(userWithAvatar.username == "sarah")
         #expect(userWithAvatar.avatarURL == "https://example.com/avatar.jpg")
+        #expect(userWithAvatar.avatarData == avatarData)
         #expect(userWithAvatar.isOnline == true)
 
         let userWithoutAvatar = User(
@@ -149,7 +152,41 @@ struct gru_Tests {
         )
 
         #expect(userWithoutAvatar.avatarURL == nil)
+        #expect(userWithoutAvatar.avatarData == nil)
+        #expect(userWithoutAvatar.isBot == false)
         #expect(userWithoutAvatar.isOnline == false)
+    }
+
+    @Test func testLegacyUserJSONRemainsDecodable() throws {
+        let id = UUID()
+        let json = """
+        {
+          "id": "\(id.uuidString)",
+          "username": "legacy",
+          "displayName": "Legacy User",
+          "isOnline": true
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(User.self, from: json)
+
+        #expect(user.id == id)
+        #expect(user.avatarData == nil)
+        #expect(user.avatarURL == nil)
+        #expect(user.isBot == false)
+    }
+
+    @Test func testBuiltInBotIdentityIsExplicit() throws {
+        let bot = User(
+            username: "gru.bot",
+            displayName: "GRU Bot",
+            isOnline: true,
+            isBot: true
+        )
+
+        #expect(bot.isBot == true)
+        #expect(bot.serverID == nil)
+        #expect(bot.username == "gru.bot")
     }
 
     // MARK: - 6. NetworkMonitor Connection Types

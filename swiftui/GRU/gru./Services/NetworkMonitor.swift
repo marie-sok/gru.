@@ -51,7 +51,10 @@ final class NetworkMonitor {
                 // Автоматическое восстановление соединения при возвращении интернета
                 if !previousState && isNowConnected {
                     print("🌐 Network connection restored (\(self.connectionType.rawValue)) -> Reconnecting")
-                    WebSocketService.shared.connect()
+                    if let token = TokenStorage.shared.token,
+                       !token.isEmpty {
+                        WebSocketService.shared.connect(token: token)
+                    }
                     Task {
                         await ChatService.shared.loadChats()
                     }

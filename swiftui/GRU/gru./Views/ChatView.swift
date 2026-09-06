@@ -33,7 +33,7 @@ struct ChatView: View {
     @State private var showDeleteChatConfirmation = false
     @State private var deletingChat = false
 
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.obsidian.rawValue
+    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
     @AppStorage("showStatus") private var showOnlineStatus = true
     @AppStorage("gru.settings.privacy.typing") private var showTypingStatus = true
     @AppStorage("gru.settings.chats.wallpaperBlur") private var wallpaperBlur = false
@@ -55,7 +55,7 @@ struct ChatView: View {
     }
 
     private var currentTheme: GRUAppTheme {
-        GRUAppTheme(rawValue: themeRaw) ?? .obsidian
+        GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
     }
 
     private var peerUser: User? {
@@ -65,13 +65,16 @@ struct ChatView: View {
     var body: some View {
         ZStack {
             Group {
-                if backgroundStyle == .obsidian {
+                if let theme = GRUAppTheme(rawValue: chatBackgroundRaw), GRUThemePolicy.allowed.contains(theme) {
+                    GRUSignatureWallpaper(theme: theme, intensity: 0.92)
+                } else if backgroundStyle == .obsidian {
                     GRUSignatureWallpaper(theme: currentTheme, intensity: 0.92)
                 } else {
                     ChatBackgroundView(style: backgroundStyle)
                 }
             }
             .blur(radius: wallpaperBlur ? 7 : 0)
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
@@ -627,6 +630,9 @@ private extension ChatView {
                             isCurrentUser: message.senderID == ChatService.shared.currentUser.id,
                             onReply: { message in
                                 vm.startReply(to: message)
+                            },
+                            onEdit: { message in
+                                vm.startEditing(message)
                             },
                             onDeleteLocal: { message in
                                 vm.deleteLocal(message)

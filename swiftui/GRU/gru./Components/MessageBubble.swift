@@ -10,115 +10,59 @@ private enum MessageDeleteScope: Equatable {
 struct MessageBubble: View {
 
     @State private var pendingDeleteScope: MessageDeleteScope?
+    @State private var dragOffset: CGFloat = 0
+    @State private var hasTriggeredReplyHaptic = false
 
     @AppStorage("gru.settings.chats.swipeReply") private var swipeReplyEnabled = true
     @AppStorage("gru.settings.chats.quickReactions") private var quickReactions = true
 
     let message: Message
-
     let isCurrentUser: Bool
-
     let onReply: (Message) -> Void
-
+    let onEdit: (Message) -> Void
     let onDeleteLocal: (Message) -> Void
-
     let onDeleteForEveryone: (Message) -> Void
-
     let onRetry: (Message) -> Void
-
-    let onReaction: (
-        ReactionType,
-        Message
-    ) -> Void
-
+    let onReaction: (ReactionType, Message) -> Void
     let isSelectionMode: Bool
     let isSelected: Bool
     let onSelect: (Message) -> Void
 
     var body: some View {
-
-        HStack(
-            alignment: .bottom
-        ) {
-
+        HStack(alignment: .bottom) {
             if isCurrentUser {
-
-                Spacer(
-                    minLength: 60
-                )
+                Spacer(minLength: 60)
             }
 
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-
-                if let reply =
-                    message.replyTo {
-
-                    ReplyPreview(
-                        message: reply
-                    )
+            VStack(alignment: .leading, spacing: 8) {
+                if let reply = message.replyTo {
+                    ReplyPreview(message: reply)
                 }
 
-                if let attachment =
-                    message.attachment {
-
-                    AttachmentContent(
-                        attachment:
-                            attachment
-                    )
+                if let attachment = message.attachment {
+                    AttachmentContent(attachment: attachment)
                 }
 
                 if !message.text.isEmpty {
-
-                    BubbleText(
-                        text:
-                            message.text,
-                        currentUser:
-                            isCurrentUser
-                    )
+                    BubbleText(text: message.text, currentUser: isCurrentUser)
                 }
 
-                if let reaction =
-                    message.reaction {
-
-                    Text(
-                        reaction.emoji
-                    )
-                    .font(.title3)
-                    .padding(
-                        .horizontal,
-                        8
-                    )
-                    .padding(
-                        .vertical,
-                        4
-                    )
-                    .background(
-                        GRUColors.card
-                    )
-                    .clipShape(
-                        Capsule()
-                    )
+                if let reaction = message.reaction {
+                    Text(reaction.emoji)
+                        .font(.title3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(GRUColors.card)
+                        .clipShape(Capsule())
                 }
 
-                // MARK: Time + Status
-
-                HStack(
-                    spacing: 5
-                ) {
-
+                HStack(spacing: 5) {
                     Spacer()
 
                     Menu {
                         messageActions
                     } label: {
-                        GRUNeonIcon(
-                            systemName: "ellipsis",
-                            size: 26,
-                            iconSize: 11
-                        )
+                        GRUNeonIcon(systemName: "ellipsis", size: 26, iconSize: 11)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Действия с сообщением")
@@ -132,27 +76,19 @@ struct MessageBubble: View {
                         Text(timeString)
                     }
                     .font(.caption2)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    .foregroundStyle(.secondary)
 
                     if isCurrentUser {
-
                         statusView
                     }
                 }
             }
 
             if !isCurrentUser {
-
-                Spacer(
-                    minLength: 60
-                )
+                Spacer(minLength: 60)
             }
         }
-        .padding(
-            .horizontal
-        )
+        .padding(.horizontal)
         .contextMenu {
             messageActions
         }
@@ -171,7 +107,7 @@ struct MessageBubble: View {
         .gesture(
             DragGesture(minimumDistance: 20)
                 .onChanged { value in
-                    guard !isSelectionMode else { return }
+                    guard swipeReplyEnabled, !isSelectionMode else { return }
                     if value.translation.width < 0 && abs(value.translation.width) > abs(value.translation.height) {
                         let translation = value.translation.width
                         if translation < -50 {
@@ -211,30 +147,13 @@ struct MessageBubble: View {
                     .allowsHitTesting(false)
             }
         }
-        .background(
-            isSelected ? GRUColors.accent.opacity(0.08) : Color.clear
-        )
-        .gesture(
-
-            DragGesture(
-                minimumDistance: 30
-            )
-            .onEnded { value in
-                guard swipeReplyEnabled, !isSelectionMode else { return }
-
-                if value.translation.width > 60 {
-                    onReply(message)
-                }
-            }
-        )
+        .background(isSelected ? GRUColors.accent.opacity(0.08) : Color.clear)
         .confirmationDialog(
             "Удалить сообщение?",
             isPresented: Binding(
                 get: { pendingDeleteScope != nil },
                 set: { visible in
-                    if !visible {
-                        pendingDeleteScope = nil
-                    }
+                    if !visible { pendingDeleteScope = nil }
                 }
             ),
             titleVisibility: .visible
@@ -267,16 +186,10 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private var messageActions: some View {
-        Button {
-            onSelect(message)
-        } label: {
-            Label(
-                isSelected ? "Снять выбор" : "Выбрать",
-                systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
-            )
-        }
-
-                if isCurrentUser && !message.text.isEmpty && message.status != .sending && message.status != .failed {
+        // Editing is intentionally first for own text messages so it is easy to
+        // discover through the standard long-press menu. It also remains
+        // available for optimistic/failed messages; unsynced edits stay local.
+        if isCurrentUser && !message.text.isEmpty {
             Button {
                 onEdit(message)
             } label: {
@@ -292,6 +205,14 @@ struct MessageBubble: View {
             }
         }
 
+        if !message.text.isEmpty {
+            Button {
+                UIPasteboard.general.string = message.text
+            } label: {
+                Label("Копировать", systemImage: "doc.on.doc")
+            }
+        }
+
         if quickReactions {
             Menu("Реакция") {
                 ForEach(ReactionType.allCases) { reaction in
@@ -302,12 +223,13 @@ struct MessageBubble: View {
             }
         }
 
-        if !message.text.isEmpty {
-            Button {
-                UIPasteboard.general.string = message.text
-            } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
-            }
+        Button {
+            onSelect(message)
+        } label: {
+            Label(
+                isSelected ? "Снять выбор" : "Выбрать",
+                systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
+            )
         }
 
         if message.status == .failed {
@@ -328,109 +250,47 @@ struct MessageBubble: View {
             Button(role: .destructive) {
                 pendingDeleteScope = .everyone
             } label: {
-                Label("Удалить у себя и собеседника", systemImage: "trash.slash")
+                Label("Удалить у всех", systemImage: "trash.slash")
             }
         }
     }
 
-    // MARK: - Delivery Status
-
     @ViewBuilder
     private var statusView: some View {
-
         switch message.status {
-
         case .sending:
-
-            Image(
-                systemName: "clock"
-            )
-            .font(
-                .system(
-                    size: 10,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .secondary
-            )
-
+            Image(systemName: "clock")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
         case .sent:
-
             Text("✓")
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
         case .delivered:
-
             Text("✓✓")
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 11, weight: .semibold))
                 .tracking(-2)
-                .foregroundStyle(
-                    .secondary
-                )
-
+                .foregroundStyle(.secondary)
         case .read:
-
             Text("✓✓")
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .bold
-                    )
-                )
+                .font(.system(size: 11, weight: .bold))
                 .tracking(-2)
-                .foregroundStyle(
-                    GRUColors.accent
-                )
-
+                .foregroundStyle(GRUColors.accent)
         case .failed:
-
-            Image(
-                systemName:
-                    "exclamationmark.circle.fill"
-            )
-            .font(
-                .system(
-                    size: 11
-                )
-            )
-            .foregroundStyle(
-                .red
-            )
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.red)
         }
     }
 
     private var timeString: String {
-
-        let formatter =
-            DateFormatter()
-
-        formatter.dateFormat =
-            "HH:mm"
-
-        return formatter.string(
-            from: message.sentAt
-        )
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: message.sentAt)
     }
 }
 
-// MARK: - Bubble Text
-
 private struct BubbleText: View {
-
     let text: String
     let currentUser: Bool
 
@@ -438,32 +298,17 @@ private struct BubbleText: View {
     @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
 
     var body: some View {
-
         Text(text)
             .font(.system(size: 16.5 * textScale))
-            .padding(
-                .horizontal,
-                14
-            )
-            .padding(
-                .vertical,
-                10
-            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(
-
                 currentUser
                     ? (gradientBubbles ? GRUColors.outgoingBubble : GRUColors.card)
                     : GRUColors.incomingBubble
             )
-            .foregroundStyle(
-                GRUColors.text
-            )
-            .clipShape(
-
-                RoundedRectangle(
-                    cornerRadius: 18
-                )
-            )
+            .foregroundStyle(GRUColors.text)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(
@@ -481,105 +326,51 @@ private struct BubbleText: View {
                     )
             }
             .shadow(
-                color: currentUser
-                    ? GRUColors.accent.opacity(0.18)
-                    : .clear,
+                color: currentUser ? GRUColors.accent.opacity(0.18) : .clear,
                 radius: 8
             )
     }
 }
 
-// MARK: - Reply
-
 private struct ReplyPreview: View {
-
     let message: Message
 
     var body: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-
+        VStack(alignment: .leading, spacing: 4) {
             Text("Ответ")
-                .font(
-                    .caption2.bold()
-                )
-                .foregroundStyle(
-                    GRUColors.accent
-                )
+                .font(.caption2.bold())
+                .foregroundStyle(GRUColors.accent)
 
             if let attachment = message.attachment {
                 AttachmentContent(attachment: attachment)
             } else {
-
-                Text(
-                    message.text
-                )
-                .font(.caption)
-                .lineLimit(1)
+                Text(message.text)
+                    .font(.caption)
+                    .lineLimit(1)
             }
         }
         .padding(8)
-        .background(
-            Color.gray.opacity(
-                0.12
-            )
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
+        .background(Color.gray.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
-// MARK: - Attachment
-
 private struct AttachmentContent: View {
-
     let attachment: Attachment
 
     @ViewBuilder
     var body: some View {
-
         switch attachment.type {
-
         case .photo:
-
-            ImageBubble(
-                attachment:
-                    attachment
-            )
-
+            ImageBubble(attachment: attachment)
         case .video:
-
-            VideoBubble(
-                attachment:
-                    attachment
-            )
-
+            VideoBubble(attachment: attachment)
         case .videoNote:
-
-            VideoNoteBubble(
-                attachment:
-                    attachment
-            )
-
+            VideoNoteBubble(attachment: attachment)
         case .document:
-
-            DocumentBubble(
-                attachment:
-                    attachment
-            )
-
+            DocumentBubble(attachment: attachment)
         case .audio:
-
-            AudioBubble(
-                attachment:
-                    attachment
-            )
+            AudioBubble(attachment: attachment)
         }
     }
 }

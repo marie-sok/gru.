@@ -137,9 +137,9 @@ struct VideoNoteRecorderView: View {
                     isMirrored: recorder.isFrontCamera
                 )
                 .frame(width: 180, height: 194)
-                .clipShape(VideoNoteRecorderCatNoteShape())
+                .clipShape(CatVideoNoteShape())
             } else {
-                VideoNoteRecorderCatNoteShape()
+                CatVideoNoteShape()
                     .fill(.white.opacity(0.08))
                     .frame(width: 180, height: 194)
                     .overlay {
@@ -161,7 +161,7 @@ struct VideoNoteRecorderView: View {
                     }
             }
 
-            VideoNoteRecorderCatNoteShape()
+            CatVideoNoteShape()
                 .stroke(
                     GRUColors.accent.opacity(glowPulse ? 0.50 : 0.24),
                     lineWidth: 9
@@ -169,7 +169,7 @@ struct VideoNoteRecorderView: View {
                 .blur(radius: 8)
                 .frame(width: 182, height: 196)
 
-            VideoNoteRecorderCatNoteShape()
+            CatVideoNoteShape()
                 .stroke(
                     GRUColors.neonGradient,
                     lineWidth: recorder.isRecording ? 3.2 : 2.0
@@ -181,7 +181,7 @@ struct VideoNoteRecorderView: View {
                 )
 
             if recorder.isRecording {
-                VideoNoteRecorderCatNoteShape()
+                CatVideoNoteShape()
                     .trim(from: 0, to: min(max(recorder.elapsed / 60.0, 0.015), 1.0))
                     .stroke(
                         Color.red.opacity(0.92),
@@ -1098,74 +1098,6 @@ private struct VideoNoteRecorderEnvelopeShape: Shape {
     }
 }
 
-private struct VideoNoteRecorderCatNoteShape: InsettableShape {
-    var insetAmount: CGFloat = 0
-
-    func path(in rect: CGRect) -> Path {
-        let bounds = rect.insetBy(dx: insetAmount, dy: insetAmount)
-
-        guard bounds.width > 0, bounds.height > 0 else {
-            return Path()
-        }
-
-        let diameter = min(bounds.width, bounds.height * 0.925)
-        let radius = diameter / 2
-
-        let headRect = CGRect(
-            x: bounds.midX - radius,
-            y: bounds.maxY - diameter,
-            width: diameter,
-            height: diameter
-        )
-
-        let cx = headRect.midX
-        let cy = headRect.midY
-        let r = radius
-
-        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: cx + r * x, y: cy + r * y)
-        }
-
-        var path = Path()
-
-        path.move(to: point(0.0, 1.0))
-        path.addCurve(to: point(-1.0, 0.0), control1: point(-0.56, 1.0), control2: point(-1.0, 0.56))
-        path.addCurve(to: point(-0.82, -0.56), control1: point(-1.0, -0.25), control2: point(-0.94, -0.43))
-        path.addCurve(
-            to: CGPoint(x: cx - r * 0.56, y: bounds.minY + max(1, insetAmount)),
-            control1: point(-0.78, -0.71),
-            control2: CGPoint(x: cx - r * 0.68, y: bounds.minY + r * 0.03)
-        )
-        path.addCurve(
-            to: point(-0.28, -0.82),
-            control1: CGPoint(x: cx - r * 0.43, y: bounds.minY + r * 0.02),
-            control2: point(-0.34, -0.74)
-        )
-        path.addCurve(to: point(0.28, -0.82), control1: point(-0.12, -0.93), control2: point(0.12, -0.93))
-        path.addCurve(
-            to: CGPoint(x: cx + r * 0.56, y: bounds.minY + max(1, insetAmount)),
-            control1: point(0.34, -0.74),
-            control2: CGPoint(x: cx + r * 0.43, y: bounds.minY + r * 0.02)
-        )
-        path.addCurve(
-            to: point(0.82, -0.56),
-            control1: CGPoint(x: cx + r * 0.68, y: bounds.minY + r * 0.03),
-            control2: point(0.78, -0.71)
-        )
-        path.addCurve(to: point(1.0, 0.0), control1: point(0.94, -0.43), control2: point(1.0, -0.25))
-        path.addCurve(to: point(0.0, 1.0), control1: point(1.0, 0.56), control2: point(0.56, 1.0))
-
-        path.closeSubpath()
-
-        return path
-    }
-
-    func inset(by amount: CGFloat) -> some InsettableShape {
-        var copy = self
-        copy.insetAmount += amount
-        return copy
-    }
-}
 
 private struct VideoNoteCameraPreview: UIViewRepresentable {
 

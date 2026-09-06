@@ -100,6 +100,7 @@ struct ProfileView: View {
             if profile.avatarData != nil {
                 Button("Удалить аватар", role: .destructive) {
                     profile.removeAvatar()
+                    service.currentUser.avatarData = nil
                 }
             }
 
@@ -135,7 +136,7 @@ private extension ProfileView {
             .buttonStyle(.plain)
             .accessibilityLabel("Изменить аватар")
 
-            Text(profile.nickname.isEmpty ? "GRU" : profile.nickname)
+            Text(profile.nickname.isEmpty ? "gru." : profile.nickname)
                 .font(.title2.bold())
 
             Text("@\(profile.username)")
@@ -277,6 +278,7 @@ private extension ProfileView {
 
                 await MainActor.run {
                     saveAvatar(image)
+                    service.currentUser.avatarData = profile.avatarData
                     selectedAvatar = nil
                 }
             } catch {
@@ -306,6 +308,7 @@ private extension ProfileView {
         }
 
         profile.avatarData = rendered.jpegData(compressionQuality: 0.84)
+        service.currentUser.avatarData = profile.avatarData
         UINotificationFeedbackGenerator()
             .notificationOccurred(.success)
     }

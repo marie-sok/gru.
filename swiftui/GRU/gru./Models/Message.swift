@@ -84,9 +84,7 @@ struct Message: Identifiable, Codable {
         self.status = status
         self.deliveredAt = deliveredAt
         self.readAt = readAt
-        self.isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
-        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
-        reaction = reaction
+        self.reaction = reaction
         self.isEdited = isEdited
         self.editedAt = editedAt
         self.replyReference =
@@ -172,8 +170,8 @@ struct Message: Identifiable, Codable {
                 forKey: .readAt
             )
 
-        isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
-        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
+        isEdited = try container.decodeIfPresent(Bool.self, forKey: .isEdited) ?? false
+        editedAt = try container.decodeIfPresent(Date.self, forKey: .editedAt)
         reaction =
             try container.decodeIfPresent(
                 ReactionType.self,
@@ -296,8 +294,6 @@ struct Message: Identifiable, Codable {
         readAt =
             serverMessage.readAt
 
-        isEdited = (try? container.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
-        editedAt = try? container.decodeIfPresent(Date.self, forKey: .editedAt)
         reaction =
             serverMessage.reaction
 

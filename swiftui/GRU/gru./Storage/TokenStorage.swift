@@ -5,90 +5,260 @@ final class TokenStorage {
 
     static let shared = TokenStorage()
 
-    private init() {
-        migrateFromUserDefaultsIfNeeded()
-    }
+    // MARK: - Storage namespace
 
-    // MARK: - Keys
+    /*
+     Beta v4 deliberately uses a new Keychain service.
 
-    private let service = "sok.com.gru.auth"
+     Why:
+     - iOS Keychain can survive app deletion/reinstall;
+     - the old beta used sok.com.gru.auth and also resurrected JWTs from UserDefaults;
+     - after changing/rebuilding the local backend, an old JWT must never silently
+       become the current session again.
+    */
+    private let service = "sok.com.gru.auth.beta.session.v4"
+    private let legacyServices = [
+        "sok.com.gru.auth",
+        "sok.com.gru.auth.beta.session.v3"
+    ]
+
     private let tokenAccount = "jwt_token"
     private let userIDAccount = "user_id"
+    private let backendAccount = "backend_base_url"
 
-    // Legacy UserDefaults keys for migration
     private let legacyTokenKey = "jwt"
     private let legacyUserIDKey = "serverUserID"
+
+    private init() {
+        purgeLegacyStorage()
+        discardSessionIfBackendChanged()
+    }
+
+    // MARK: - Current backend binding
+
+    private var currentBackend: String {
+        GRUServerConfiguration.httpBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    var storedBackend: String? {
+        readFromKeychain(
+            service: service,
+            account: backendAccount
+        )
+    }
+
+    var belongsToCurrentBackend: Bool {
+        guard let storedBackend,
+              !storedBackend.isEmpty else {
+            return false
+        }
+
+        return storedBackend == currentBackend
+    }
 
     // MARK: - Token
 
     var token: String? {
-        if let keychainToken = readFromKeychain(account: tokenAccount) {
-            return keychainToken
+        guard belongsToCurrentBackend else {
+            clear()
+            return nil
         }
-        // Fallback to UserDefaults if migration hasn't run yet
-        return UserDefaults.standard.string(forKey: legacyTokenKey)
+
+        return readFromKeychain(
+            service: service,
+            account: tokenAccount
+        )
     }
 
     // MARK: - User ID
 
     var userID: String? {
-        if let keychainUserID = readFromKeychain(account: userIDAccount) {
-            return keychainUserID
+        guard belongsToCurrentBackend else {
+            clear()
+            return nil
         }
-        return UserDefaults.standard.string(forKey: legacyUserIDKey)
+
+        return readFromKeychain(
+            service: service,
+            account: userIDAccount
+        )
     }
 
     // MARK: - Save Session
 
-    func save(token: String, userID: String) {
-        saveToKeychain(value: token, account: tokenAccount)
-        saveToKeychain(value: userID, account: userIDAccount)
+    func save(
+        token: String,
+        userID: String
+    ) {
+        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Also keep synchronized in UserDefaults as backup for background extensions
-        UserDefaults.standard.set(token, forKey: legacyTokenKey)
-        UserDefaults.standard.set(userID, forKey: legacyUserIDKey)
+        guard !cleanToken.isEmpty,
+              !cleanUserID.isEmpty else {
+            clear()
+            return
+        }
+
+        // Atomic replacement from the app's point of view: old values are gone
+        // before a new backend-bound session is written.
+        clearCurrentService()
+
+        saveToKeychain(
+            value: currentBackend,
+            service: service,
+            account: backendAccount
+        )
+
+        saveToKeychain(
+            value: cleanToken,
+            service: service,
+            account: tokenAccount
+        )
+
+        saveToKeychain(
+            value: cleanUserID,
+            service: service,
+            account: userIDAccount
+        )
+
+        // Never mirror auth secrets back into UserDefaults.
+        removeLegacyDefaults()
     }
 
     // MARK: - Compatibility
 
     func save(_ token: String) {
-        saveToKeychain(value: token, account: tokenAccount)
-        UserDefaults.standard.set(token, forKey: legacyTokenKey)
+        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanToken.isEmpty else { return }
+
+        saveToKeychain(
+            value: currentBackend,
+            service: service,
+            account: backendAccount
+        )
+
+        saveToKeychain(
+            value: cleanToken,
+            service: service,
+            account: tokenAccount
+        )
+
+        removeLegacyDefaults()
     }
 
     // MARK: - Clear
 
     func clear() {
-        deleteFromKeychain(account: tokenAccount)
-        deleteFromKeychain(account: userIDAccount)
+        clearCurrentService()
+        removeLegacyDefaults()
+    }
 
+    func purgeAllKnownSessions() {
+        clearCurrentService()
+
+        for legacyService in legacyServices {
+            deleteFromKeychain(
+                service: legacyService,
+                account: tokenAccount
+            )
+
+            deleteFromKeychain(
+                service: legacyService,
+                account: userIDAccount
+            )
+
+            deleteFromKeychain(
+                service: legacyService,
+                account: backendAccount
+            )
+        }
+
+        removeLegacyDefaults()
+    }
+
+    // MARK: - Backend mismatch protection
+
+    private func discardSessionIfBackendChanged() {
+        guard let savedBackend = readFromKeychain(
+            service: service,
+            account: backendAccount
+        ) else {
+            return
+        }
+
+        guard savedBackend != currentBackend else {
+            return
+        }
+
+        clearCurrentService()
+
+        #if DEBUG
+        print(
+            "🧹 GRU session discarded: backend changed from \(savedBackend) to \(currentBackend)"
+        )
+        #endif
+    }
+
+    // MARK: - Legacy purge
+
+    private func purgeLegacyStorage() {
+        for legacyService in legacyServices {
+            deleteFromKeychain(
+                service: legacyService,
+                account: tokenAccount
+            )
+
+            deleteFromKeychain(
+                service: legacyService,
+                account: userIDAccount
+            )
+
+            deleteFromKeychain(
+                service: legacyService,
+                account: backendAccount
+            )
+        }
+
+        removeLegacyDefaults()
+    }
+
+    private func removeLegacyDefaults() {
         UserDefaults.standard.removeObject(forKey: legacyTokenKey)
         UserDefaults.standard.removeObject(forKey: legacyUserIDKey)
     }
 
-    // MARK: - Migration
+    private func clearCurrentService() {
+        deleteFromKeychain(
+            service: service,
+            account: tokenAccount
+        )
 
-    private func migrateFromUserDefaultsIfNeeded() {
-        if let legacyToken = UserDefaults.standard.string(forKey: legacyTokenKey), !legacyToken.isEmpty {
-            if readFromKeychain(account: tokenAccount) == nil {
-                saveToKeychain(value: legacyToken, account: tokenAccount)
-            }
-        }
+        deleteFromKeychain(
+            service: service,
+            account: userIDAccount
+        )
 
-        if let legacyUserID = UserDefaults.standard.string(forKey: legacyUserIDKey), !legacyUserID.isEmpty {
-            if readFromKeychain(account: userIDAccount) == nil {
-                saveToKeychain(value: legacyUserID, account: userIDAccount)
-            }
-        }
+        deleteFromKeychain(
+            service: service,
+            account: backendAccount
+        )
     }
 
     // MARK: - Keychain Helpers
 
-    private func saveToKeychain(value: String, account: String) {
+    private func saveToKeychain(
+        value: String,
+        service: String,
+        account: String
+    ) {
         guard let data = value.data(using: .utf8) else { return }
 
-        // Remove existing item first
-        deleteFromKeychain(account: account)
+        deleteFromKeychain(
+            service: service,
+            account: account
+        )
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -98,10 +268,19 @@ final class TokenStorage {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+
+        #if DEBUG
+        if status != errSecSuccess {
+            print("❌ Keychain save failed for \(account): \(status)")
+        }
+        #endif
     }
 
-    private func readFromKeychain(account: String) -> String? {
+    private func readFromKeychain(
+        service: String,
+        account: String
+    ) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -111,19 +290,24 @@ final class TokenStorage {
         ]
 
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        let status = SecItemCopyMatching(
+            query as CFDictionary,
+            &item
+        )
 
         guard status == errSecSuccess,
               let data = item as? Data,
-              let string = String(data: data, encoding: .utf8)
-        else {
+              let string = String(data: data, encoding: .utf8) else {
             return nil
         }
 
         return string
     }
 
-    private func deleteFromKeychain(account: String) {
+    private func deleteFromKeychain(
+        service: String,
+        account: String
+    ) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
