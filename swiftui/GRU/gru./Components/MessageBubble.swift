@@ -12,8 +12,11 @@ struct MessageBubble: View {
     @State private var dragOffset: CGFloat = 0
     @State private var hasTriggeredReplyHaptic = false
 
-    @AppStorage("gru.settings.chats.swipeReply") private var swipeReplyEnabled = true
-    @AppStorage("gru.settings.chats.quickReactions") private var quickReactions = true
+    @AppStorage("gru.settings.chats.swipeReply")
+    private var swipeReplyEnabled = true
+
+    @AppStorage("gru.settings.chats.quickReactions")
+    private var quickReactions = true
 
     let message: Message
     let isCurrentUser: Bool
@@ -41,7 +44,10 @@ struct MessageBubble: View {
                 Spacer(minLength: 54)
             }
 
-            VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 7) {
+            VStack(
+                alignment: isCurrentUser ? .trailing : .leading,
+                spacing: 7
+            ) {
                 if message.status == .failed || message.isQueuedForRetry {
                     deliveryBanner
                 }
@@ -55,7 +61,10 @@ struct MessageBubble: View {
                 }
 
                 if !message.text.isEmpty {
-                    BubbleText(text: message.text, currentUser: isCurrentUser)
+                    BubbleText(
+                        text: message.text,
+                        currentUser: isCurrentUser
+                    )
                 }
 
                 if let reaction = message.reaction {
@@ -87,20 +96,30 @@ struct MessageBubble: View {
         .gesture(
             DragGesture(minimumDistance: 18)
                 .onChanged { value in
-                    guard swipeReplyEnabled, !isSelectionMode else { return }
+                    guard swipeReplyEnabled,
+                          !isSelectionMode else {
+                        return
+                    }
+
                     guard value.translation.width < 0,
-                          abs(value.translation.width) > abs(value.translation.height)
-                    else { return }
+                          abs(value.translation.width)
+                            > abs(value.translation.height)
+                    else {
+                        return
+                    }
 
                     let translation = value.translation.width
+
                     if translation < -52 {
                         dragOffset = -52 + (translation + 52) * 0.18
                     } else {
                         dragOffset = translation
                     }
 
-                    if translation < -45 && !hasTriggeredReplyHaptic {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    if translation < -45,
+                       !hasTriggeredReplyHaptic {
+                        UIImpactFeedbackGenerator(style: .medium)
+                            .impactOccurred()
                         hasTriggeredReplyHaptic = true
                     }
                 }
@@ -109,7 +128,12 @@ struct MessageBubble: View {
                         onReply(message)
                     }
 
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
+                    withAnimation(
+                        .spring(
+                            response: 0.34,
+                            dampingFraction: 0.76
+                        )
+                    ) {
                         dragOffset = 0
                         hasTriggeredReplyHaptic = false
                     }
@@ -131,46 +155,65 @@ struct MessageBubble: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(GRUColors.accent.opacity(0.075))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(GRUColors.accent.opacity(0.16), lineWidth: 1)
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(
+                            GRUColors.accent.opacity(0.16),
+                            lineWidth: 1
+                        )
                     }
                     .padding(.horizontal, 4)
             }
         }
         .scaleEffect(isSelected ? 0.99 : 1)
-        .animation(.spring(response: 0.28, dampingFraction: 0.80), value: isSelected)
+        .animation(
+            .spring(response: 0.28, dampingFraction: 0.80),
+            value: isSelected
+        )
         .confirmationDialog(
-            "Удалить сообщение?",
+            GRUL10n.text("Удалить сообщение?"),
             isPresented: Binding(
                 get: { pendingDeleteScope != nil },
                 set: { visible in
-                    if !visible { pendingDeleteScope = nil }
+                    if !visible {
+                        pendingDeleteScope = nil
+                    }
                 }
             ),
             titleVisibility: .visible
         ) {
             if pendingDeleteScope == .local {
-                Button("Удалить только у себя", role: .destructive) {
+                Button(
+                    GRUL10n.text("Удалить только у себя"),
+                    role: .destructive
+                ) {
                     onDeleteLocal(message)
                     pendingDeleteScope = nil
                 }
             }
 
             if pendingDeleteScope == .everyone {
-                Button("Удалить у себя и собеседника", role: .destructive) {
+                Button(
+                    GRUL10n.text("Удалить у себя и собеседника"),
+                    role: .destructive
+                ) {
                     onDeleteForEveryone(message)
                     pendingDeleteScope = nil
                 }
             }
 
-            Button("Отмена", role: .cancel) {
+            Button(GRUL10n.text("Отмена"), role: .cancel) {
                 pendingDeleteScope = nil
             }
         } message: {
             Text(
-                pendingDeleteScope == .everyone
-                    ? "Сообщение исчезнет у обоих участников чата."
-                    : "Сообщение исчезнет только на этом устройстве."
+                GRUL10n.text(
+                    pendingDeleteScope == .everyone
+                        ? "Сообщение исчезнет у обоих участников чата."
+                        : "Сообщение исчезнет только на этом устройстве."
+                )
             )
         }
     }
@@ -184,29 +227,45 @@ struct MessageBubble: View {
             )
             .font(.system(size: 9, weight: .black))
 
-            Text(message.status == .failed ? "НЕ ОТПРАВЛЕНО" : "В ОЧЕРЕДИ")
-                .font(.system(size: 8, weight: .black, design: .rounded))
-                .tracking(0.7)
+            Text(
+                GRUL10n.text(
+                    message.status == .failed
+                        ? "НЕ ОТПРАВЛЕНО"
+                        : "В ОЧЕРЕДИ"
+                )
+            )
+            .font(.system(size: 8, weight: .black, design: .rounded))
+            .tracking(0.7)
 
             if message.status == .failed {
-                Button("повторить") {
+                Button(GRUL10n.text("повторить")) {
                     onRetry(message)
                 }
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .buttonStyle(.plain)
             }
         }
-        .foregroundStyle(message.status == .failed ? Color.orange : GRUColors.accent)
+        .foregroundStyle(
+            message.status == .failed
+                ? Color.orange
+                : GRUColors.accent
+        )
         .padding(.horizontal, 9)
         .frame(height: 24)
         .background(
-            (message.status == .failed ? Color.orange : GRUColors.accent).opacity(0.09),
+            (message.status == .failed
+                ? Color.orange
+                : GRUColors.accent)
+                .opacity(0.09),
             in: Capsule()
         )
         .overlay {
             Capsule()
                 .stroke(
-                    (message.status == .failed ? Color.orange : GRUColors.accent).opacity(0.18),
+                    (message.status == .failed
+                        ? Color.orange
+                        : GRUColors.accent)
+                        .opacity(0.18),
                     lineWidth: 1
                 )
         }
@@ -223,10 +282,12 @@ struct MessageBubble: View {
                     .frame(width: 22, height: 20)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Действия с сообщением")
+            .accessibilityLabel(
+                GRUL10n.text("Действия с сообщением")
+            )
 
             if message.isEdited {
-                Text("изм.")
+                Text(GRUL10n.text("изм."))
                     .font(.system(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -244,7 +305,8 @@ struct MessageBubble: View {
         .frame(height: 23)
         .background(Color.primary.opacity(0.035), in: Capsule())
         .overlay {
-            Capsule().stroke(Color.primary.opacity(0.045), lineWidth: 0.8)
+            Capsule()
+                .stroke(Color.primary.opacity(0.045), lineWidth: 0.8)
         }
     }
 
@@ -258,17 +320,27 @@ struct MessageBubble: View {
                 .trim(from: 0, to: replyProgress)
                 .stroke(
                     GRUColors.neonGradient,
-                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+                    style: StrokeStyle(
+                        lineWidth: 2.2,
+                        lineCap: .round
+                    )
                 )
                 .rotationEffect(.degrees(-90))
                 .frame(width: 38, height: 38)
 
             Image(systemName: "arrowshape.turn.up.left.fill")
                 .font(.system(size: 13, weight: .black))
-                .foregroundStyle(replyProgress >= 1 ? GRUColors.accent : Color.secondary)
+                .foregroundStyle(
+                    replyProgress >= 1
+                        ? GRUColors.accent
+                        : Color.secondary
+                )
                 .scaleEffect(0.78 + replyProgress * 0.22)
         }
-        .shadow(color: GRUColors.accent.opacity(replyProgress * 0.34), radius: 9)
+        .shadow(
+            color: GRUColors.accent.opacity(replyProgress * 0.34),
+            radius: 9
+        )
     }
 
     private var selectionIndicator: some View {
@@ -279,11 +351,16 @@ struct MessageBubble: View {
 
             Circle()
                 .stroke(
-                    isSelected ? GRUColors.neonGradient : LinearGradient(
-                        colors: [Color.secondary.opacity(0.45), Color.secondary.opacity(0.18)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
+                    isSelected
+                        ? GRUColors.neonGradient
+                        : LinearGradient(
+                            colors: [
+                                Color.secondary.opacity(0.45),
+                                Color.secondary.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
                     lineWidth: 1.5
                 )
                 .frame(width: 27, height: 27)
@@ -323,7 +400,10 @@ struct MessageBubble: View {
             Button {
                 onEdit(message)
             } label: {
-                Label("Редактировать", systemImage: "pencil")
+                Label(
+                    GRUL10n.text("Редактировать"),
+                    systemImage: "pencil"
+                )
             }
         }
 
@@ -331,7 +411,10 @@ struct MessageBubble: View {
             Button {
                 onReply(message)
             } label: {
-                Label("Ответить", systemImage: "arrowshape.turn.up.left")
+                Label(
+                    GRUL10n.text("Ответить"),
+                    systemImage: "arrowshape.turn.up.left"
+                )
             }
         }
 
@@ -339,12 +422,15 @@ struct MessageBubble: View {
             Button {
                 UIPasteboard.general.string = message.text
             } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+                Label(
+                    GRUL10n.text("Копировать"),
+                    systemImage: "doc.on.doc"
+                )
             }
         }
 
         if quickReactions {
-            Menu("Реакция") {
+            Menu(GRUL10n.text("Реакция")) {
                 ForEach(ReactionType.allCases) { reaction in
                     Button(reaction.emoji) {
                         onReaction(reaction, message)
@@ -357,14 +443,23 @@ struct MessageBubble: View {
             onSelect(message)
         } label: {
             Label(
-                isSelected ? "Снять выбор" : "Выбрать",
-                systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
+                GRUL10n.text(
+                    isSelected ? "Снять выбор" : "Выбрать"
+                ),
+                systemImage: isSelected
+                    ? "checkmark.circle.fill"
+                    : "checkmark.circle"
             )
         }
 
         if message.status == .failed {
-            Button { onRetry(message) } label: {
-                Label("Повторить отправку", systemImage: "arrow.clockwise")
+            Button {
+                onRetry(message)
+            } label: {
+                Label(
+                    GRUL10n.text("Повторить отправку"),
+                    systemImage: "arrow.clockwise"
+                )
             }
         }
 
@@ -373,14 +468,20 @@ struct MessageBubble: View {
         Button(role: .destructive) {
             pendingDeleteScope = .local
         } label: {
-            Label("Удалить только у себя", systemImage: "trash")
+            Label(
+                GRUL10n.text("Удалить только у себя"),
+                systemImage: "trash"
+            )
         }
 
         if isCurrentUser {
             Button(role: .destructive) {
                 pendingDeleteScope = .everyone
             } label: {
-                Label("Удалить у всех", systemImage: "trash.slash")
+                Label(
+                    GRUL10n.text("Удалить у всех"),
+                    systemImage: "trash.slash"
+                )
             }
         }
     }
@@ -393,27 +494,35 @@ struct MessageBubble: View {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Сообщение в очереди на отправку")
+                    .accessibilityLabel(
+                        GRUL10n.text("Сообщение в очереди на отправку")
+                    )
             } else {
                 Image(systemName: "clock")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Сообщение отправляется")
+                    .accessibilityLabel(
+                        GRUL10n.text("Сообщение отправляется")
+                    )
             }
+
         case .sent:
             Text("✓")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
+
         case .delivered:
             Text("✓✓")
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(-2)
                 .foregroundStyle(.secondary)
+
         case .read:
             Text("✓✓")
                 .font(.system(size: 10, weight: .black))
                 .tracking(-2)
                 .foregroundStyle(GRUColors.accent)
+
         case .failed:
             Image(systemName: "exclamationmark.circle.fill")
                 .font(.system(size: 10))
@@ -432,18 +541,29 @@ private struct BubbleText: View {
     let text: String
     let currentUser: Bool
 
-    @AppStorage("gru.settings.chats.textScale") private var textScale = 1.0
-    @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
+    @AppStorage("gru.settings.chats.textScale")
+    private var textScale = 1.0
+
+    @AppStorage("gru.settings.appearance.gradientBubbles")
+    private var gradientBubbles = true
 
     var body: some View {
         Text(text)
-            .font(.system(size: 16.5 * textScale, weight: .regular, design: .rounded))
+            .font(
+                .system(
+                    size: 16.5 * textScale,
+                    weight: .regular,
+                    design: .rounded
+                )
+            )
             .lineSpacing(1.5)
             .padding(.horizontal, 15)
             .padding(.vertical, 10.5)
             .background(
                 currentUser
-                    ? (gradientBubbles ? GRUColors.outgoingBubble : GRUColors.card)
+                    ? (gradientBubbles
+                        ? GRUColors.outgoingBubble
+                        : GRUColors.card)
                     : GRUColors.incomingBubble
             )
             .foregroundStyle(GRUColors.text)
@@ -465,7 +585,9 @@ private struct BubbleText: View {
                     )
             }
             .shadow(
-                color: currentUser ? GRUColors.accent.opacity(0.16) : Color.black.opacity(0.08),
+                color: currentUser
+                    ? GRUColors.accent.opacity(0.16)
+                    : Color.black.opacity(0.08),
                 radius: currentUser ? 10 : 5,
                 y: 3
             )
@@ -481,10 +603,14 @@ private struct GRUChatBubbleShape: Shape {
 
         let corners = UIRectCorner(
             rawValue:
-                (currentUser ? UIRectCorner.topLeft.rawValue : UIRectCorner.topRight.rawValue) |
-                UIRectCorner.topLeft.rawValue |
-                UIRectCorner.topRight.rawValue |
-                (currentUser ? UIRectCorner.bottomLeft.rawValue : UIRectCorner.bottomRight.rawValue)
+                (currentUser
+                    ? UIRectCorner.topLeft.rawValue
+                    : UIRectCorner.topRight.rawValue)
+                | UIRectCorner.topLeft.rawValue
+                | UIRectCorner.topRight.rawValue
+                | (currentUser
+                    ? UIRectCorner.bottomLeft.rawValue
+                    : UIRectCorner.bottomRight.rawValue)
         )
 
         let path = UIBezierPath(
@@ -497,28 +623,62 @@ private struct GRUChatBubbleShape: Shape {
 
         if currentUser {
             let tail = Path { tail in
-                tail.move(to: CGPoint(x: rect.maxX - small - 3, y: rect.maxY - 13))
-                tail.addQuadCurve(
-                    to: CGPoint(x: rect.maxX + 5, y: rect.maxY - 2),
-                    control: CGPoint(x: rect.maxX + 1, y: rect.maxY - 8)
+                tail.move(
+                    to: CGPoint(
+                        x: rect.maxX - small - 3,
+                        y: rect.maxY - 13
+                    )
                 )
                 tail.addQuadCurve(
-                    to: CGPoint(x: rect.maxX - 8, y: rect.maxY - 4),
-                    control: CGPoint(x: rect.maxX - 1, y: rect.maxY)
+                    to: CGPoint(
+                        x: rect.maxX + 5,
+                        y: rect.maxY - 2
+                    ),
+                    control: CGPoint(
+                        x: rect.maxX + 1,
+                        y: rect.maxY - 8
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.maxX - 8,
+                        y: rect.maxY - 4
+                    ),
+                    control: CGPoint(
+                        x: rect.maxX - 1,
+                        y: rect.maxY
+                    )
                 )
                 tail.closeSubpath()
             }
             result.addPath(tail)
         } else {
             let tail = Path { tail in
-                tail.move(to: CGPoint(x: rect.minX + small + 3, y: rect.maxY - 13))
-                tail.addQuadCurve(
-                    to: CGPoint(x: rect.minX - 5, y: rect.maxY - 2),
-                    control: CGPoint(x: rect.minX - 1, y: rect.maxY - 8)
+                tail.move(
+                    to: CGPoint(
+                        x: rect.minX + small + 3,
+                        y: rect.maxY - 13
+                    )
                 )
                 tail.addQuadCurve(
-                    to: CGPoint(x: rect.minX + 8, y: rect.maxY - 4),
-                    control: CGPoint(x: rect.minX + 1, y: rect.maxY)
+                    to: CGPoint(
+                        x: rect.minX - 5,
+                        y: rect.maxY - 2
+                    ),
+                    control: CGPoint(
+                        x: rect.minX - 1,
+                        y: rect.maxY - 8
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.minX + 8,
+                        y: rect.maxY - 4
+                    ),
+                    control: CGPoint(
+                        x: rect.minX + 1,
+                        y: rect.maxY
+                    )
                 )
                 tail.closeSubpath()
             }
@@ -542,17 +702,22 @@ private struct ReplyPreview: View {
                 HStack(spacing: 5) {
                     Image(systemName: "arrowshape.turn.up.left.fill")
                         .font(.system(size: 9, weight: .black))
-                    Text("ОТВЕТ")
+
+                    Text(GRUL10n.text("ОТВЕТ"))
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.8)
                 }
                 .foregroundStyle(GRUColors.accent)
 
                 if let attachment = message.attachment {
-                    Text(attachment.fileName.isEmpty ? "Вложение" : attachment.fileName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Text(
+                        attachment.fileName.isEmpty
+                            ? GRUL10n.text("Вложение")
+                            : attachment.fileName
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 } else {
                     Text(message.text)
                         .font(.caption)
@@ -563,7 +728,10 @@ private struct ReplyPreview: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(GRUColors.accent.opacity(0.14), lineWidth: 1)
