@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -52,49 +53,93 @@ public class HealthController {
     /**
      * Release readiness check. MongoDB is required for normal messenger operation,
      * but a broken database must not make the endpoint hang for 30+ seconds.
+     *
+     * databaseReason is deliberately coarse and never exposes credentials, hosts,
+     * URIs or raw exception messages.
      */
     @GetMapping("/ready")
     public ResponseEntity<Map<String, Object>> ready() {
-        Future<Boolean> ping = readinessExecutor.submit(databasePing());
+        Future<DatabaseProbe> ping = readinessExecutor.submit(databasePing());
 
-        boolean databaseReady;
-        String detail;
+        DatabaseProbe probe;
 
         try {
-            databaseReady = ping.get(DATABASE_READY_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-            detail = databaseReady ? "ok" : "unavailable";
+            probe = ping.get(DATABASE_READY_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException error) {
             ping.cancel(true);
-            databaseReady = false;
-            detail = "timeout";
+            probe = DatabaseProbe.failed("timeout");
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             ping.cancel(true);
-            databaseReady = false;
-            detail = "interrupted";
+            probe = DatabaseProbe.failed("interrupted");
         } catch (ExecutionException error) {
-            databaseReady = false;
-            detail = "unavailable";
+            probe = DatabaseProbe.failed(classifyDatabaseError(error.getCause()));
         }
 
         Map<String, Object> response = baseResponse();
-        response.put("status", databaseReady ? "ok" : "degraded");
-        response.put("database", detail);
+        response.put("status", probe.ready() ? "ok" : "degraded");
+        response.put("database", probe.ready() ? "ok" : "unavailable");
+        response.put("databaseReason", probe.reason());
 
         return ResponseEntity
-                .status(databaseReady ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
+                .status(probe.ready() ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
                 .body(response);
     }
 
-    private Callable<Boolean> databasePing() {
+    private Callable<DatabaseProbe> databasePing() {
         return () -> {
             try {
                 mongoTemplate.getDb().runCommand(new Document("ping", 1));
-                return true;
+                return DatabaseProbe.ready();
             } catch (RuntimeException error) {
-                return false;
+                return DatabaseProbe.failed(classifyDatabaseError(error));
             }
         };
+    }
+
+    private String classifyDatabaseError(Throwable error) {
+        Throwable current = error;
+
+        while (current != null) {
+            String className = current.getClass().getName().toLowerCase(Locale.ROOT);
+            String message = current.getMessage() == null
+                    ? ""
+                    : current.getMessage().toLowerCase(Locale.ROOT);
+
+            if (message.contains("authentication failed")
+                    || message.contains("bad auth")
+                    || message.contains("auth failed")
+                    || message.contains("code 8000")
+                    || className.contains("mongosecurityexception")) {
+                return "auth_failed";
+            }
+
+            if (className.contains("unknownhostexception")
+                    || message.contains("unknown host")
+                    || message.contains("querysrv")
+                    || message.contains("srv lookup")
+                    || message.contains("dns")) {
+                return "dns";
+            }
+
+            if (className.contains("timeout")
+                    || message.contains("timed out")
+                    || message.contains("timeout")) {
+                return "timeout";
+            }
+
+            if (className.contains("mongosocket")
+                    || className.contains("connectexception")
+                    || message.contains("connection refused")
+                    || message.contains("connection reset")
+                    || message.contains("network is unreachable")) {
+                return "network";
+            }
+
+            current = current.getCause();
+        }
+
+        return "unknown";
     }
 
     private Map<String, Object> baseResponse() {
@@ -103,6 +148,16 @@ public class HealthController {
         response.put("application", GruApplicationName.VALUE);
         response.put("port", port);
         return response;
+    }
+
+    private record DatabaseProbe(boolean ready, String reason) {
+        private static DatabaseProbe ready() {
+            return new DatabaseProbe(true, "ok");
+        }
+
+        private static DatabaseProbe failed(String reason) {
+            return new DatabaseProbe(false, reason);
+        }
     }
 
     private static final class DaemonThreadFactory implements ThreadFactory {
