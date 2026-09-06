@@ -36,6 +36,16 @@ final class ChatViewModel {
   var actionError: String?
   var chatWasDeleted = false
   private var hasLoadedMessages = false
+
+  // **MARK: - Durable Offline Outbox**
+  private var outboxRecoveryTask: Task<Void, Never>?
+
+  var queuedMessageCount: Int {
+    chat.messages.filter {
+      $0.serverID == nil && $0.isQueuedForRetry
+    }.count
+  }
+
   // **MARK: - Realtime Message**
   private var realtimeListenerID: UUID?
   private var realtimeChatID: String?
@@ -63,6 +73,7 @@ final class ChatViewModel {
   func loadMessages() async {
     startRealtimeIfNeeded()
     startTypingRealtimeIfNeeded()
+    startOutboxRecoveryIfNeeded()
     guard !hasLoadedMessages else {
       return
     }
@@ -110,6 +121,7 @@ final class ChatViewModel {
         chat
       )
       hasLoadedMessages = true
+      recoverQueuedMessagesIfPossible()
       refreshSearch()
       print(
         "✅ Chat messages loaded:",
@@ -298,6 +310,12 @@ final class ChatViewModel {
       nil
     isOtherUserTyping =
       false
+
+    outboxRecoveryTask?
+      .cancel()
+    outboxRecoveryTask =
+      nil
+
     if let chatID =
       realtimeChatID,
       let listenerID =
@@ -947,6 +965,144 @@ final class ChatViewModel {
     }
     return service.currentUser.id
   }
+  // **MARK: - Durable Offline Outbox**
+
+  private func startOutboxRecoveryIfNeeded() {
+    guard outboxRecoveryTask == nil else {
+      return
+    }
+
+    outboxRecoveryTask = Task {
+      [weak self] in
+
+      while !Task.isCancelled {
+        guard let self else {
+          return
+        }
+
+        self.recoverQueuedMessagesIfPossible()
+
+        do {
+          try await Task.sleep(
+            nanoseconds:
+              2_000_000_000
+          )
+        } catch {
+          return
+        }
+      }
+    }
+  }
+
+  private func isConnectivityDefinitelyUnavailable() -> Bool {
+    let center =
+      GRUConnectivityCenter.shared
+
+    if !center.hasNetwork {
+      return true
+    }
+
+    switch center.backendState {
+    case .offline, .degraded:
+      return true
+    case .checking, .online:
+      return false
+    }
+  }
+
+  /// Queues only when we know BEFORE the request that transport/backend
+  /// is unavailable. We intentionally do not auto-queue ambiguous
+  /// mid-flight failures because retrying them without a server
+  /// idempotency key could duplicate a message.
+  @discardableResult
+  private func queueMessageIfConnectivityUnavailable(
+    messageID: UUID
+  ) -> Bool {
+    guard isConnectivityDefinitelyUnavailable()
+    else {
+      return false
+    }
+
+    guard
+      let index =
+        chat.messages.firstIndex(
+          where: {
+            $0.id == messageID
+          }
+        )
+    else {
+      return true
+    }
+
+    chat.messages[index].status =
+      .sending
+
+    chat.messages[index].isQueuedForRetry =
+      true
+
+    service.update(
+      chat
+    )
+
+    print(
+      "📥 OUTBOX QUEUED:",
+      messageID.uuidString
+    )
+
+    return true
+  }
+
+  private func recoverQueuedMessagesIfPossible() {
+    let center =
+      GRUConnectivityCenter.shared
+
+    guard center.hasNetwork
+    else {
+      return
+    }
+
+    guard case .online =
+      center.backendState
+    else {
+      return
+    }
+
+    guard
+      TokenStorage.shared.token != nil,
+      chat.serverID != nil
+    else {
+      return
+    }
+
+    let queued =
+      chat.messages
+        .filter {
+          $0.serverID == nil &&
+          $0.isQueuedForRetry
+        }
+        .sorted {
+          $0.sentAt < $1.sentAt
+        }
+
+    guard !queued.isEmpty
+    else {
+      return
+    }
+
+    print(
+      "📤 OUTBOX RECOVERY:",
+      queued.count
+    )
+
+    // A small batch prevents a reconnect burst from uploading an
+    // unlimited amount of media at once.
+    for message in queued.prefix(4) {
+      retryMessage(
+        message
+      )
+    }
+  }
+
   // **MARK: - Send Message**
   func sendMessage() {
     if editingMessage != nil {
@@ -1055,6 +1211,13 @@ final class ChatViewModel {
       return
     }
     Task {
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
+      return
+    }
+
       do {
         let serverMessage =
           try await MessageAPIService.shared
@@ -1329,7 +1492,8 @@ final class ChatViewModel {
     _ message: Message
   ) {
     guard
-      message.status == .failed
+      message.status == .failed ||
+      message.isQueuedForRetry
     else {
       return
     }
@@ -1411,10 +1575,21 @@ final class ChatViewModel {
       return
     }
     stopOwnTyping()
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        message.id
+    ) {
+      return
+    }
+
     chat.messages[
       index
     ].status =
       .sending
+    chat.messages[
+      index
+    ].isQueuedForRetry =
+      false
     service.update(
       chat
     )
@@ -1500,13 +1675,25 @@ final class ChatViewModel {
       return
     }
 
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        message.id
+    ) {
+      return
+    }
+
     let replyToServerID =
+
       message.replyTo?.serverID
 
     chat.messages[
       index
     ].status =
       .sending
+    chat.messages[
+      index
+    ].isQueuedForRetry =
+      false
 
     service.update(
       chat
@@ -1576,6 +1763,15 @@ final class ChatViewModel {
     }
 
     chat.messages[index].status = .sending
+
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        message.id
+    ) {
+      return
+    }
+
+    chat.messages[index].isQueuedForRetry = false
     service.update(chat)
 
     let localMessageID = message.id
@@ -1643,13 +1839,25 @@ final class ChatViewModel {
       return
     }
 
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        message.id
+    ) {
+      return
+    }
+
     let replyToServerID =
+
       message.replyTo?.serverID
 
     chat.messages[
       index
     ].status =
       .sending
+    chat.messages[
+      index
+    ].isQueuedForRetry =
+      false
 
     service.update(
       chat
@@ -1733,7 +1941,16 @@ final class ChatViewModel {
     }
 
     let replyToServerID = message.replyTo?.serverID
+
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        message.id
+    ) {
+      return
+    }
+
     chat.messages[index].status = .sending
+    chat.messages[index].isQueuedForRetry = false
     service.update(chat)
     let localMessageID = message.id
 
@@ -1839,6 +2056,13 @@ final class ChatViewModel {
 
     guard let token = TokenStorage.shared.token else {
       updateMessageStatus(messageID: localMessage.id, status: .failed)
+      return
+    }
+
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
       return
     }
 
@@ -2014,6 +2238,13 @@ final class ChatViewModel {
     }
 
     print("")
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
+      return
+    }
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("🖼 PHOTO UPLOAD")
     print(
@@ -2141,6 +2372,13 @@ final class ChatViewModel {
     }
 
     print("")
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
+      return
+    }
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("🎬 VIDEO UPLOAD")
     print("📎 file:", fileName)
@@ -2314,6 +2552,13 @@ final class ChatViewModel {
     }
 
     print("")
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
+      return
+    }
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("🐱 VIDEO MESSAGE UPLOAD")
     print(
@@ -2447,6 +2692,13 @@ final class ChatViewModel {
     }
 
     print("")
+    if queueMessageIfConnectivityUnavailable(
+      messageID:
+        localMessage.id
+    ) {
+      return
+    }
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("🎙️ VOICE AUDIO UPLOAD")
     print("📎 file:", fileName)

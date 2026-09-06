@@ -259,9 +259,20 @@ struct MessageBubble: View {
     private var statusView: some View {
         switch message.status {
         case .sending:
-            Image(systemName: "clock")
-                .font(.system(size: 10, weight: .medium))
+            if message.isQueuedForRetry {
+                HStack(spacing: 3) {
+                    Image(systemName: "clock.arrow.circlepath")
+                    Text("очередь")
+                }
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
+                .accessibilityLabel("Сообщение в очереди на отправку")
+            } else {
+                Image(systemName: "clock")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Сообщение отправляется")
+            }
         case .sent:
             Text("✓")
                 .font(.system(size: 11, weight: .semibold))

@@ -36,6 +36,11 @@ struct Message: Identifiable, Codable {
 
     var editedAt: Date?
 
+    /// True only when the client deliberately did NOT start an HTTP upload
+    /// because network/backend readiness was already known to be unavailable.
+    /// This state is persisted in chat cache and is safe to auto-retry.
+    var isQueuedForRetry: Bool = false
+
     // MARK: - Reply
 
     private var replyReference: MessageReference?
@@ -72,6 +77,7 @@ struct Message: Identifiable, Codable {
         reaction: ReactionType? = nil,
         isEdited: Bool = false,
         editedAt: Date? = nil,
+        isQueuedForRetry: Bool = false,
         replyTo: Message? = nil,
         attachment: Attachment? = nil
     ) {
@@ -87,6 +93,7 @@ struct Message: Identifiable, Codable {
         self.reaction = reaction
         self.isEdited = isEdited
         self.editedAt = editedAt
+        self.isQueuedForRetry = isQueuedForRetry
         self.replyReference =
             replyTo.map {
                 MessageReference($0)
@@ -109,6 +116,7 @@ struct Message: Identifiable, Codable {
         case reaction
         case isEdited
         case editedAt
+        case isQueuedForRetry
         case replyTo
         case attachment
     }
@@ -172,6 +180,10 @@ struct Message: Identifiable, Codable {
 
         isEdited = try container.decodeIfPresent(Bool.self, forKey: .isEdited) ?? false
         editedAt = try container.decodeIfPresent(Date.self, forKey: .editedAt)
+        isQueuedForRetry = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .isQueuedForRetry
+        ) ?? false
         reaction =
             try container.decodeIfPresent(
                 ReactionType.self,
@@ -250,6 +262,7 @@ struct Message: Identifiable, Codable {
 
         try container.encode(isEdited, forKey: .isEdited)
         try container.encodeIfPresent(editedAt, forKey: .editedAt)
+        try container.encode(isQueuedForRetry, forKey: .isQueuedForRetry)
         try container.encodeIfPresent(
             reaction,
             forKey: .reaction
@@ -302,6 +315,10 @@ struct Message: Identifiable, Codable {
 
         editedAt =
             serverMessage.editedAt
+
+        // A server DTO is authoritative proof that this local message
+        // left the outbox successfully.
+        isQueuedForRetry = false
 
         if var serverAttachment =
             serverMessage.attachment {
