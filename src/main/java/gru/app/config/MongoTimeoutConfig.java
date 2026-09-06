@@ -9,9 +9,9 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class MongoTimeoutConfig {
 
-    private static final long SERVER_SELECTION_TIMEOUT_SECONDS = 5L;
-    private static final long CONNECT_TIMEOUT_SECONDS = 5L;
-    private static final long READ_TIMEOUT_SECONDS = 10L;
+    private static final int SERVER_SELECTION_TIMEOUT_SECONDS = 5;
+    private static final int CONNECT_TIMEOUT_SECONDS = 5;
+    private static final int READ_TIMEOUT_SECONDS = 10;
 
     @Bean
     MongoClientSettingsBuilderCustomizer gruMongoTimeouts() {
