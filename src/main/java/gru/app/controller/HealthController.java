@@ -38,10 +38,6 @@ public class HealthController {
         this.readinessExecutor = Executors.newSingleThreadExecutor(new DaemonThreadFactory());
     }
 
-    /**
-     * Render and external uptime checks must never wait for MongoDB.
-     * If Spring can serve this route, the process is alive and HTTP routing works.
-     */
     @GetMapping("/health")
     public Map<String, Object> health() {
         Map<String, Object> response = baseResponse();
@@ -50,13 +46,6 @@ public class HealthController {
         return response;
     }
 
-    /**
-     * Release readiness check. MongoDB is required for normal messenger operation,
-     * but a broken database must not make the endpoint hang for 30+ seconds.
-     *
-     * databaseReason is deliberately coarse and never exposes credentials, hosts,
-     * URIs or raw exception messages.
-     */
     @GetMapping("/ready")
     public ResponseEntity<Map<String, Object>> ready() {
         Future<DatabaseProbe> ping = readinessExecutor.submit(databasePing());
@@ -90,7 +79,7 @@ public class HealthController {
         return () -> {
             try {
                 mongoTemplate.getDb().runCommand(new Document("ping", 1));
-                return DatabaseProbe.ready();
+                return DatabaseProbe.success();
             } catch (RuntimeException error) {
                 return DatabaseProbe.failed(classifyDatabaseError(error));
             }
@@ -151,7 +140,7 @@ public class HealthController {
     }
 
     private record DatabaseProbe(boolean ready, String reason) {
-        private static DatabaseProbe ready() {
+        private static DatabaseProbe success() {
             return new DatabaseProbe(true, "ok");
         }
 
