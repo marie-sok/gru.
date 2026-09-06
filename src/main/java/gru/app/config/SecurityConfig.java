@@ -39,6 +39,8 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/privacy",
                                 "/support",
+                                "/health",
+                                "/ready",
                                 "/actuator/health"
                         ).permitAll()
 
