@@ -15,18 +15,24 @@ struct MainView: View {
             selectedContent
         }
         .overlay(alignment: .top) {
-            GRUConnectionBanner(
-                center: connectivity,
-                onOpenDiagnostics: {
-                    showConnectivityDiagnostics = true
-                }
-            )
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-            .animation(
-                .easeInOut(duration: 0.20),
-                value: connectivity.bannerTitle
-            )
+            if !isChatPresented && !isAgentPresented {
+                GRUConnectionBanner(
+                    center: connectivity,
+                    onOpenDiagnostics: {
+                        showConnectivityDiagnostics = true
+                    }
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .transition(
+                    .move(edge: .top)
+                        .combined(with: .opacity)
+                )
+                .animation(
+                    .easeInOut(duration: 0.20),
+                    value: connectivity.bannerTitle
+                )
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !isChatPresented && !isAgentPresented {

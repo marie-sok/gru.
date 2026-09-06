@@ -290,6 +290,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "gru. connects to your development server on the local network.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "gru. uses the microphone for voice messages and video notes.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. расшифровывает голосовые сообщения в текст только по твоему запросу.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "gru. can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "gru. lets you choose avatars, photos and videos to send.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -334,6 +335,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "gru. connects to your development server on the local network.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "gru. uses the microphone for voice messages and video notes.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. расшифровывает голосовые сообщения в текст только по твоему запросу.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "gru. can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "gru. lets you choose avatars, photos and videos to send.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

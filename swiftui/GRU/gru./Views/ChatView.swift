@@ -185,6 +185,11 @@ struct ChatView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .background {
+            GRUSwipeBackEnabler()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .task {
             await vm.loadMessages()
         }
