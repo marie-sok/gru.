@@ -28,8 +28,7 @@ struct LoginView: View {
                         placeholder: "Phone",
                         text: $viewModel.phone,
                         isSecure: false,
-                        keyboardType: .phonePad,
-                        suppressCredentialAutofill: true
+                        keyboardType: .phonePad
                     )
                     .frame(height: 52)
                     .padding(.horizontal, 14)
@@ -40,8 +39,7 @@ struct LoginView: View {
                         placeholder: "Password",
                         text: $viewModel.password,
                         isSecure: true,
-                        keyboardType: .default,
-                        suppressCredentialAutofill: true
+                        keyboardType: .default
                     )
                     .frame(height: 52)
                     .padding(.horizontal, 14)
@@ -53,8 +51,7 @@ struct LoginView: View {
                             placeholder: "Nickname",
                             text: $viewModel.nickname,
                             isSecure: false,
-                            keyboardType: .default,
-                            suppressCredentialAutofill: false
+                            keyboardType: .default
                         )
                         .frame(height: 52)
                         .padding(.horizontal, 14)
@@ -112,16 +109,12 @@ struct LoginView: View {
             .padding(.horizontal, 24)
         }
         .onAppear {
-            // Always open auth with a clean, unfocused form and never restore
-            // stale credential suggestions into the visible fields.
             viewModel.phone = ""
             viewModel.password = ""
             viewModel.nickname = ""
 
             dismissKeyboard()
 
-            // iOS can restore a responder one run-loop later while rebuilding
-            // the screen. Resign once more after that restoration window.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
                 dismissKeyboard()
             }
@@ -141,16 +134,15 @@ struct LoginView: View {
     }
 }
 
-/// UIKit-backed field used only on the auth screen.
-/// It deliberately avoids the username/password content types that trigger
-/// Password AutoFill. `.oneTimeCode` keeps saved-login credentials out of
-/// these fields while preserving normal manual typing and secure entry.
+/// UIKit-backed auth field that deliberately opts out of semantic credential
+/// content types. iOS may still render its own QuickType/password UI after an
+/// explicit tap, but the app itself never requests username/password/OTP
+/// AutoFill and never becomes first responder programmatically.
 private struct GRUNoCredentialTextField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
     let isSecure: Bool
     let keyboardType: UIKeyboardType
-    let suppressCredentialAutofill: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -183,12 +175,8 @@ private struct GRUNoCredentialTextField: UIViewRepresentable {
         textField.smartQuotesType = .no
         textField.smartInsertDeleteType = .no
 
-        if suppressCredentialAutofill {
-            textField.textContentType = .oneTimeCode
-            textField.passwordRules = nil
-        } else {
-            textField.textContentType = nil
-        }
+        textField.textContentType = nil
+        textField.passwordRules = nil
 
         textField.attributedPlaceholder = NSAttributedString(
             string: placeholder,
@@ -197,8 +185,6 @@ private struct GRUNoCredentialTextField: UIViewRepresentable {
             ]
         )
 
-        // Never call becomeFirstResponder here. The keyboard must appear only
-        // after an explicit user tap.
         return textField
     }
 
@@ -209,12 +195,8 @@ private struct GRUNoCredentialTextField: UIViewRepresentable {
 
         uiView.isSecureTextEntry = isSecure
         uiView.keyboardType = keyboardType
-
-        if suppressCredentialAutofill {
-            uiView.textContentType = .oneTimeCode
-        } else {
-            uiView.textContentType = nil
-        }
+        uiView.textContentType = nil
+        uiView.passwordRules = nil
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
