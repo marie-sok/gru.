@@ -32,16 +32,17 @@ struct ContactsView: View {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 16) {
                         GRUAgentCard()
-                        peoplePulse
                         searchField
 
                         if isSearchingGRU {
                             HStack(spacing: 10) {
                                 ProgressView()
                                     .tint(currentTheme.accent)
-                                Text("Ищем людей в gru.…")
+
+                                Text(GRUL10n.text("Ищем людей в gru.…"))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
+
                                 Spacer()
                             }
                             .padding(.horizontal, 4)
@@ -79,13 +80,13 @@ struct ContactsView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Люди")
+            .navigationTitle(GRUL10n.text("Люди"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     GRUNeonIconButton(
                         systemName: "envelope.badge.fill",
-                        accessibilityLabel: "Новый чат",
+                        accessibilityLabel: GRUL10n.text("Новый чат"),
                         size: 38,
                         iconSize: 15
                     ) {
@@ -113,122 +114,23 @@ struct ContactsView: View {
 }
 
 private extension ContactsView {
-    var peoplePulse: some View {
-        ZStack(alignment: .bottom) {
-            GRUSignatureWallpaper(
-                theme: currentTheme,
-                intensity: 0.80,
-                animated: true
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.08),
-                    Color.black.opacity(0.68)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 13) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("PEOPLE PULSE")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundStyle(currentTheme.accent)
-
-                        Text("Твои люди в gru.")
-                            .font(.system(size: 21, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
-
-                    Spacer()
-
-                    ZStack {
-                        Circle()
-                            .fill(currentTheme.accent.opacity(0.18))
-                            .frame(width: 46, height: 46)
-
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundStyle(currentTheme.accent)
-                    }
-                    .overlay {
-                        Circle()
-                            .stroke(currentTheme.accent.opacity(0.42), lineWidth: 1)
-                    }
-                    .shadow(color: currentTheme.accent.opacity(0.28), radius: 11)
-                }
-
-                HStack(spacing: 8) {
-                    pulseMetric(
-                        value: "\(allGRUContacts.count)",
-                        label: "в gru.",
-                        icon: "person.2.fill"
-                    )
-
-                    pulseMetric(
-                        value: "\(onlineGRUCount)",
-                        label: "online",
-                        icon: "bolt.fill"
-                    )
-
-                    pulseMetric(
-                        value: phoneMetricValue,
-                        label: "iPhone",
-                        icon: "iphone"
-                    )
-                }
-            }
-            .padding(15)
-        }
-        .frame(height: 190)
-        .clipShape(RoundedRectangle(cornerRadius: 27, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 27, style: .continuous)
-                .stroke(currentTheme.accent.opacity(0.28), lineWidth: 1)
-        }
-        .shadow(color: currentTheme.accent.opacity(0.16), radius: 20, y: 10)
-    }
-
-    func pulseMetric(value: String, label: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundStyle(currentTheme.accent)
-
-                Text(value)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-
-            Text(label.uppercased())
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.48))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        }
-    }
-
     var searchField: some View {
         HStack(spacing: 10) {
             GRUNeonIcon(
-                systemName: searchFocused ? "sparkle.magnifyingglass" : "magnifyingglass",
+                systemName: searchFocused
+                    ? "sparkle.magnifyingglass"
+                    : "magnifyingglass",
                 size: 36,
                 iconSize: 14
             )
 
-            TextField("Имя, никнейм или номер", text: $vm.searchText)
-                .textFieldStyle(.plain)
-                .focused($searchFocused)
-                .submitLabel(.search)
+            TextField(
+                GRUL10n.text("Имя, никнейм или номер"),
+                text: $vm.searchText
+            )
+            .textFieldStyle(.plain)
+            .focused($searchFocused)
+            .submitLabel(.search)
 
             if !vm.searchText.isEmpty {
                 Button {
@@ -241,12 +143,15 @@ private extension ContactsView {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Очистить поиск")
+                .accessibilityLabel(GRUL10n.text("Очистить поиск"))
             }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 21, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 21, style: .continuous)
                 .stroke(
@@ -255,20 +160,27 @@ private extension ContactsView {
                 )
         }
         .shadow(
-            color: searchFocused ? currentTheme.accent.opacity(0.20) : .clear,
+            color: searchFocused
+                ? currentTheme.accent.opacity(0.20)
+                : .clear,
             radius: 13
         )
         .animation(.easeOut(duration: 0.18), value: searchFocused)
     }
 
-    func sectionHeader(_ title: String, subtitle: String, icon: String) -> some View {
+    func sectionHeader(
+        _ title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
         HStack(spacing: 10) {
             GRUNeonIcon(systemName: icon, size: 34, iconSize: 13)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(GRUL10n.text(title))
                     .font(.headline)
-                Text(subtitle)
+
+                Text(GRUL10n.text(subtitle))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -286,14 +198,6 @@ private extension ContactsView {
                 } label: {
                     HStack(spacing: 12) {
                         AvatarView(user: user, size: 50)
-                            .overlay {
-                                Circle()
-                                    .stroke(currentTheme.accent.opacity(0.16), lineWidth: 1)
-                            }
-                            .shadow(
-                                color: user.isOnline ? currentTheme.accent.opacity(0.18) : .clear,
-                                radius: 9
-                            )
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(user.displayName)
@@ -301,10 +205,12 @@ private extension ContactsView {
                                 .foregroundStyle(GRUColors.text)
                                 .lineLimit(1)
 
-                            Text("@\(user.username)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            if !user.username.isEmpty {
+                                Text("@\(user.username)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
 
                         Spacer(minLength: 4)
@@ -318,17 +224,33 @@ private extension ContactsView {
                         )
                     }
                     .padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                    )
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(
-                                user.isOnline ? currentTheme.accent.opacity(0.18) : Color.white.opacity(0.045),
-                                lineWidth: 1
-                            )
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(
+                            user.isOnline
+                                ? currentTheme.accent.opacity(0.16)
+                                : Color.white.opacity(0.045),
+                            lineWidth: 1
+                        )
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Открыть чат с \(user.displayName)")
+                .accessibilityLabel(
+                    GRUL10n.format(
+                        "Открыть чат с %@",
+                        user.displayName
+                    )
+                )
             }
         }
     }
@@ -336,18 +258,29 @@ private extension ContactsView {
     func presencePill(_ online: Bool) -> some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(online ? currentTheme.accent : Color.secondary.opacity(0.55))
+                .fill(
+                    online
+                        ? currentTheme.accent
+                        : Color.secondary.opacity(0.55)
+                )
                 .frame(width: 6, height: 6)
-                .shadow(color: online ? currentTheme.accent.opacity(0.8) : .clear, radius: 5)
+                .shadow(
+                    color: online
+                        ? currentTheme.accent.opacity(0.8)
+                        : .clear,
+                    radius: 5
+                )
 
-            Text(online ? "online" : "offline")
+            Text(GRUL10n.text(online ? "online" : "offline"))
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(online ? currentTheme.accent : .secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
-            (online ? currentTheme.accent.opacity(0.09) : Color.white.opacity(0.035)),
+            online
+                ? currentTheme.accent.opacity(0.09)
+                : Color.white.opacity(0.035),
             in: Capsule()
         )
     }
@@ -374,14 +307,24 @@ private extension ContactsView {
                                 )
 
                             Text(String(user.nickname.prefix(1)).uppercased())
-                                .font(.system(size: 17, weight: .black, design: .rounded))
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight: .black,
+                                        design: .rounded
+                                    )
+                                )
                                 .foregroundStyle(.white)
                         }
                         .frame(width: 50, height: 50)
                         .overlay {
-                            Circle().stroke(GRUColors.neonGradient, lineWidth: 1.2)
+                            Circle()
+                                .stroke(GRUColors.neonGradient, lineWidth: 1.2)
                         }
-                        .shadow(color: currentTheme.accent.opacity(0.22), radius: 9)
+                        .shadow(
+                            color: currentTheme.accent.opacity(0.22),
+                            radius: 9
+                        )
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(user.nickname)
@@ -392,7 +335,8 @@ private extension ContactsView {
                             HStack(spacing: 5) {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(.system(size: 9, weight: .bold))
-                                Text("в gru.")
+
+                                Text(GRUL10n.text("в gru."))
                                     .font(.caption2.weight(.bold))
                             }
                             .foregroundStyle(currentTheme.accent)
@@ -413,15 +357,29 @@ private extension ContactsView {
                         }
                     }
                     .padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                    )
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(currentTheme.accent.opacity(0.13), lineWidth: 1)
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(currentTheme.accent.opacity(0.13), lineWidth: 1)
                     }
                 }
                 .buttonStyle(.plain)
                 .disabled(creatingUserID != nil)
-                .accessibilityLabel("Начать чат с \(user.nickname)")
+                .accessibilityLabel(
+                    GRUL10n.format(
+                        "Начать чат с %@",
+                        user.nickname
+                    )
+                )
             }
         }
     }
@@ -433,12 +391,17 @@ private extension ContactsView {
             HStack(spacing: 12) {
                 ProgressView()
                     .tint(currentTheme.accent)
-                Text("Загружаем контакты iPhone…")
+
+                Text(GRUL10n.text("Загружаем контакты iPhone…"))
                     .foregroundStyle(.secondary)
+
                 Spacer()
             }
             .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
 
         case .denied:
             VStack(alignment: .leading, spacing: 12) {
@@ -448,16 +411,23 @@ private extension ContactsView {
                         size: 38,
                         iconSize: 15
                     )
-                    Text("Доступ к контактам выключен")
+
+                    Text(GRUL10n.text("Доступ к контактам выключен"))
                         .font(.headline)
                 }
 
-                Text("Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(
+                    GRUL10n.text(
+                        "Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-                Button("Открыть Настройки") {
-                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                Button(GRUL10n.text("Открыть Настройки")) {
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                        return
+                    }
                     openURL(url)
                 }
                 .buttonStyle(.borderedProminent)
@@ -465,7 +435,10 @@ private extension ContactsView {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(currentTheme.accent.opacity(0.14), lineWidth: 1)
@@ -473,12 +446,21 @@ private extension ContactsView {
 
         case .granted:
             if vm.filteredPhoneContacts.isEmpty {
-                Text(vm.searchText.isEmpty ? "В телефонной книге нет контактов с номером." : "Ничего не найдено.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                Text(
+                    GRUL10n.text(
+                        vm.searchText.isEmpty
+                            ? "В телефонной книге нет контактов с номером."
+                            : "Ничего не найдено."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(vm.filteredPhoneContacts) { contact in
@@ -512,35 +494,21 @@ private extension ContactsView {
         }
     }
 
-    var onlineGRUCount: Int {
-        allGRUContacts.filter(\.isOnline).count
-    }
-
-    var phoneMetricValue: String {
-        switch vm.accessState {
-        case .granted:
-            return "\(vm.filteredPhoneContacts.count)"
-        case .denied:
-            return "OFF"
-        case .unknown, .loading:
-            return "…"
-        }
-    }
-
     func phoneContactRow(_ contact: PhoneContact) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(currentTheme.accent.opacity(0.10))
+
                 Text(contact.initials.isEmpty ? "?" : contact.initials)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(currentTheme.accent)
             }
             .frame(width: 46, height: 46)
             .overlay {
-                Circle().stroke(currentTheme.accent.opacity(0.22), lineWidth: 1)
+                Circle()
+                    .stroke(currentTheme.accent.opacity(0.22), lineWidth: 1)
             }
-            .shadow(color: currentTheme.accent.opacity(0.12), radius: 6)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(contact.displayName)
@@ -558,13 +526,20 @@ private extension ContactsView {
             Button {
                 invite(contact)
             } label: {
-                GRUNeonIcon(systemName: "message.fill", size: 40, iconSize: 15)
+                GRUNeonIcon(
+                    systemName: "message.fill",
+                    size: 40,
+                    iconSize: 15
+                )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Пригласить через Messages")
+            .accessibilityLabel(GRUL10n.text("Пригласить через Messages"))
         }
         .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color.white.opacity(0.045), lineWidth: 1)
@@ -634,6 +609,7 @@ private extension ContactsView {
                 selectedChat = chat
                 showSelectedChat = true
                 searchFocused = false
+
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
             } catch {
@@ -645,13 +621,17 @@ private extension ContactsView {
     }
 
     func createChat(with user: User) {
-        guard let serverID = user.serverID, !serverID.isEmpty else {
+        guard let serverID = user.serverID,
+              !serverID.isEmpty else {
             service.createChat(username: user.displayName)
             return
         }
 
         createServerChat(
-            with: UserSearchDTO(id: serverID, nickname: user.displayName)
+            with: UserSearchDTO(
+                id: serverID,
+                nickname: user.displayName
+            )
         )
     }
 }
