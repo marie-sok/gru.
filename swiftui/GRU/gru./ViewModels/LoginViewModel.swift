@@ -169,7 +169,54 @@ final class LoginViewModel {
         print(authError.localizedDescription)
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        error = authError.localizedDescription
+        error = localizedAuthError(
+            authError
+        )
+    }
+
+    private func localizedAuthError(
+        _ authError: Error
+    ) -> String {
+        let raw =
+            authError
+                .localizedDescription
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let normalized =
+            raw.lowercased()
+
+        if normalized.contains(
+            "user already exists"
+        ) {
+            return GRUL10n.text(
+                "An account with this phone number already exists."
+            )
+        }
+
+        if normalized.contains(
+            "user not found"
+        ) {
+            return GRUL10n.text(
+                "No account found for this phone number."
+            )
+        }
+
+        if normalized.contains(
+            "wrong password"
+        ) {
+            return GRUL10n.text(
+                "Incorrect password."
+            )
+        }
+
+        return raw.isEmpty
+            ? GRUL10n.text(
+                "Authentication failed."
+            )
+            : raw
     }
 
     // MARK: - Apply user
@@ -204,12 +251,21 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = GRUL10n.text("Введите номер телефона")
+            error = GRUL10n.text(
+                "Enter your phone number."
+            )
+            return false
+        }
+
+        guard isPhonePlausible else {
+            error = GRUL10n.text(
+                "Enter a valid phone number with country code."
+            )
             return false
         }
 
         guard !password.isEmpty else {
-            error = GRUL10n.text("Введите пароль")
+            error = GRUL10n.text("Enter your password.")
             return false
         }
 
@@ -220,22 +276,31 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = GRUL10n.text("Введите номер телефона")
+            error = GRUL10n.text(
+                "Enter your phone number."
+            )
+            return false
+        }
+
+        guard isPhonePlausible else {
+            error = GRUL10n.text(
+                "Enter a valid phone number with country code."
+            )
             return false
         }
 
         guard !cleanNickname.isEmpty else {
-            error = GRUL10n.text("Введите имя")
+            error = GRUL10n.text("Enter a nickname.")
             return false
         }
 
         guard !password.isEmpty else {
-            error = GRUL10n.text("Введите пароль")
+            error = GRUL10n.text("Enter your password.")
             return false
         }
 
         guard password.count >= 6 else {
-            error = GRUL10n.text("Пароль должен содержать минимум 6 символов")
+            error = GRUL10n.text("Password must contain at least 6 characters.")
             return false
         }
 
@@ -250,14 +315,28 @@ final class LoginViewModel {
         nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var phoneDigitCount: Int {
+        cleanPhone.filter {
+            $0.isNumber
+        }.count
+    }
+
+    private var isPhonePlausible: Bool {
+        (7...15).contains(
+            phoneDigitCount
+        )
+    }
+
     var canLogin: Bool {
-        !cleanPhone.isEmpty && !password.isEmpty && !loading
+        isPhonePlausible &&
+        !password.isEmpty &&
+        !loading
     }
 
     var canRegister: Bool {
-        !cleanPhone.isEmpty &&
+        isPhonePlausible &&
         !cleanNickname.isEmpty &&
-        !password.isEmpty &&
+        password.count >= 6 &&
         !loading
     }
 }
@@ -284,9 +363,16 @@ private enum LoginViewModelError: LocalizedError {
             return GRUL10n.text("Новая сессия не привязалась к текущему backend")
         case .tokenRejected(let statusCode, let message):
             if let statusCode {
-                return "Backend отклонил только что выданную сессию (HTTP \(statusCode)). \(message)"
+                return GRUL10n.format(
+                    "Backend rejected the new session (HTTP %d). %@",
+                    statusCode,
+                    message
+                )
             }
-            return "Не удалось проверить новую сессию на backend. \(message)"
+            return GRUL10n.format(
+                "Could not verify the new session on the backend. %@",
+                message
+            )
         }
     }
 }
