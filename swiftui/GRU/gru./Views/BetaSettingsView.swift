@@ -23,12 +23,12 @@ struct BetaSettingsView: View {
 
                 Section("Оформление") {
                     NavigationLink {
-                        GRUBetaThemesView()
+                        GRUThemeStudioView()
                     } label: {
                         BetaSettingsRow(
                             icon: currentTheme.icon,
-                            title: "Темы",
-                            subtitle: BetaThemeName.title(for: currentTheme)
+                            title: "Theme Studio",
+                            subtitle: "live preview • движение • accent"
                         )
                     }
                 }
