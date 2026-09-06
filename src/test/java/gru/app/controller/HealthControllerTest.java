@@ -41,6 +41,7 @@ class HealthControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("ok", response.getBody().get("status"));
         assertEquals("ok", response.getBody().get("database"));
+        assertEquals("ok", response.getBody().get("databaseReason"));
     }
 
     @Test
@@ -54,5 +55,20 @@ class HealthControllerTest {
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("degraded", response.getBody().get("status"));
         assertEquals("unavailable", response.getBody().get("database"));
+        assertEquals("unknown", response.getBody().get("databaseReason"));
+    }
+
+    @Test
+    void readinessClassifiesAuthenticationFailureWithoutLeakingExceptionText() {
+        MongoTemplate template = mock(MongoTemplate.class);
+        when(template.getDb()).thenThrow(
+                new IllegalStateException("AtlasError: bad auth : authentication failed code 8000")
+        );
+
+        ResponseEntity<Map<String, Object>> response =
+                new HealthController(template, "8081").ready();
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertEquals("auth_failed", response.getBody().get("databaseReason"));
     }
 }
