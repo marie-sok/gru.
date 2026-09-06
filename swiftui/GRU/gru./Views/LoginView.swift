@@ -112,9 +112,8 @@ struct LoginView: View {
             .padding(.horizontal, 24)
         }
         .onAppear {
-            // Login always opens with a clean, unfocused form. In particular,
-            // do not allow an old iOS Password AutoFill credential such as
-            // the previously suggested "222" account to pre-populate fields.
+            // Always open auth with a clean, unfocused form and never restore
+            // stale credential suggestions into the visible fields.
             viewModel.phone = ""
             viewModel.password = ""
             viewModel.nickname = ""
@@ -144,9 +143,8 @@ struct LoginView: View {
 
 /// UIKit-backed field used only on the auth screen.
 /// It deliberately avoids the username/password content types that trigger
-/// Password AutoFill. `.oneTimeCode` is used for credential fields because it
-/// prevents iOS from treating them as saved login/password destinations while
-/// preserving normal manual typing and secure entry.
+/// Password AutoFill. `.oneTimeCode` keeps saved-login credentials out of
+/// these fields while preserving normal manual typing and secure entry.
 private struct GRUNoCredentialTextField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
