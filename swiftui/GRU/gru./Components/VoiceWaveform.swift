@@ -65,9 +65,12 @@ struct VoiceWaveform: View {
             )
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Форма голосового сообщения")
+        .accessibilityLabel(GRUL10n.text("Форма голосового сообщения"))
         .accessibilityValue(
-            "\(Int((clampedProgress * 100).rounded())) процентов"
+            GRUL10n.format(
+                "%d процентов",
+                Int((clampedProgress * 100).rounded())
+            )
         )
     }
 
