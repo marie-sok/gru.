@@ -14,6 +14,15 @@ struct GRUIllustratedWallpaper: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
 
+    @AppStorage(GRUAppearanceSettings.animationIntensityKey)
+    private var globalAnimationIntensity = GRUAppearanceSettings.defaultAnimationIntensity
+
+    private var effectiveIntensity: Double {
+        GRUAppearanceSettings.clampedIntensity(
+            intensity * globalAnimationIntensity
+        )
+    }
+
     private var shouldAnimate: Bool {
         animated
             && !reduceMotion
@@ -47,20 +56,20 @@ struct GRUIllustratedWallpaper: View {
 
                 GRUMicroDoodleOverlay(
                     theme: theme,
-                    intensity: min(max(intensity, 0), 1) * 0.82,
+                    intensity: effectiveIntensity * 0.82,
                     animated: shouldAnimate
                 )
 
                 if shouldAnimate {
                     if theme == .powderPrincess {
                         GRUPowderPrincessDetailOverlay(
-                            intensity: intensity,
+                            intensity: effectiveIntensity,
                             animated: true
                         )
                     } else {
                         GRUApprovedThemeOverlay(
                             theme: theme,
-                            intensity: intensity,
+                            intensity: effectiveIntensity,
                             animated: true
                         )
                     }
