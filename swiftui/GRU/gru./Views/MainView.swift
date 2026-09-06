@@ -1,15 +1,32 @@
 import SwiftUI
 
+@MainActor
 struct MainView: View {
     @State private var selectedTab: AppTab = .chats
     @State private var isChatPresented = false
     @State private var isAgentPresented = false
     @State private var showBotTestLab = false
+    @State private var showConnectivityDiagnostics = false
+    @StateObject private var connectivity = GRUConnectivityCenter.shared
 
     var body: some View {
         ZStack {
             GRUAppBackdrop()
             selectedContent
+        }
+        .overlay(alignment: .top) {
+            GRUConnectionBanner(
+                center: connectivity,
+                onOpenDiagnostics: {
+                    showConnectivityDiagnostics = true
+                }
+            )
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .animation(
+                .easeInOut(duration: 0.20),
+                value: connectivity.bannerTitle
+            )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !isChatPresented && !isAgentPresented {
@@ -19,6 +36,9 @@ struct MainView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .onAppear {
+            connectivity.start()
+        }
         .sheet(isPresented: $showBotTestLab) {
             NavigationStack {
                 GRUBetaTestChatView()
@@ -26,6 +46,18 @@ struct MainView: View {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Готово") {
                                 showBotTestLab = false
+                            }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showConnectivityDiagnostics) {
+            NavigationStack {
+                GRUConnectivityDiagnosticsView(center: connectivity)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Готово") {
+                                showConnectivityDiagnostics = false
                             }
                         }
                     }
