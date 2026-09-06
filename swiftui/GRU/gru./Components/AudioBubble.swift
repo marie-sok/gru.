@@ -14,7 +14,7 @@ struct AudioBubble: View {
     @State private var audioSessionTask: Task<Void, Never>?
 
     @State private var showTranscript = false
-    @State private var transcript: String?
+    @State private var transcript: GRUVoiceTranscript?
     @State private var transcriptionError: String?
     @State private var isTranscribing = false
     @State private var transcriptionTask: Task<Void, Never>?
@@ -31,8 +31,7 @@ struct AudioBubble: View {
                             .frame(width: 42, height: 42)
 
                         if isLoading {
-                            ProgressView()
-                                .tint(.white)
+                            ProgressView().tint(.white)
                         } else {
                             Image(
                                 systemName:
@@ -48,9 +47,11 @@ struct AudioBubble: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    isPlaying
-                    ? "Пауза"
-                    : "Воспроизвести голосовое"
+                    GRUL10n.text(
+                        isPlaying
+                        ? "Пауза"
+                        : "Воспроизвести голосовое"
+                    )
                 )
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -85,19 +86,24 @@ struct AudioBubble: View {
                                         .controlSize(.mini)
                                         .tint(GRUColors.accent)
                                 } else {
-                                    Image(systemName: "text.bubble")
-                                        .font(
-                                            .system(
-                                                size: 10,
-                                                weight: .bold
-                                            )
+                                    Image(
+                                        systemName:
+                                            "captions.bubble.fill"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 10,
+                                            weight: .bold
                                         )
+                                    )
                                 }
 
                                 Text(
-                                    showTranscript
-                                    ? "Скрыть"
-                                    : "Текст"
+                                    GRUL10n.text(
+                                        showTranscript
+                                        ? "Скрыть"
+                                        : "Текст"
+                                    )
                                 )
                                 .font(
                                     .system(
@@ -106,10 +112,23 @@ struct AudioBubble: View {
                                         design: .rounded
                                     )
                                 )
+
+                                if let transcript,
+                                   !showTranscript
+                                {
+                                    Text(transcript.language.badge)
+                                        .font(
+                                            .system(
+                                                size: 8,
+                                                weight: .black,
+                                                design: .rounded
+                                            )
+                                        )
+                                }
                             }
                             .foregroundStyle(GRUColors.accent)
                             .padding(.horizontal, 7)
-                            .frame(height: 24)
+                            .frame(height: 25)
                             .background(
                                 GRUColors.accent.opacity(0.10),
                                 in: Capsule()
@@ -118,9 +137,11 @@ struct AudioBubble: View {
                         .buttonStyle(.plain)
                         .disabled(isLoading)
                         .accessibilityLabel(
-                            showTranscript
-                            ? "Скрыть расшифровку"
-                            : "Расшифровать голосовое в текст"
+                            GRUL10n.text(
+                                showTranscript
+                                ? "Скрыть расшифровку"
+                                : "Расшифровать голосовое в текст"
+                            )
                         )
                     }
                 }
@@ -129,14 +150,15 @@ struct AudioBubble: View {
             if showTranscript {
                 transcriptContent
                     .transition(
-                        .opacity
-                            .combined(with: .move(edge: .top))
+                        .opacity.combined(
+                            with: .move(edge: .top)
+                        )
                     )
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .frame(width: 274)
+        .frame(width: 286)
         .background(Color.primary.opacity(0.055))
         .clipShape(
             RoundedRectangle(
@@ -160,6 +182,7 @@ struct AudioBubble: View {
         )
         .task(id: loadIdentity) {
             await preparePlayerIfNeeded()
+            loadCachedTranscriptIfNeeded()
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -211,34 +234,114 @@ struct AudioBubble: View {
                     .controlSize(.small)
                     .tint(GRUColors.accent)
 
-                Text("Расшифровываю голосовое…")
-                    .font(
-                        .system(
-                            size: 12,
-                            weight: .semibold,
-                            design: .rounded
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Распознаю RU + EN…")
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .semibold,
+                                design: .rounded
+                            )
                         )
+
+                    Text(
+                        "автоматически выбираю лучший язык"
                     )
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                }
             }
             .padding(.vertical, 2)
 
         } else if let transcript {
-            VStack(alignment: .leading, spacing: 5) {
-                Label(
-                    "Расшифровка",
-                    systemImage: "quote.bubble.fill"
-                )
-                .font(
-                    .system(
-                        size: 10,
-                        weight: .black,
-                        design: .rounded
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 7) {
+                    Label(
+                        "Расшифровка",
+                        systemImage: "quote.bubble.fill"
                     )
-                )
-                .foregroundStyle(GRUColors.accent)
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .black,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(GRUColors.accent)
 
-                Text(transcript)
+                    Spacer()
+
+                    Menu {
+                        Button {
+                            startTranscription(
+                                forcedLanguage: .russian
+                            )
+                        } label: {
+                            Label(
+                                "Русский",
+                                systemImage:
+                                    transcript.language == .russian
+                                    ? "checkmark"
+                                    : "character.bubble"
+                            )
+                        }
+
+                        Button {
+                            startTranscription(
+                                forcedLanguage: .english
+                            )
+                        } label: {
+                            Label(
+                                "English",
+                                systemImage:
+                                    transcript.language == .english
+                                    ? "checkmark"
+                                    : "character.bubble"
+                            )
+                        }
+
+                        Divider()
+
+                        Button {
+                            startTranscription(
+                                forcedLanguage: nil
+                            )
+                        } label: {
+                            Label(
+                                "Авто RU + EN",
+                                systemImage: "wand.and.stars"
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(transcript.language.badge)
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .black,
+                                        design: .rounded
+                                    )
+                                )
+
+                            Image(systemName: "chevron.down")
+                                .font(
+                                    .system(
+                                        size: 8,
+                                        weight: .bold
+                                    )
+                                )
+                        }
+                        .foregroundStyle(GRUColors.accent)
+                        .padding(.horizontal, 7)
+                        .frame(height: 22)
+                        .background(
+                            GRUColors.accent.opacity(0.10),
+                            in: Capsule()
+                        )
+                    }
+                }
+
+                Text(transcript.text)
                     .font(
                         .system(
                             size: 13,
@@ -252,10 +355,22 @@ struct AudioBubble: View {
                         vertical: true
                     )
                     .textSelection(.enabled)
+
+                HStack(spacing: 5) {
+                    Text(transcript.language.title)
+                    Text("•")
+                    Text(
+                        confidenceText(
+                            transcript.confidence
+                        )
+                    )
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
 
         } else if let transcriptionError {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 7) {
                 Text(transcriptionError)
                     .font(
                         .system(
@@ -270,8 +385,26 @@ struct AudioBubble: View {
                         vertical: true
                     )
 
-                Button("Повторить") {
-                    startTranscription(force: true)
+                HStack(spacing: 12) {
+                    Button("Авто RU + EN") {
+                        startTranscription(
+                            forcedLanguage: nil
+                        )
+                    }
+
+                    Menu("Язык") {
+                        Button("Русский") {
+                            startTranscription(
+                                forcedLanguage: .russian
+                            )
+                        }
+
+                        Button("English") {
+                            startTranscription(
+                                forcedLanguage: .english
+                            )
+                        }
+                    }
                 }
                 .font(
                     .system(
@@ -286,6 +419,42 @@ struct AudioBubble: View {
         }
     }
 
+    private var transcriptFingerprint: String {
+        GRUVoiceTranscriptCache.fingerprint(
+            remoteURL: attachment.remoteURL,
+            fileName: attachment.fileName,
+            size: attachment.size,
+            duration: attachment.duration
+        )
+    }
+
+    private func confidenceText(
+        _ confidence: Double
+    ) -> String {
+        let percent = Int(
+            (
+                min(
+                    1,
+                    max(0, confidence)
+                )
+                * 100
+            )
+            .rounded()
+        )
+
+        return "\(percent)%"
+    }
+
+    private func loadCachedTranscriptIfNeeded() {
+        guard transcript == nil else {
+            return
+        }
+
+        transcript = GRUVoiceTranscriptCache.shared.load(
+            fingerprint: transcriptFingerprint
+        )
+    }
+
     private var loadIdentity: String {
         [
             attachment.localPath ?? "",
@@ -296,30 +465,26 @@ struct AudioBubble: View {
     }
 
     private var timeText: String {
-        let duration =
-            max(
-                0,
-                player?.duration
-                    ?? attachment.duration
-                    ?? 0
-            )
+        let duration = max(
+            0,
+            player?.duration
+                ?? attachment.duration
+                ?? 0
+        )
 
-        let current =
-            max(
-                0,
-                player?.currentTime
-                    ?? 0
-            )
+        let current = max(
+            0,
+            player?.currentTime ?? 0
+        )
 
         let shown =
             isPlaying
             ? current
             : (progress > 0 ? current : duration)
 
-        let seconds =
-            Int(
-                shown.rounded(.down)
-            )
+        let seconds = Int(
+            shown.rounded(.down)
+        )
 
         return String(
             format: "%d:%02d",
@@ -331,7 +496,8 @@ struct AudioBubble: View {
     @MainActor
     private func preparePlayerIfNeeded() async {
         if player != nil,
-           preparedAudioURL != nil {
+           preparedAudioURL != nil
+        {
             return
         }
 
@@ -352,36 +518,19 @@ struct AudioBubble: View {
         }
 
         isLoading = true
-        defer {
-            isLoading = false
-        }
+        defer { isLoading = false }
 
         do {
-            let data =
-                try await APIClient.shared.download(
-                    path: remotePath,
-                    token: token
-                )
+            let data = try await APIClient.shared.download(
+                path: remotePath,
+                token: token
+            )
 
-            let url =
-                try cacheAudio(data)
-
+            let url = try cacheAudio(data)
             preparePlayer(url: url)
 
-            print("")
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            print("🎧 VOICE AUDIO LOADED")
-            print("📎", attachment.fileName)
-            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
         } catch {
-            loadError =
-                error.localizedDescription
-
-            print(
-                "❌ Voice audio load error:",
-                error
-            )
+            loadError = error.localizedDescription
         }
     }
 
@@ -396,55 +545,46 @@ struct AudioBubble: View {
             return nil
         }
 
-        return URL(
-            fileURLWithPath: path
-        )
+        return URL(fileURLWithPath: path)
     }
 
     private func preparePlayer(url: URL) {
         preparedAudioURL = url
 
         do {
-            let audioPlayer =
-                try AVAudioPlayer(
-                    contentsOf: url
-                )
+            let audioPlayer = try AVAudioPlayer(
+                contentsOf: url
+            )
 
             audioPlayer.prepareToPlay()
             player = audioPlayer
 
         } catch {
-            loadError =
-                error.localizedDescription
+            loadError = error.localizedDescription
         }
     }
 
     private func cacheAudio(
         _ data: Data
     ) throws -> URL {
-        let directory =
-            FileManager.default.urls(
-                for: .cachesDirectory,
-                in: .userDomainMask
-            ).first!
+        let directory = FileManager.default.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        ).first!
 
-        let ext =
-            URL(
-                fileURLWithPath:
-                    attachment.fileName
-            )
-            .pathExtension
+        let ext = URL(
+            fileURLWithPath: attachment.fileName
+        ).pathExtension
 
-        let fileURL =
-            directory.appendingPathComponent(
-                "remote-voice-"
-                    + attachment.id.uuidString
-                    + (
-                        ext.isEmpty
-                        ? ".m4a"
-                        : ".\(ext)"
-                    )
-            )
+        let fileURL = directory.appendingPathComponent(
+            "remote-voice-"
+                + attachment.id.uuidString
+                + (
+                    ext.isEmpty
+                    ? ".m4a"
+                    : ".\(ext)"
+                )
+        )
 
         try data.write(
             to: fileURL,
@@ -461,76 +601,89 @@ struct AudioBubble: View {
         }
 
         showTranscript = true
+        loadCachedTranscriptIfNeeded()
 
         if transcript == nil,
-           !isTranscribing {
+           !isTranscribing
+        {
             startTranscription(
-                force: false
+                forcedLanguage: nil
             )
         }
     }
 
     private func startTranscription(
-        force: Bool
+        forcedLanguage: GRUVoiceLanguage?
     ) {
         guard !isTranscribing else {
             return
         }
 
-        if transcript != nil,
-           !force {
-            return
-        }
-
         transcriptionTask?.cancel()
 
-        transcriptionTask =
-            Task { @MainActor in
-                isTranscribing = true
-                transcriptionError = nil
+        transcriptionTask = Task { @MainActor in
+            isTranscribing = true
+            transcriptionError = nil
 
-                await preparePlayerIfNeeded()
+            await preparePlayerIfNeeded()
 
-                guard
-                    let audioURL =
-                        preparedAudioURL
-                        ?? localAudioURL
-                else {
+            guard
+                let audioURL =
+                    preparedAudioURL
+                    ?? localAudioURL
+            else {
+                isTranscribing = false
+                transcriptionError =
+                    loadError
+                    ?? GRUL10n.text(
+                        "Не удалось подготовить голосовое для расшифровки."
+                    )
+                return
+            }
+
+            do {
+                let value: GRUVoiceTranscript
+
+                if let forcedLanguage {
+                    value = try await
+                        GRUVoiceTranscriptionService.shared
+                        .transcribe(
+                            audioURL: audioURL,
+                            language: forcedLanguage
+                        )
+                } else {
+                    value = try await
+                        GRUVoiceTranscriptionService.shared
+                        .transcribeAuto(
+                            audioURL: audioURL
+                        )
+                }
+
+                guard !Task.isCancelled else {
                     isTranscribing = false
-                    transcriptionError =
-                        loadError
-                        ?? "Не удалось подготовить голосовое для расшифровки."
                     return
                 }
 
-                do {
-                    let value =
-                        try await
-                            GRUVoiceTranscriptionService.shared
-                            .transcribe(
-                                audioURL: audioURL
-                            )
+                transcript = value
+                transcriptionError = nil
 
-                    guard !Task.isCancelled else {
-                        isTranscribing = false
-                        return
-                    }
+                GRUVoiceTranscriptCache.shared.save(
+                    value,
+                    fingerprint: transcriptFingerprint
+                )
 
-                    transcript = value
-                    transcriptionError = nil
-
-                } catch {
-                    guard !Task.isCancelled else {
-                        isTranscribing = false
-                        return
-                    }
-
-                    transcriptionError =
-                        error.localizedDescription
+            } catch {
+                guard !Task.isCancelled else {
+                    isTranscribing = false
+                    return
                 }
 
-                isTranscribing = false
+                transcriptionError =
+                    error.localizedDescription
             }
+
+            isTranscribing = false
+        }
     }
 
     private func togglePlayback() {
@@ -552,38 +705,36 @@ struct AudioBubble: View {
         isLoading = true
         audioSessionTask?.cancel()
 
-        audioSessionTask =
-            Task { @MainActor in
-                do {
-                    try await
-                        Self.activatePlaybackAudioSession()
-                } catch {
-                    print(
-                        "⚠️ Audio session:",
-                        error
-                    )
-                }
-
-                guard !Task.isCancelled else {
-                    isLoading = false
-                    return
-                }
-
-                isLoading = false
-
-                if player.currentTime
-                    >= player.duration - 0.05
-                {
-                    player.currentTime = 0
-                }
-
-                guard player.play() else {
-                    return
-                }
-
-                isPlaying = true
-                startProgressLoop()
+        audioSessionTask = Task { @MainActor in
+            do {
+                try await Self.activatePlaybackAudioSession()
+            } catch {
+                print(
+                    "⚠️ Audio session:",
+                    error
+                )
             }
+
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
+
+            isLoading = false
+
+            if player.currentTime
+                >= player.duration - 0.05
+            {
+                player.currentTime = 0
+            }
+
+            guard player.play() else {
+                return
+            }
+
+            isPlaying = true
+            startProgressLoop()
+        }
     }
 
     nonisolated
@@ -593,10 +744,7 @@ struct AudioBubble: View {
         try await withCheckedThrowingContinuation {
             (
                 continuation:
-                    CheckedContinuation<
-                        Void,
-                        Error
-                    >
+                    CheckedContinuation<Void, Error>
             ) in
 
             DispatchQueue.global(
@@ -613,7 +761,6 @@ struct AudioBubble: View {
                     )
 
                     try session.setActive(true)
-
                     continuation.resume()
 
                 } catch {
@@ -632,23 +779,17 @@ struct AudioBubble: View {
         await withCheckedContinuation {
             (
                 continuation:
-                    CheckedContinuation<
-                        Void,
-                        Never
-                    >
+                    CheckedContinuation<Void, Never>
             ) in
 
             DispatchQueue.global(
                 qos: .utility
             )
             .async {
-                try?
-                    AVAudioSession.sharedInstance()
-                    .setActive(
-                        false,
-                        options:
-                            .notifyOthersOnDeactivation
-                    )
+                try? AVAudioSession.sharedInstance().setActive(
+                    false,
+                    options: .notifyOthersOnDeactivation
+                )
 
                 continuation.resume()
             }
@@ -658,44 +799,40 @@ struct AudioBubble: View {
     private func startProgressLoop() {
         progressTask?.cancel()
 
-        progressTask =
-            Task { @MainActor in
-                while
-                    !Task.isCancelled,
-                    let player,
-                    isPlaying
-                {
-                    if player.duration > 0 {
-                        progress =
-                            min(
-                                1,
-                                max(
-                                    0,
-                                    player.currentTime
-                                        / player.duration
-                                )
-                            )
-                    }
-
-                    if !player.isPlaying {
-                        isPlaying = false
-
-                        if player.currentTime
-                            >= player.duration - 0.05
-                        {
-                            player.currentTime = 0
-                            progress = 0
-                        }
-
-                        break
-                    }
-
-                    try?
-                        await Task.sleep(
-                            for:
-                                .milliseconds(60)
+        progressTask = Task { @MainActor in
+            while
+                !Task.isCancelled,
+                let player,
+                isPlaying
+            {
+                if player.duration > 0 {
+                    progress = min(
+                        1,
+                        max(
+                            0,
+                            player.currentTime
+                                / player.duration
                         )
+                    )
                 }
+
+                if !player.isPlaying {
+                    isPlaying = false
+
+                    if player.currentTime
+                        >= player.duration - 0.05
+                    {
+                        player.currentTime = 0
+                        progress = 0
+                    }
+
+                    break
+                }
+
+                try? await Task.sleep(
+                    for: .milliseconds(60)
+                )
             }
+        }
     }
 }

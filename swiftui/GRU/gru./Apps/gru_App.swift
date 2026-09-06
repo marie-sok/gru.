@@ -2,6 +2,15 @@ import SwiftUI
 
 @main
 struct gru_App: App {
+    @AppStorage(GRUAppLanguage.storageKey)
+    private var languageRaw =
+        GRUAppLanguage.defaultLanguage.rawValue
+
+    private var appLanguage: GRUAppLanguage {
+        GRUAppLanguage(rawValue: languageRaw)
+            ?? .defaultLanguage
+    }
+
     init() {
         GRUThemePolicy.migrateIfNeeded()
     }
@@ -11,6 +20,10 @@ struct gru_App: App {
             GRUScreenProtectionView {
                 RootView()
             }
+            .environment(
+                \.locale,
+                appLanguage.locale
+            )
         }
     }
 }

@@ -204,12 +204,12 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = "Введите номер телефона"
+            error = GRUL10n.text("Введите номер телефона")
             return false
         }
 
         guard !password.isEmpty else {
-            error = "Введите пароль"
+            error = GRUL10n.text("Введите пароль")
             return false
         }
 
@@ -220,22 +220,22 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = "Введите номер телефона"
+            error = GRUL10n.text("Введите номер телефона")
             return false
         }
 
         guard !cleanNickname.isEmpty else {
-            error = "Введите имя"
+            error = GRUL10n.text("Введите имя")
             return false
         }
 
         guard !password.isEmpty else {
-            error = "Введите пароль"
+            error = GRUL10n.text("Введите пароль")
             return false
         }
 
         guard password.count >= 6 else {
-            error = "Пароль должен содержать минимум 6 символов"
+            error = GRUL10n.text("Пароль должен содержать минимум 6 символов")
             return false
         }
 
@@ -273,15 +273,15 @@ private enum LoginViewModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyToken:
-            return "Сервер не вернул токен авторизации"
+            return GRUL10n.text("Сервер не вернул токен авторизации")
         case .emptyUserID:
-            return "Сервер не вернул ID пользователя"
+            return GRUL10n.text("Сервер не вернул ID пользователя")
         case .tokenSaveFailed:
-            return "Не удалось сохранить новую сессию"
+            return GRUL10n.text("Не удалось сохранить новую сессию")
         case .userIDSaveFailed:
-            return "Не удалось сохранить ID новой сессии"
+            return GRUL10n.text("Не удалось сохранить ID новой сессии")
         case .backendBindingFailed:
-            return "Новая сессия не привязалась к текущему backend"
+            return GRUL10n.text("Новая сессия не привязалась к текущему backend")
         case .tokenRejected(let statusCode, let message):
             if let statusCode {
                 return "Backend отклонил только что выданную сессию (HTTP \(statusCode)). \(message)"

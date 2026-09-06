@@ -117,6 +117,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				ru,
 				Base,
 			);
 			mainGroup = C0A1CF9E2F93C7A700D763FD;
@@ -290,7 +291,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "gru. connects to your development server on the local network.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "gru. uses the microphone for voice messages and video notes.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. расшифровывает голосовые сообщения в текст только по твоему запросу.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. recognizes Russian and English speech in voice messages only when you tap Text.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "gru. can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "gru. lets you choose avatars, photos and videos to send.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -299,7 +300,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.2;
 				PRODUCT_BUNDLE_IDENTIFIER = sok.com.gru;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -335,7 +336,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "gru. connects to your development server on the local network.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "gru. uses the microphone for voice messages and video notes.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. расшифровывает голосовые сообщения в текст только по твоему запросу.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "gru. recognizes Russian and English speech in voice messages only when you tap Text.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "gru. can save media when you explicitly choose to do so.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "gru. lets you choose avatars, photos and videos to send.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -344,7 +345,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.2;
 				PRODUCT_BUNDLE_IDENTIFIER = sok.com.gru;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

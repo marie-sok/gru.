@@ -1,12 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Restores the standard UINavigationController interactive edge-pop gesture
-/// when SwiftUI's custom chat header hides the stock back button.
-///
-/// The view itself is invisible and never intercepts chat touches. This keeps
-/// vertical message scrolling and the existing left-swipe-to-reply gesture
-/// independent from the system right-edge-back interaction.
 struct GRUSwipeBackEnabler: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let controller = GRUSwipeBackProbeController()
@@ -24,14 +18,6 @@ struct GRUSwipeBackEnabler: UIViewControllerRepresentable {
         }
     }
 
-    static func dismantleUIViewController(
-        _ uiViewController: UIViewController,
-        coordinator: ()
-    ) {
-        // Do not disable the recognizer on teardown. UINavigationController
-        // owns its lifecycle and will configure it for the next destination.
-    }
-
     fileprivate static func enableInteractivePop(
         from controller: UIViewController
     ) {
@@ -44,10 +30,6 @@ struct GRUSwipeBackEnabler: UIViewControllerRepresentable {
         }
 
         recognizer.isEnabled = true
-
-        // Hiding SwiftUI's stock Back button commonly installs a delegate that
-        // suppresses interactive pop. Removing it returns UIKit's normal edge
-        // gesture behavior for this NavigationStack.
         recognizer.delegate = nil
     }
 }

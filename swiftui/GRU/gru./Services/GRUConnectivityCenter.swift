@@ -164,15 +164,15 @@ final class GRUConnectivityCenter: ObservableObject, @unchecked Sendable {
     }
 
     var bannerTitle: String? {
-        guard hasNetwork else { return "Нет сети" }
+        guard hasNetwork else { return GRUL10n.text("Нет сети") }
 
         switch backendState {
         case .checking, .online:
             return nil
         case .degraded:
-            return "Сервис временно ограничен"
+            return GRUL10n.text("Сервис временно ограничен")
         case .offline:
-            return "Нет связи с gru."
+            return GRUL10n.text("Нет связи с gru.")
         }
     }
 
@@ -213,12 +213,12 @@ final class GRUConnectivityCenter: ObservableObject, @unchecked Sendable {
 
         switch backendState {
         case .checking:
-            return "Проверяем production backend"
+            return GRUL10n.text("Проверяем production backend")
         case .online(let latency):
             if let latency {
                 return "Backend + Mongo ready • \(latency) ms"
             }
-            return "Backend + Mongo ready"
+            return GRUL10n.text("Backend + Mongo ready")
         case .degraded(let reason):
             return userFacingReason(reason)
         case .offline(let message):
@@ -312,17 +312,17 @@ final class GRUConnectivityCenter: ObservableObject, @unchecked Sendable {
     private func userFacingReason(_ reason: String) -> String {
         switch reason.lowercased() {
         case "auth_failed":
-            return "База данных отклонила авторизацию"
+            return GRUL10n.text("База данных отклонила авторизацию")
         case "dns":
             return "Backend не может найти адрес базы данных"
         case "timeout":
-            return "Backend не дождался ответа базы данных"
+            return GRUL10n.text("Backend не дождался ответа базы данных")
         case "network":
-            return "Backend не может подключиться к базе данных"
+            return GRUL10n.text("Backend не может подключиться к базе данных")
         case "interrupted":
-            return "Проверка backend была прервана"
+            return GRUL10n.text("Проверка backend была прервана")
         case "unknown", "unavailable":
-            return "Backend доступен, база данных пока недоступна"
+            return GRUL10n.text("Backend доступен, база данных пока недоступна")
         default:
             return reason
         }

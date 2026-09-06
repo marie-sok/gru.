@@ -25,7 +25,7 @@ struct LoginView: View {
 
                 VStack(spacing: 16) {
                     GRUNoCredentialTextField(
-                        placeholder: "Phone",
+                        placeholder: GRUL10n.text("Phone"),
                         text: $viewModel.phone,
                         isSecure: false,
                         keyboardType: .phonePad
@@ -36,7 +36,7 @@ struct LoginView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     GRUNoCredentialTextField(
-                        placeholder: "Password",
+                        placeholder: GRUL10n.text("Password"),
                         text: $viewModel.password,
                         isSecure: true,
                         keyboardType: .default
@@ -48,7 +48,7 @@ struct LoginView: View {
 
                     if isRegister {
                         GRUNoCredentialTextField(
-                            placeholder: "Nickname",
+                            placeholder: GRUL10n.text("Nickname"),
                             text: $viewModel.nickname,
                             isSecure: false,
                             keyboardType: .default
@@ -84,7 +84,13 @@ struct LoginView: View {
                     if viewModel.loading {
                         ProgressView()
                     } else {
-                        Text(isRegister ? "Create account" : "Login")
+                        Text(
+                            GRUL10n.text(
+                                isRegister
+                                    ? "Create account"
+                                    : "Login"
+                            )
+                        )
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -97,9 +103,11 @@ struct LoginView: View {
                     isRegister.toggle()
                 } label: {
                     Text(
-                        isRegister
-                            ? "Already have an account?"
-                            : "Create account"
+                        GRUL10n.text(
+                            isRegister
+                                ? "Already have an account?"
+                                : "Create account"
+                        )
                     )
                     .foregroundStyle(.gray)
                 }
@@ -197,6 +205,14 @@ private struct GRUNoCredentialTextField: UIViewRepresentable {
         uiView.keyboardType = keyboardType
         uiView.textContentType = nil
         uiView.passwordRules = nil
+        uiView.placeholder = placeholder
+        uiView.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .foregroundColor:
+                    UIColor.white.withAlphaComponent(0.42)
+            ]
+        )
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {

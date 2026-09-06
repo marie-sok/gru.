@@ -1,0 +1,9 @@
+"CFBundleDisplayName" = "gru.";
+"NSCameraUsageDescription" = "gru. uses the camera for avatars, videos, and video notes.";
+"NSFaceIDUsageDescription" = "Face ID is used to protect access to gru.";
+"NSContactsUsageDescription" = "gru. uses contacts to show people on gru. and invite friends.";
+"NSLocalNetworkUsageDescription" = "gru. connects to a local development server only during development.";
+"NSMicrophoneUsageDescription" = "gru. uses the microphone for voice messages and video notes.";
+"NSPhotoLibraryUsageDescription" = "gru. lets you choose avatars, photos, and videos to send.";
+"NSPhotoLibraryAddUsageDescription" = "gru. saves media only when you explicitly choose to save it.";
+"NSSpeechRecognitionUsageDescription" = "gru. recognizes Russian and English speech in voice messages only when you tap Text.";

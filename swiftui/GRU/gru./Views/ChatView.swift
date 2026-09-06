@@ -434,7 +434,12 @@ private extension ChatView {
                     finishMessageSelection()
                 }
 
-                Text("Выбрано: \(selectedMessageIDs.count)")
+                Text(
+                    GRUL10n.format(
+                        "Выбрано: %d",
+                        selectedMessageIDs.count
+                    )
+                )
                     .font(.headline)
 
                 Spacer()
@@ -483,7 +488,11 @@ private extension ChatView {
                             Text(chatName)
                                 .font(.headline)
 
-                            Text(showTypingStatus && vm.isOtherUserTyping ? "печатает…" : chatStatus)
+                            Text(
+                                showTypingStatus && vm.isOtherUserTyping
+                                    ? GRUL10n.text("печатает…")
+                                    : GRUL10n.text(chatStatus)
+                            )
                                 .font(.caption)
                                 .foregroundStyle(showTypingStatus && vm.isOtherUserTyping ? GRUColors.accent : .secondary)
                         }

@@ -232,15 +232,15 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Некорректный адрес сервера"
+            return GRUL10n.text("Некорректный адрес сервера")
         case .invalidResponse:
-            return "Некорректный ответ сервера"
+            return GRUL10n.text("Некорректный ответ сервера")
         case .unauthorized:
-            return "Сессия истекла. Войдите снова"
+            return GRUL10n.text("Сессия истекла. Войдите снова")
         case .forbidden:
-            return "Доступ запрещён"
+            return GRUL10n.text("Доступ запрещён")
         case .notFound:
-            return "Запрашиваемые данные не найдены"
+            return GRUL10n.text("Запрашиваемые данные не найдены")
         case .serverError(let code):
             return "Ошибка сервера: \(code)"
         case .httpError(let code, let message):

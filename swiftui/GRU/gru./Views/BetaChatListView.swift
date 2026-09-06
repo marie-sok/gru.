@@ -276,9 +276,11 @@ struct BetaChatListView: View {
                 .font(.system(size: 11, weight: .bold))
 
             Text(
-                service.isUsingCachedChats
-                    ? "offline • показываю сохранённые чаты"
-                    : "backend недоступен • test lab полностью работает локально"
+                GRUL10n.text(
+                    service.isUsingCachedChats
+                        ? "offline • показываю сохранённые чаты"
+                        : "backend недоступен • test lab полностью работает локально"
+                )
             )
             .font(.system(size: 10, weight: .semibold, design: .rounded))
             .lineLimit(1)

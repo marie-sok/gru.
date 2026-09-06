@@ -9,6 +9,10 @@ struct GRUReleaseSettingsView: View {
     @AppStorage(GRUTheme.selectionKey)
     private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
 
+    @AppStorage(GRUAppLanguage.storageKey)
+    private var languageRaw =
+        GRUAppLanguage.defaultLanguage.rawValue
+
     @AppStorage("showStatus") private var showStatus = true
     @AppStorage("readReceipts") private var readReceipts = true
     @AppStorage("gru.settings.privacy.typing") private var typing = true
@@ -28,6 +32,7 @@ struct GRUReleaseSettingsView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 14) {
                     identityCard
+                    languageCard
                     themeCard
                     messagingCard
                     securityCard
@@ -100,6 +105,81 @@ private extension GRUReleaseSettingsView {
             .releaseCard()
         }
         .buttonStyle(.plain)
+    }
+
+    var languageCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                GRUNeonIcon(
+                    systemName: "character.bubble.fill",
+                    size: 36,
+                    iconSize: 14
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Язык")
+                        .font(.subheadline.weight(.bold))
+
+                    Text(
+                        (
+                            GRUAppLanguage(
+                                rawValue: languageRaw
+                            )
+                            ?? .defaultLanguage
+                        ).nativeTitle
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(
+                    (
+                        GRUAppLanguage(
+                            rawValue: languageRaw
+                        )
+                        ?? .defaultLanguage
+                    ).badge
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .black,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(GRUColors.accent)
+                .padding(.horizontal, 8)
+                .frame(height: 23)
+                .background(
+                    GRUColors.accent.opacity(0.10),
+                    in: Capsule()
+                )
+            }
+
+            Picker(
+                "Язык",
+                selection: $languageRaw
+            ) {
+                Text("Русский")
+                    .tag(
+                        GRUAppLanguage
+                            .russian
+                            .rawValue
+                    )
+
+                Text("English")
+                    .tag(
+                        GRUAppLanguage
+                            .english
+                            .rawValue
+                    )
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(14)
+        .releaseCard()
     }
 
     var themeCard: some View {

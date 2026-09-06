@@ -1,0 +1,9 @@
+"CFBundleDisplayName" = "gru.";
+"NSCameraUsageDescription" = "gru. использует камеру для аватара, видео и кото-кружков.";
+"NSFaceIDUsageDescription" = "Face ID используется для защиты входа в gru.";
+"NSContactsUsageDescription" = "gru. использует контакты, чтобы показывать людей в gru. и приглашать друзей.";
+"NSLocalNetworkUsageDescription" = "gru. подключается к локальному серверу разработки только во время разработки.";
+"NSMicrophoneUsageDescription" = "gru. использует микрофон для голосовых сообщений и кото-кружков.";
+"NSPhotoLibraryUsageDescription" = "gru. позволяет выбирать аватар, фото и видео для отправки.";
+"NSPhotoLibraryAddUsageDescription" = "gru. сохраняет медиа только когда ты явно выбираешь сохранение.";
+"NSSpeechRecognitionUsageDescription" = "gru. распознаёт русскую и английскую речь в голосовых сообщениях только когда ты нажимаешь «Текст».";

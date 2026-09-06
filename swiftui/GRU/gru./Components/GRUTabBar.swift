@@ -64,7 +64,7 @@ struct GRUTabBar: View {
                 }
 
                 if active {
-                    Text(label)
+                    Text(GRUL10n.text(label))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                         .transition(.opacity.combined(with: .move(edge: .leading)))
@@ -84,7 +84,7 @@ struct GRUTabBar: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel(GRUL10n.text(label))
     }
 }
 
