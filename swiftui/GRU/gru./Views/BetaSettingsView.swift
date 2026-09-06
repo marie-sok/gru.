@@ -156,23 +156,6 @@ struct BetaSettingsView: View {
     }
 }
 
-private enum BetaThemeName {
-    static func title(for theme: GRUAppTheme) -> String {
-        switch theme {
-        case .blackMoonCat: return "Black Moon Cat"
-        case .neonCatDemon: return "Neon Demon Cat"
-        case .bloodDragon: return "Fold-Eared Cat Dragon"
-        case .forestWitch: return "Forest Witch"
-        case .cyberMidnight: return "Cyber Midnight"
-        case .ultravioletUnicorn: return "Ultraviolet Caticorn"
-        case .powderPrincess: return "Powder Princess"
-        case .greenAcidMonster: return "Green Acid Monster"
-        case .ironKnight: return "Iron Knight"
-        default: return "Black Moon Cat"
-        }
-    }
-}
-
 private struct BetaSettingsRow: View {
     let icon: String
     let title: String
@@ -196,66 +179,6 @@ private struct BetaSettingsRow: View {
             }
         }
         .padding(.vertical, 2)
-    }
-}
-
-private struct GRUBetaThemesView: View {
-    @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
-
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 12) {
-                ForEach(GRUThemePolicy.allowed) { theme in
-                    Button {
-                        themeRaw = theme.rawValue
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        HStack(spacing: 12) {
-                            GRUSignatureWallpaper(theme: theme, intensity: 1.0, animated: false)
-                                .frame(width: 74, height: 124)
-                                .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                                        .stroke(theme.accent.opacity(0.36), lineWidth: 1)
-                                }
-
-                            Text(BetaThemeName.title(for: theme))
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(GRUColors.text)
-
-                            Spacer(minLength: 4)
-
-                            if theme.rawValue == themeRaw {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundStyle(theme.accent)
-                            }
-                        }
-                        .padding(10)
-                        .background(
-                            GRUColors.card.opacity(0.76),
-                            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-        }
-        .background(GRUAppBackdrop())
-        .navigationTitle("Темы")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            let selected = GRUAppTheme(rawValue: themeRaw)
-            if let selected {
-                if !GRUThemePolicy.allowed.contains(selected) {
-                    themeRaw = GRUAppTheme.blackMoonCat.rawValue
-                }
-            } else {
-                themeRaw = GRUAppTheme.blackMoonCat.rawValue
-            }
-        }
     }
 }
 
