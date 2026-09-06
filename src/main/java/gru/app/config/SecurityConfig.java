@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 "/privacy",
                                 "/support",
                                 "/health",
+                                "/ready",
                                 "/actuator/health"
                         ).permitAll()
 
