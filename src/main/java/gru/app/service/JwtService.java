@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class JwtService {
 
     private final SecretKey key;
 
+    @Autowired
     public JwtService(
             @Value("${gru.security.jwt-secret:${GRU_JWT_SECRET:}}") String configuredSecret,
             Environment environment
