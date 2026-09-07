@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#070708" />
+  <meta name="description" content="gru. — приватный выразительный мессенджер для близкого общения. Людьми для людей." />
+  <title>gru. — людьми для людей</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="nav shell">
+    <a class="wordmark" href="#top" aria-label="gru. home">gru<span>.</span></a>
+    <nav class="navlinks" aria-label="Основная навигация">
+      <a href="#product">Продукт</a>
+      <a href="#human">Людьми для людей</a>
+      <a href="#design">Дизайн</a>
+      <a href="#circles">Кото-кружки</a>
+      <a href="#ai">gru.bot</a>
+    </nav>
+    <a class="nav-cta" href="#beta">beta / iOS</a>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><i></i> private beta · native iOS</div>
+        <h1>Не ещё один<br />мессенджер.<br /><em>Твой.</em></h1>
+        <p class="lead">gru. — место для близкого общения, где технология не перетягивает внимание на себя. Она просто помогает людям оставаться людьми.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#product">Смотреть продукт <span>↘</span></a>
+          <a class="button ghost" href="#human">Наша позиция</a>
+        </div>
+        <div class="hero-meta">
+          <div><b>SwiftUI</b><span>нативный iOS</span></div>
+          <div><b>Realtime</b><span>REST + WebSocket</span></div>
+          <div><b>Private beta</b><span>без фальшивых обещаний</span></div>
+        </div>
+      </div>
+
+      <div class="hero-stage" aria-label="Концепт интерфейса GRU">
+        <div class="halo h1"></div><div class="halo h2"></div>
+        <div class="phone phone-back">
+          <div class="phone-top"><span>9:41</span><b>gru.</b><span>◉</span></div>
+          <div class="screen-title">Люди</div>
+          <div class="people-row"><i class="avatar a1"></i><div><b>Саша</b><span>в сети</span></div><em>●</em></div>
+          <div class="people-row"><i class="avatar a2"></i><div><b>Аня</b><span>недавно</span></div></div>
+          <div class="people-row"><i class="avatar a3"></i><div><b>gru.bot</b><span>AI внутри GRU</span></div><em class="bot-dot">✦</em></div>
+          <div class="tabbar"><span>◌</span><span>⌁</span><strong>＋</strong><span>◎</span></div>
+        </div>
+        <div class="phone phone-front">
+          <div class="phone-top"><span>9:41</span><b>Аня</b><span>•••</span></div>
+          <div class="status">в сети</div>
+          <div class="messages">
+            <div class="bubble incoming">ты где? мы уже взяли кофе</div>
+            <div class="bubble outgoing">иду. две минуты 🫶</div>
+            <div class="voice"><span class="wave">▂▅▃▇▅▂▆▃▅▂</span><b>0:18</b></div>
+            <div class="bubble incoming small">окей, ждём тебя</div>
+          </div>
+          <div class="composer"><span>＋</span><p>Сообщение</p><button aria-label="Отправить"><span class="envelope">⌁</span></button></div>
+        </div>
+        <div class="orbit-card o1">reply<br/><b>без лишних тапов</b></div>
+        <div class="orbit-card o2"><b>online</b><br/>presence</div>
+        <div class="orbit-card o3">voice <b>◖▰◗</b></div>
+      </div>
+    </section>
+
+    <section id="human" class="manifesto section shell">
+      <div class="section-kicker">01 · позиция</div>
+      <div class="manifesto-grid">
+        <h2>Людьми<br/>для людей.</h2>
+        <div class="manifesto-copy">
+          <p class="big">Мы не строим продукт, который требует внимания к себе. Мы строим среду, в которой легче уделять внимание <em>друг другу.</em></p>
+          <p>У GRU нет задачи заменить отношения алгоритмами, сделать каждую эмоцию метрикой или превратить разговор в контент. Интерфейс должен быть красивым, понятным и тихим там, где должен быть тихим.</p>
+          <div class="principles">
+            <article><span>01</span><b>Человек — центр</b><p>Сначала разговор и контекст. Потом технология.</p></article>
+            <article><span>02</span><b>Без театра</b><p>Не заявляем функции, которых ещё нет. Beta — значит beta.</p></article>
+            <article><span>03</span><b>Характер ≠ шум</b><p>GRU может быть выразительным, не превращаясь в визуальный аттракцион.</p></article>
+            <article><span>04</span><b>AI — помощник</b><p>gru.bot помогает, но не подменяет людей и их общение.</p></article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="product" class="product section shell">
+      <div class="section-head">
+        <div><div class="section-kicker">02 · продукт</div><h2>Мессенджер, который уже умеет быть мессенджером.</h2></div>
+        <p>Не концепт на слайдах: нативный iOS-клиент, production backend, realtime-транспорт, медиа и собственный визуальный язык.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature feature-wide"><span class="feature-no">A</span><h3>Realtime чаты</h3><p>Один-на-один, WebSocket / STOMP, typing, presence, unread и восстановление после потери сети.</p><div class="mini-chat"><i></i><i></i><i></i></div></article>
+        <article class="feature"><span class="feature-no">B</span><h3>Ответы · edit · delete</h3><p>Нормальные повседневные сценарии без компромиссов.</p><div class="feature-icon">↩︎ ✎ ×</div></article>
+        <article class="feature"><span class="feature-no">C</span><h3>Медиа</h3><p>Фото, видео, документы, контакты и голосовые сообщения.</p><div class="chips"><i>PHOTO</i><i>VIDEO</i><i>FILE</i><i>VOICE</i></div></article>
+        <article class="feature"><span class="feature-no">D</span><h3>People</h3><p>Контакты GRU, телефонная книга, поиск пользователей и online presence.</p><div class="people-stack"><i></i><i></i><i></i><i></i></div></article>
+        <article class="feature"><span class="feature-no">E</span><h3>Сессии и recovery</h3><p>JWT-сессии, сохранение входа, cached state и понятная работа при нестабильной сети.</p><div class="signal">◜◝◟◞</div></article>
+        <article class="feature feature-dark"><span class="feature-no">F</span><h3>Свой send</h3><p>Фирменный envelope вместо копирования чужого paper plane.</p><div class="big-envelope">⌁</div></article>
+      </div>
+    </section>
+
+    <section id="design" class="design section">
+      <div class="shell">
+        <div class="section-head design-head">
+          <div><div class="section-kicker">03 · визуальный язык</div><h2>Не одна тема.<br/>Девять характеров.</h2></div>
+          <p>В текущем picker — только фирменные GRU-темы. Они меняют не только accent, но атмосферу, персонажей и фон разговора.</p>
+        </div>
+      </div>
+      <div class="theme-rail" aria-label="Темы GRU">
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_black_moon_cat.imageset/theme_black_moon_cat.png" alt="Black Moon Cat" /><figcaption><b>Black Moon Cat</b><span>лунные коты · золото · космос</span></figcaption></figure>
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_blood_dragon.imageset/theme_blood_dragon.png" alt="Blood Dragon" /><figcaption><b>Blood Dragon</b><span>вислоухие котодраконы · огонь</span></figcaption></figure>
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_ultraviolet_unicorn.imageset/theme_ultraviolet_unicorn.png" alt="Ultraviolet Unicorn" /><figcaption><b>Ultraviolet Unicorn</b><span>кото-единороги · звёздная пыль</span></figcaption></figure>
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_cyber_midnight.imageset/theme_cyber_midnight.png" alt="Cyber Midnight" /><figcaption><b>Cyber Midnight</b><span>кибер-коты · город · технологии</span></figcaption></figure>
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_powder_princess.imageset/theme_powder_princess.png" alt="Powder Princess" /><figcaption><b>Powder Princess</b><span>коты-принцессы · нежность</span></figcaption></figure>
+        <figure class="theme-card"><img src="https://raw.githubusercontent.com/marie-sok/gru./all-backand/swiftui/GRU/gru./Assets.xcassets/ThemeIllustrations/theme_neon_demon_cat.imageset/theme_neon_demon_cat.png" alt="Neon Demon Cat" /><figcaption><b>Neon Demon Cat</b><span>неон · хаос · коты-демоны</span></figcaption></figure>
+      </div>
+      <div class="shell design-note"><b>Мелкие анимированные персонажи</b><p>В illustrated wallpapers десятки небольших котов и декоративных деталей живут по всему экрану: мягкое покачивание, breathing/stretching, разные фазы. Reduce Motion и Low Power Mode уважаются.</p></div>
+    </section>
+
+    <section id="circles" class="circles section shell">
+      <div class="section-kicker">04 · фирменный формат</div>
+      <div class="circles-grid">
+        <div class="circles-copy">
+          <h2>Кото-<br/>кружки.</h2>
+          <p class="big">Видео-заметка, которая выглядит как GRU ещё до того, как ты нажал play.</p>
+          <p>Круглый video note с кошачьими ушками и фирменной рамкой. Это не «прикол ради прикола», а узнаваемая форма быстрого живого сообщения — ближе к эмоции, чем к публикации.</p>
+          <ul><li>запись с камеры на физическом iPhone</li><li>отправка как сообщение в чате</li><li>проигрывание прямо в bubble</li><li>собственная cat-shape вместо копии чужого кружка</li></ul>
+        </div>
+        <div class="circle-demo">
+          <div class="cat-circle c1"><span>00:08</span></div>
+          <div class="cat-circle c2"><span>00:14</span></div>
+          <div class="cat-circle c3"><span>00:21</span></div>
+          <svg class="circle-line" viewBox="0 0 800 400" aria-hidden="true"><path d="M28 250 C 190 50, 405 420, 760 116" /></svg>
+          <small>video note / voice / эмоция</small>
+        </div>
+      </div>
+    </section>
+
+    <section id="ai" class="ai section shell">
+      <div class="ai-card">
+        <div class="ai-copy">
+          <div class="section-kicker">05 · встроенный AI</div>
+          <h2>gru.bot.<br/><span>Помогает. Не мешает.</span></h2>
+          <p>Встроенный AI уже живёт внутри продукта и работает через GRU backend. Ключ провайдера остаётся на сервере — не в приложении. Но главный принцип важнее архитектуры: бот не должен притворяться человеком и не должен занимать место человека.</p>
+          <div class="ai-tags"><span>контекст разговора</span><span>идеи</span><span>тексты</span><span>объяснения</span><span>планирование</span></div>
+        </div>
+        <div class="ai-chat">
+          <div class="ai-head"><b>gru.bot</b><i>AI · beta</i></div>
+          <div class="ai-msg user">Мне нужен способ мягко отказаться от встречи.</div>
+          <div class="ai-msg bot">Могу сделать без холодного «нет». Скажи только: это близкий человек или рабочий контакт?</div>
+          <div class="ai-msg user short">Близкий.</div>
+          <div class="ai-typing"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="truth section shell">
+      <div class="section-kicker">06 · что важно</div>
+      <div class="truth-grid">
+        <h2>Без маркетинговой<br/>магии.</h2>
+        <div class="truth-copy">
+          <p>GRU сейчас — beta-продукт. Поэтому лендинг не обещает звонки, миллион пользователей или «абсолютную безопасность». В beta-фокусе то, что уже имеет код и реальные пользовательские сценарии.</p>
+          <div class="truth-columns">
+            <div><b>Уже здесь</b><span>чаты · realtime · voice · media · contacts · themes · cat video notes · gru.bot</span></div>
+            <div><b>Не выдаём за готовое</b><span>audio/video calls · GRU Pulse · Radar · Music/Purr Library</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="beta" class="closing section shell">
+      <div class="closing-card">
+        <div class="cat-stamp">=^._.^=</div>
+        <p>for your people.</p>
+        <h2>Хорошая технология<br/>остаётся на своём месте.</h2>
+        <h3>Между людьми, а не вместо них.</h3>
+        <div class="closing-actions"><a class="button primary" href="#top">Вернуться наверх ↑</a><a class="button ghost" href="https://github.com/marie-sok/gru." rel="noreferrer">GitHub продукта</a></div>
+        <footer><span>gru. · private beta · iOS 17+</span><span>Created & developed by Marie Sok</span></footer>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const cards = [...document.querySelectorAll('.theme-card')];
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const io = new IntersectionObserver(entries => entries.forEach(e => e.target.classList.toggle('seen', e.isIntersecting)), {threshold:.12});
+      document.querySelectorAll('.feature,.principles article,.cat-circle,.ai-card').forEach(el => io.observe(el));
+      window.addEventListener('pointermove', e => {
+        const x=(e.clientX/window.innerWidth-.5)*8, y=(e.clientY/window.innerHeight-.5)*8;
+        document.documentElement.style.setProperty('--mx', `${x}px`);
+        document.documentElement.style.setProperty('--my', `${y}px`);
+      }, {passive:true});
+    }
+    cards.forEach(c => c.addEventListener('click', () => { cards.forEach(x=>x.classList.remove('active')); c.classList.add('active'); c.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}); }));
+  </script>
+</body>
+</html>
