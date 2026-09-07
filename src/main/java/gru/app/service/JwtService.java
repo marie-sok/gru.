@@ -5,10 +5,12 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Date;
 
 @Service
@@ -20,17 +22,42 @@ public class JwtService {
     private final SecretKey key;
 
     public JwtService(
-            @Value("${gru.security.jwt-secret:${GRU_JWT_SECRET:}}") String configuredSecret
+            @Value("${gru.security.jwt-secret:${GRU_JWT_SECRET:}}") String configuredSecret,
+            Environment environment
     ) {
-        String secret = configuredSecret == null || configuredSecret.isBlank()
-                ? DEVELOPMENT_SECRET
-                : configuredSecret.trim();
+        boolean production = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch("prod"::equalsIgnoreCase);
 
-        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+        this.key = buildKey(resolveSecret(configuredSecret, production));
+    }
+
+    // Kept for focused unit tests and local non-Spring construction.
+    JwtService(String configuredSecret) {
+        this.key = buildKey(resolveSecret(configuredSecret, false));
+    }
+
+    private static String resolveSecret(String configuredSecret, boolean production) {
+        String clean = configuredSecret == null ? "" : configuredSecret.trim();
+
+        if (clean.isBlank()) {
+            if (production) {
+                throw new IllegalStateException(
+                        "GRU_JWT_SECRET must be configured when the prod profile is active"
+                );
+            }
+
+            clean = DEVELOPMENT_SECRET;
+        }
+
+        if (clean.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("GRU_JWT_SECRET must contain at least 32 bytes");
         }
 
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        return clean;
+    }
+
+    private static SecretKey buildKey(String secret) {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String userId) {
