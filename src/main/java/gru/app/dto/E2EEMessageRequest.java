@@ -11,4 +11,5 @@ public class E2EEMessageRequest {
     private String senderEphemeralPublicKey;
     private String signature;
     private String senderKeyFingerprint;
+    private String replyToMessageId;
 }
