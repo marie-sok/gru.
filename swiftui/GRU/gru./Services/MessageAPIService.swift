@@ -22,15 +22,11 @@ final class MessageAPIService {
                 continue
             }
 
-            // New envelopes are decrypted synchronously by ServerMessageDTO so
-            // REST history and WebSocket realtime share exactly the same path.
             if !message.text.isEmpty && !message.text.hasPrefix("🔒") {
                 result.append(message)
                 continue
             }
 
-            // Backward compatibility for E2EE records created before the
-            // sender signing key was embedded in each server envelope.
             do {
                 let plaintext = try await E2EEAPIService.shared.decrypt(
                     message: message,
@@ -60,8 +56,6 @@ final class MessageAPIService {
             throw MessageTransportError.emptyMessage
         }
 
-        // Text is E2EE by default. There is deliberately no plaintext fallback:
-        // if identity/trust/encryption setup fails, sending fails closed.
         return try await E2EEAPIService.shared.sendEncryptedText(
             chatID: chatID,
             plaintext: cleanText,
@@ -279,15 +273,26 @@ final class MessageAPIService {
     }
 
     func editMessage(messageID: String, text: String, token: String) async throws -> ServerMessageDTO {
-        struct EditMessageRequest: Codable { let text: String }
-        let body = try JSONCoding.encoder.encode(EditMessageRequest(text: text))
-        let data = try await APIClient.shared.request(
-            path: "/messages/\(messageID)",
-            method: "PATCH",
-            token: token,
-            body: body
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else {
+            throw MessageTransportError.emptyMessage
+        }
+
+        let chatID = await MainActor.run { () -> String? in
+            ChatService.shared.chats.first(where: { chat in
+                chat.messages.contains(where: { $0.serverID == messageID })
+            })?.serverID
+        }
+        guard let chatID, !chatID.isEmpty else {
+            throw MessageTransportError.missingChatContext
+        }
+
+        return try await E2EEAPIService.shared.editEncryptedText(
+            messageID: messageID,
+            chatID: chatID,
+            plaintext: cleanText,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
     }
 
     func deleteMessageForMe(messageID: String, token: String) async throws -> ServerMessageDTO {
@@ -306,11 +311,14 @@ private struct SetReactionDTO: Codable {
 
 enum MessageTransportError: LocalizedError {
     case emptyMessage
+    case missingChatContext
 
     var errorDescription: String? {
         switch self {
         case .emptyMessage:
             return "Сообщение пустое."
+        case .missingChatContext:
+            return "Не удалось определить чат для защищённого сообщения."
         }
     }
 }
