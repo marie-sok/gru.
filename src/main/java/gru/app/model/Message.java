@@ -2,6 +2,7 @@ package gru.app.model;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -9,6 +10,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Document(collection = "messages")
+@CompoundIndex(
+        name = "uniq_e2ee_sender_client_message",
+        def = "{'senderId': 1, 'e2eeClientMessageId': 1}",
+        unique = true,
+        sparse = true
+)
 @Data
 public class Message {
 
