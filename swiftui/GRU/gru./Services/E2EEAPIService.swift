@@ -120,6 +120,13 @@ final class E2EEAPIService {
             return message.text
         }
 
+        guard GRUE2EEReplayGuard.shared.accept(
+            clientMessageID: envelope.clientMessageId,
+            serverMessageID: message.id
+        ) else {
+            throw E2EEAPIError.replayedEnvelope
+        }
+
         let sender = try await identity(for: message.senderId, token: token)
         switch GRUE2EE.shared.trustState(for: message.senderId, identity: sender.identity) {
         case .keyChanged:
@@ -145,4 +152,5 @@ enum E2EEAPIError: Error {
     case senderKeyChanged
     case recipientKeyNotTrusted(String)
     case senderKeyNotTrusted(String)
+    case replayedEnvelope
 }
