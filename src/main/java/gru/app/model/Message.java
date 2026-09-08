@@ -52,6 +52,9 @@ public class Message {
     /** Public Ed25519 identity key used by clients to verify this envelope offline. */
     private String senderSigningPublicKey;
 
+    /** Public X25519 identity key, pinned together with the signing key as one peer identity. */
+    private String senderKeyAgreementPublicKey;
+
     private Instant createdAt;
 
     private Instant deliveredAt;
