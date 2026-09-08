@@ -49,6 +49,9 @@ public class Message {
     /** SHA-256 fingerprint of the sender signing identity key. */
     private String senderKeyFingerprint;
 
+    /** Public Ed25519 identity key used by clients to verify this envelope offline. */
+    private String senderSigningPublicKey;
+
     private Instant createdAt;
 
     private Instant deliveredAt;
