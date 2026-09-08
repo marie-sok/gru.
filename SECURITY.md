@@ -42,11 +42,20 @@ Production API and realtime traffic use TLS (`HTTPS` / `WSS`). TLS protects traf
 
 The server still sees metadata required to operate the service, including participants, timestamps, delivery/read state, message IDs, attachment metadata and routing information.
 
-## Trust model
+## Trust and identity verification
 
-The current beta uses trust-on-first-use (TOFU): the first observed complete peer identity is pinned locally. A later identity change is blocked.
+The current beta starts with trust-on-first-use (TOFU): the first observed complete peer identity is pinned locally. A later identity change is blocked rather than silently trusted.
 
-TOFU is materially weaker than out-of-band identity verification against a malicious first-contact key-directory/server. A safety-number / QR verification UI is therefore still required before making stronger identity-authentication claims.
+The iOS client also provides explicit out-of-band verification:
+
+- a symmetric 60-digit safety number is derived from both users' IDs and complete X25519 + Ed25519 identities;
+- the same verification material can be represented as a QR code;
+- the full combined identity fingerprint is available for manual comparison;
+- explicit human verification is stored separately from TOFU trust in device-only Keychain state;
+- explicit verification is valid only for the exact combined identity and automatically becomes invalid if either long-lived public key changes;
+- after a legitimate key change, accepting the replacement identity is an explicit user action intended to happen only after the new safety number or QR has been checked out-of-band.
+
+This materially improves resistance to silent key substitution, but it does not replace a complete multi-device/recovery design or an independent protocol audit.
 
 ## Important limitations
 
@@ -54,12 +63,11 @@ E2EE v1 is a direct-chat protocol implementation, **not** a claim of Signal Prot
 
 Before public product copy describes gru. as fully E2EE, the following still need to be completed and verified:
 
-1. implement explicit fingerprint / safety-number verification UX;
-2. define and test multi-device key management, reinstall recovery and user-facing signed key rotation without server access to private keys;
-3. extend the model to groups before claiming group-chat E2EE;
-4. perform two-device physical-iPhone/TestFlight interoperability tests covering text, realtime reconnect, edits and every encrypted media type;
-5. expand protocol/adversarial tests, including key substitution, malformed envelopes, replay, rollback and media corruption cases;
-6. complete an independent cryptographic/security review before making strong security claims.
+1. define and test multi-device key management, reinstall recovery and the full user-facing signed key-rotation/recovery flow without server access to private keys;
+2. extend the model to groups before claiming group-chat E2EE;
+3. deploy the E2EE backend/client combination to the intended production beta environment and perform two-device physical-iPhone/TestFlight interoperability tests covering text, realtime reconnect, edits, safety-number comparison and every encrypted media type;
+4. expand protocol/adversarial tests, including key substitution, malformed envelopes, replay, rollback, corrupted media and downgrade/legacy-client scenarios;
+5. complete an independent cryptographic/security review before making strong security claims.
 
 Legacy plaintext endpoints remain for compatibility with older clients. The current E2EE branch routes its normal direct-chat text and supported media send paths through the encrypted endpoints, but the backend does not yet enforce a universal “E2EE-only” policy for every client version.
 
