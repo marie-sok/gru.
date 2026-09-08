@@ -1,63 +1,72 @@
 # gru.
 
-**An independent iOS messenger built around privacy, presence and a calmer kind of communication.**
+**iOS-first realtime messenger with a custom visual language, expressive media and a Spring Boot backend.**
 
-`gru.` is my attempt to rethink what a messenger can feel like when it is not designed by committee and not optimized to become another noisy social feed.
+`gru.` is an independent product project focused on one question: what does a messenger look and feel like when the product has a strong point of view instead of copying an existing chat app?
 
-I am building it as a focused iOS-first product: fast, tactile, visually distinctive and intentionally personal.
+This public repository is the **project showcase and roadmap**. The application itself is being iterated separately.
 
-## Why I am building it
+## Product scope
 
-Most messengers have converged on the same interface, the same interaction patterns and the same growth mechanics. I want `gru.` to move in a different direction:
-
-- communication first, content feed second;
-- a strong visual identity instead of a clone of an existing messenger;
-- expressive media that still feels lightweight;
-- presence that is useful without becoming invasive;
-- a product that can feel private, premium and human at the same time.
-
-## Product direction
-
-The current product work includes:
+The current product work covers:
 
 - native iOS client in SwiftUI;
-- authenticated one-to-one chats;
-- realtime messaging over STOMP/WebSocket;
+- authenticated one-to-one messaging;
+- realtime delivery over STOMP/WebSocket;
 - online presence and typing state;
-- unread counters and message delivery/read state;
+- unread counters and delivery/read state;
 - replies, reactions and message deletion;
 - photo, audio and short video-note interactions;
-- a custom visual language, including the GRU envelope and signature media UI;
-- a Spring Boot backend with MongoDB and Redis.
+- custom chat themes and animated visual backgrounds;
+- signature GRU interaction details, including the envelope send control and custom media UI;
+- Spring Boot backend with MongoDB and Redis.
 
-## Design principles
+## Product thinking
 
-**Distinct, not derivative.**  
-The goal is not to reproduce Telegram, WhatsApp or iMessage with different colors.
+### Distinct, not derivative
+The goal is not to rebuild Telegram, WhatsApp or iMessage with another color palette. Navigation, media interactions, themes and micro-interactions are treated as part of the product identity.
 
-**Private by default.**  
-The interface should make direct communication feel direct again.
+### Realtime without visual noise
+Presence, typing, delivery state and media are useful only when they support the conversation. The interface is intentionally built around direct communication rather than a content feed.
 
-**Small details matter.**  
-Motion, sound, recording states, message actions and empty states are part of the product, not decoration added at the end.
+### Design is part of engineering
+Theme systems, recording states, empty states and animation are not late decoration. They influence component boundaries, state handling and the way the application is structured.
 
-**iOS first.**  
-I would rather make one platform feel coherent than rush into every platform with a generic experience.
+## Technical shape
 
-## Status
+```text
+iOS / SwiftUI
+      |
+      | REST + STOMP/WebSocket
+      v
+Spring Boot backend
+      |---- authentication / chats / messages
+      |---- realtime events / presence
+      |---- media flows
+      v
+MongoDB + Redis
+```
 
-`gru.` is in active development. The public repository currently serves as the project page while the product itself is being iterated privately.
+## Selected interface direction
 
-The near-term focus is reliability, media flows, account/session handling, push notifications and TestFlight readiness.
+GRU uses a dark, neon-led visual system with multiple character-driven themes. The visual exploration includes worlds such as **Black Moon Cat**, **Blood Dragon**, **Ultraviolet Unicorn**, **Cyber Midnight**, **Forest Witch** and others.
 
-## Roadmap
+The design system is intentionally recognizable at a glance: custom envelope interactions, cat-ear media circles, animated theme elements and high-contrast chat surfaces.
 
-See [ROADMAP.md](ROADMAP.md) for the current product direction.
+## Current focus
 
-## About the project
+- reliability of account/session flows;
+- media capture and upload behavior;
+- realtime reconnection and delivery correctness;
+- push-notification readiness;
+- polish for TestFlight-style distribution.
 
-`gru.` is an independent project by **Marie Sok**.
+See [ROADMAP.md](ROADMAP.md) for the working product direction.
 
-There is no large product team behind it. I design the product, make the calls, build the system and iterate on it directly. AI is part of my development workflow as a tool for engineering, review and iteration — not a substitute for product ownership.
+## What this project demonstrates
 
-That is also the point of the project: a small product can still have a strong point of view.
+`gru.` is my end-to-end product case: product decisions, mobile UI, interaction design, realtime networking, backend integration and iterative debugging all live in the same problem space.
+
+---
+
+**Independent project by Marie Sok.**
