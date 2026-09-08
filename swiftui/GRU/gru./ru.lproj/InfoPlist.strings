@@ -1,4 +1,6 @@
 "CFBundleDisplayName" = "gru.";
+"GRUProductionHTTPBaseURL" = "https://gru-jiqi.onrender.com";
+"GRUProductionWebSocketURL" = "wss://gru-jiqi.onrender.com/ws";
 "NSCameraUsageDescription" = "gru. использует камеру для аватара, видео и кото-кружков.";
 "NSFaceIDUsageDescription" = "Face ID используется для защиты входа в gru.";
 "NSContactsUsageDescription" = "gru. использует контакты, чтобы показывать людей в gru. и приглашать друзей.";
