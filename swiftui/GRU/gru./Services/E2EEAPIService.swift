@@ -57,6 +57,7 @@ final class E2EEAPIService {
         senderID: String,
         receiverID: String,
         plaintext: String,
+        clientMessageID: String = UUID().uuidString.lowercased(),
         token: String
     ) async throws -> ServerMessageDTO {
         let recipient = try await identity(for: receiverID, token: token)
@@ -65,8 +66,6 @@ final class E2EEAPIService {
         case .keyChanged:
             throw E2EEAPIError.recipientKeyChanged
         case .firstSeen:
-            // TOFU: the caller/UI should surface the fingerprint and explicitly
-            // confirm it before production E2EE is enabled by default.
             throw E2EEAPIError.recipientKeyNotTrusted(recipient.identity.signingFingerprint)
         case .trusted:
             break
@@ -77,11 +76,13 @@ final class E2EEAPIService {
             chatID: chatID,
             senderID: senderID,
             receiverID: receiverID,
-            receiverIdentity: recipient.identity
+            receiverIdentity: recipient.identity,
+            clientMessageID: clientMessageID
         )
 
         struct Request: Codable {
             let chatId: String
+            let clientMessageId: String
             let encryptedPayload: String
             let encryptionVersion: String
             let senderEphemeralPublicKey: String
@@ -92,6 +93,7 @@ final class E2EEAPIService {
         let body = try JSONCoding.encoder.encode(
             Request(
                 chatId: chatID,
+                clientMessageId: envelope.clientMessageId,
                 encryptedPayload: envelope.encryptedPayload,
                 encryptionVersion: envelope.version,
                 senderEphemeralPublicKey: envelope.senderEphemeralPublicKey,
