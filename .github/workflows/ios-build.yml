@@ -51,14 +51,26 @@ jobs:
 
       - name: Verify TestFlight production transport
         run: |
-          INFO="$RUNNER_TEMP/GRUReleaseDerivedData/Build/Products/Release-iphoneos/gru.app/Info.plist"
+          APP="$RUNNER_TEMP/GRUReleaseDerivedData/Build/Products/Release-iphoneos/gru.app"
+          INFO="$APP/Info.plist"
+          EN="$APP/en.lproj/InfoPlist.strings"
+          RU="$APP/ru.lproj/InfoPlist.strings"
+
           test -f "$INFO"
+          test -f "$EN"
+          test -f "$RU"
 
-          HTTP="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionHTTPBaseURL' "$INFO")"
-          WSS="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionWebSocketURL' "$INFO")"
+          HTTP_EN="$(plutil -extract GRUProductionHTTPBaseURL raw "$EN")"
+          WSS_EN="$(plutil -extract GRUProductionWebSocketURL raw "$EN")"
+          HTTP_RU="$(plutil -extract GRUProductionHTTPBaseURL raw "$RU")"
+          WSS_RU="$(plutil -extract GRUProductionWebSocketURL raw "$RU")"
 
-          echo "HTTP=$HTTP"
-          echo "WSS=$WSS"
+          echo "EN HTTP=$HTTP_EN"
+          echo "EN WSS=$WSS_EN"
+          echo "RU HTTP=$HTTP_RU"
+          echo "RU WSS=$WSS_RU"
 
-          test "$HTTP" = "https://gru-jiqi.onrender.com"
-          test "$WSS" = "wss://gru-jiqi.onrender.com/ws"
+          test "$HTTP_EN" = "https://gru-jiqi.onrender.com"
+          test "$WSS_EN" = "wss://gru-jiqi.onrender.com/ws"
+          test "$HTTP_RU" = "https://gru-jiqi.onrender.com"
+          test "$WSS_RU" = "wss://gru-jiqi.onrender.com/ws"
