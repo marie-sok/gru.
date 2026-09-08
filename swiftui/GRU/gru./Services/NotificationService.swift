@@ -5,7 +5,6 @@
 //  Created by Maria Morozova on 06.07.2026.
 //
 
-
 import Foundation
 import UserNotifications
 
@@ -20,90 +19,68 @@ final class NotificationService {
     // MARK: - Permission
 
     func requestPermission() async {
-
         do {
-
             let center = UNUserNotificationCenter.current()
-
             _ = try await center.requestAuthorization(
-                options: [
-                    .alert,
-                    .badge,
-                    .sound
-                ]
+                options: [.alert, .badge, .sound]
             )
-
         } catch {
-
-            print(error.localizedDescription)
+            #if DEBUG
+            print("Notification permission error:", error.localizedDescription)
+            #endif
         }
     }
 
     // MARK: - Message
 
+    /// Privacy-first: message previews are OFF unless the user explicitly opts in.
+    /// This prevents decrypted message contents from appearing on the lock screen
+    /// merely because notifications were enabled.
     func sendMessageNotification(
-
         title: String,
-
         body: String
-
     ) {
-
         let defaults = UserDefaults.standard
         let enabled = defaults.object(forKey: "notifications") as? Bool ?? true
         guard enabled else { return }
 
-        let preview = defaults.object(forKey: "gru.settings.notifications.messagePreview") as? Bool ?? true
+        let preview = defaults.object(
+            forKey: "gru.settings.notifications.messagePreview"
+        ) as? Bool ?? false
         let sounds = defaults.object(forKey: "sounds") as? Bool ?? true
         let badge = defaults.object(forKey: "gru.settings.notifications.badge") as? Bool ?? true
 
         let content = UNMutableNotificationContent()
-
-        content.title = title
+        content.title = preview ? title : "gru."
         content.body = preview ? body : "Новое сообщение"
         content.sound = sounds ? .default : nil
         if badge { content.badge = 1 }
 
         let trigger = UNTimeIntervalNotificationTrigger(
-
             timeInterval: 1,
-
             repeats: false
-
         )
 
         let request = UNNotificationRequest(
-
             identifier: UUID().uuidString,
-
             content: content,
-
             trigger: trigger
-
         )
 
-        UNUserNotificationCenter.current()
-
-            .add(request)
+        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - Remove
 
     func removeAllNotifications() {
-
         let center = UNUserNotificationCenter.current()
-
         center.removeAllDeliveredNotifications()
-
         center.removeAllPendingNotificationRequests()
     }
 
     // MARK: - Badge
 
     func clearBadge() {
-
-        UNUserNotificationCenter.current()
-
-            .setBadgeCount(0)
+        UNUserNotificationCenter.current().setBadgeCount(0)
     }
 }
