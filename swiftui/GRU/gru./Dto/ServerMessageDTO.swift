@@ -19,6 +19,7 @@ struct ServerMessageDTO: Codable {
     let senderEphemeralPublicKey: String?
     let e2eeSignature: String?
     let senderKeyFingerprint: String?
+    let senderSigningPublicKey: String?
 
     let createdAt: Date
     let deliveredAt: Date?
@@ -34,26 +35,40 @@ struct ServerMessageDTO: Codable {
         case id, chatId, senderId, receiverId, text
         case e2eeClientMessageId, encryptedPayload, encryptionVersion
         case senderEphemeralPublicKey, e2eeSignature, senderKeyFingerprint
+        case senderSigningPublicKey
         case createdAt, deliveredAt, readAt, deletedAt, isEdited, editedAt
         case reaction, replyTo, attachment
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        chatId = try c.decode(String.self, forKey: .chatId)
-        senderId = try c.decode(String.self, forKey: .senderId)
-        receiverId = try c.decodeIfPresent(String.self, forKey: .receiverId)
 
-        // E2EE records deliberately carry no server-readable plaintext.
-        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        let decodedID = try c.decode(String.self, forKey: .id)
+        let decodedChatID = try c.decode(String.self, forKey: .chatId)
+        let decodedSenderID = try c.decode(String.self, forKey: .senderId)
+        let decodedReceiverID = try c.decodeIfPresent(String.self, forKey: .receiverId)
+        let legacyText = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
 
-        e2eeClientMessageId = try c.decodeIfPresent(String.self, forKey: .e2eeClientMessageId)
-        encryptedPayload = try c.decodeIfPresent(String.self, forKey: .encryptedPayload)
-        encryptionVersion = try c.decodeIfPresent(String.self, forKey: .encryptionVersion)
-        senderEphemeralPublicKey = try c.decodeIfPresent(String.self, forKey: .senderEphemeralPublicKey)
-        e2eeSignature = try c.decodeIfPresent(String.self, forKey: .e2eeSignature)
-        senderKeyFingerprint = try c.decodeIfPresent(String.self, forKey: .senderKeyFingerprint)
+        let decodedClientID = try c.decodeIfPresent(String.self, forKey: .e2eeClientMessageId)
+        let decodedPayload = try c.decodeIfPresent(String.self, forKey: .encryptedPayload)
+        let decodedVersion = try c.decodeIfPresent(String.self, forKey: .encryptionVersion)
+        let decodedEphemeral = try c.decodeIfPresent(String.self, forKey: .senderEphemeralPublicKey)
+        let decodedSignature = try c.decodeIfPresent(String.self, forKey: .e2eeSignature)
+        let decodedFingerprint = try c.decodeIfPresent(String.self, forKey: .senderKeyFingerprint)
+        let decodedSigningKey = try c.decodeIfPresent(String.self, forKey: .senderSigningPublicKey)
+
+        id = decodedID
+        chatId = decodedChatID
+        senderId = decodedSenderID
+        receiverId = decodedReceiverID
+        e2eeClientMessageId = decodedClientID
+        encryptedPayload = decodedPayload
+        encryptionVersion = decodedVersion
+        senderEphemeralPublicKey = decodedEphemeral
+        e2eeSignature = decodedSignature
+        senderKeyFingerprint = decodedFingerprint
+        senderSigningPublicKey = decodedSigningKey
+
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         deliveredAt = try c.decodeIfPresent(Date.self, forKey: .deliveredAt)
         readAt = try c.decodeIfPresent(Date.self, forKey: .readAt)
@@ -63,6 +78,58 @@ struct ServerMessageDTO: Codable {
         reaction = try c.decodeIfPresent(ReactionType.self, forKey: .reaction)
         replyTo = try c.decodeIfPresent(ServerReplyReferenceDTO.self, forKey: .replyTo)
         attachment = try c.decodeIfPresent(Attachment.self, forKey: .attachment)
+
+        if let clientID = decodedClientID,
+           let payload = decodedPayload,
+           let version = decodedVersion,
+           let ephemeral = decodedEphemeral,
+           let signature = decodedSignature,
+           let fingerprint = decodedFingerprint {
+            let envelope = GRUE2EEEnvelope(
+                version: version,
+                clientMessageId: clientID,
+                encryptedPayload: payload,
+                senderEphemeralPublicKey: ephemeral,
+                signature: signature,
+                senderKeyFingerprint: fingerprint
+            )
+
+            text = Self.resolveE2EEText(
+                envelope: envelope,
+                serverMessageID: decodedID,
+                chatID: decodedChatID,
+                senderID: decodedSenderID,
+                receiverID: decodedReceiverID,
+                senderSigningPublicKey: decodedSigningKey
+            )
+        } else {
+            text = legacyText
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(chatId, forKey: .chatId)
+        try c.encode(senderId, forKey: .senderId)
+        try c.encodeIfPresent(receiverId, forKey: .receiverId)
+        try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(e2eeClientMessageId, forKey: .e2eeClientMessageId)
+        try c.encodeIfPresent(encryptedPayload, forKey: .encryptedPayload)
+        try c.encodeIfPresent(encryptionVersion, forKey: .encryptionVersion)
+        try c.encodeIfPresent(senderEphemeralPublicKey, forKey: .senderEphemeralPublicKey)
+        try c.encodeIfPresent(e2eeSignature, forKey: .e2eeSignature)
+        try c.encodeIfPresent(senderKeyFingerprint, forKey: .senderKeyFingerprint)
+        try c.encodeIfPresent(senderSigningPublicKey, forKey: .senderSigningPublicKey)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(deliveredAt, forKey: .deliveredAt)
+        try c.encodeIfPresent(readAt, forKey: .readAt)
+        try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
+        try c.encodeIfPresent(isEdited, forKey: .isEdited)
+        try c.encodeIfPresent(editedAt, forKey: .editedAt)
+        try c.encodeIfPresent(reaction, forKey: .reaction)
+        try c.encodeIfPresent(replyTo, forKey: .replyTo)
+        try c.encodeIfPresent(attachment, forKey: .attachment)
     }
 
     var messageStatus: MessageStatus {
@@ -103,6 +170,7 @@ struct ServerMessageDTO: Codable {
             senderEphemeralPublicKey: senderEphemeralPublicKey,
             e2eeSignature: e2eeSignature,
             senderKeyFingerprint: senderKeyFingerprint,
+            senderSigningPublicKey: senderSigningPublicKey,
             createdAt: createdAt,
             deliveredAt: deliveredAt,
             readAt: readAt,
@@ -116,18 +184,114 @@ struct ServerMessageDTO: Codable {
     }
 
     private init(
-        id: String, chatId: String, senderId: String, receiverId: String?, text: String,
-        e2eeClientMessageId: String?, encryptedPayload: String?, encryptionVersion: String?,
-        senderEphemeralPublicKey: String?, e2eeSignature: String?, senderKeyFingerprint: String?,
-        createdAt: Date, deliveredAt: Date?, readAt: Date?, deletedAt: Date?, isEdited: Bool?,
-        editedAt: Date?, reaction: ReactionType?, replyTo: ServerReplyReferenceDTO?, attachment: Attachment?
+        id: String,
+        chatId: String,
+        senderId: String,
+        receiverId: String?,
+        text: String,
+        e2eeClientMessageId: String?,
+        encryptedPayload: String?,
+        encryptionVersion: String?,
+        senderEphemeralPublicKey: String?,
+        e2eeSignature: String?,
+        senderKeyFingerprint: String?,
+        senderSigningPublicKey: String?,
+        createdAt: Date,
+        deliveredAt: Date?,
+        readAt: Date?,
+        deletedAt: Date?,
+        isEdited: Bool?,
+        editedAt: Date?,
+        reaction: ReactionType?,
+        replyTo: ServerReplyReferenceDTO?,
+        attachment: Attachment?
     ) {
-        self.id = id; self.chatId = chatId; self.senderId = senderId; self.receiverId = receiverId; self.text = text
-        self.e2eeClientMessageId = e2eeClientMessageId; self.encryptedPayload = encryptedPayload
-        self.encryptionVersion = encryptionVersion; self.senderEphemeralPublicKey = senderEphemeralPublicKey
-        self.e2eeSignature = e2eeSignature; self.senderKeyFingerprint = senderKeyFingerprint
-        self.createdAt = createdAt; self.deliveredAt = deliveredAt; self.readAt = readAt; self.deletedAt = deletedAt
-        self.isEdited = isEdited; self.editedAt = editedAt; self.reaction = reaction; self.replyTo = replyTo
+        self.id = id
+        self.chatId = chatId
+        self.senderId = senderId
+        self.receiverId = receiverId
+        self.text = text
+        self.e2eeClientMessageId = e2eeClientMessageId
+        self.encryptedPayload = encryptedPayload
+        self.encryptionVersion = encryptionVersion
+        self.senderEphemeralPublicKey = senderEphemeralPublicKey
+        self.e2eeSignature = e2eeSignature
+        self.senderKeyFingerprint = senderKeyFingerprint
+        self.senderSigningPublicKey = senderSigningPublicKey
+        self.createdAt = createdAt
+        self.deliveredAt = deliveredAt
+        self.readAt = readAt
+        self.deletedAt = deletedAt
+        self.isEdited = isEdited
+        self.editedAt = editedAt
+        self.reaction = reaction
+        self.replyTo = replyTo
         self.attachment = attachment
+    }
+
+    private static func resolveE2EEText(
+        envelope: GRUE2EEEnvelope,
+        serverMessageID: String,
+        chatID: String,
+        senderID: String,
+        receiverID: String?,
+        senderSigningPublicKey: String?
+    ) -> String {
+        guard let currentUserID = TokenStorage.shared.userID else {
+            return "🔒 Защищённое сообщение"
+        }
+
+        if senderID == currentUserID {
+            return GRUE2EESentMessageStore.shared.plaintext(
+                for: envelope.clientMessageId
+            ) ?? "🔒 Защищённое сообщение"
+        }
+
+        guard receiverID == currentUserID,
+              let signingKey = senderSigningPublicKey,
+              !signingKey.isEmpty else {
+            return "🔒 Защищённое сообщение"
+        }
+
+        let senderIdentity = GRUE2EEPublicIdentity(
+            keyAgreementPublicKey: "",
+            signingPublicKey: signingKey
+        )
+        let trustState = GRUE2EE.shared.trustState(
+            for: senderID,
+            identity: senderIdentity
+        )
+
+        if case .keyChanged = trustState {
+            return "🔒 Ключ отправителя изменился"
+        }
+
+        do {
+            let plaintext = try GRUE2EE.shared.decrypt(
+                envelope: envelope,
+                chatID: chatID,
+                senderID: senderID,
+                receiverID: currentUserID,
+                senderIdentity: senderIdentity
+            )
+
+            if case .firstSeen = trustState {
+                try GRUE2EE.shared.trust(
+                    identity: senderIdentity,
+                    for: senderID
+                )
+            }
+
+            guard GRUE2EEReplayGuard.shared.accept(
+                clientMessageID: envelope.clientMessageId,
+                serverMessageID: serverMessageID
+            ) else {
+                return "🔒 Повтор защищённого сообщения заблокирован"
+            }
+
+            return plaintext
+        } catch {
+            return "🔒 Не удалось расшифровать сообщение"
+        }
     }
 }
