@@ -66,7 +66,9 @@ final class E2EEAPIService {
         case .keyChanged:
             throw E2EEAPIError.recipientKeyChanged
         case .firstSeen:
-            throw E2EEAPIError.recipientKeyNotTrusted(recipient.identity.signingFingerprint)
+            // Trust On First Use: first observed key is pinned in Keychain.
+            // Any later key change is fail-closed until explicitly re-verified.
+            try GRUE2EE.shared.trust(identity: recipient.identity, for: receiverID)
         case .trusted:
             break
         }
@@ -120,6 +122,32 @@ final class E2EEAPIService {
             return message.text
         }
 
+        // A sender cannot decrypt its own recipient envelope in v1. Its
+        // plaintext remains in the protected local chat cache.
+        if message.senderId == currentUserID {
+            throw E2EEAPIError.senderCopyUnavailable
+        }
+
+        let sender = try await identity(for: message.senderId, token: token)
+        let trustState = GRUE2EE.shared.trustState(for: message.senderId, identity: sender.identity)
+        if case .keyChanged = trustState {
+            throw E2EEAPIError.senderKeyChanged
+        }
+
+        // Verify signature + AEAD before recording replay state. This prevents
+        // an invalid packet from poisoning a legitimate clientMessageId.
+        let plaintext = try GRUE2EE.shared.decrypt(
+            envelope: envelope,
+            chatID: message.chatId,
+            senderID: message.senderId,
+            receiverID: currentUserID,
+            senderIdentity: sender.identity
+        )
+
+        if case .firstSeen = trustState {
+            try GRUE2EE.shared.trust(identity: sender.identity, for: message.senderId)
+        }
+
         guard GRUE2EEReplayGuard.shared.accept(
             clientMessageID: envelope.clientMessageId,
             serverMessageID: message.id
@@ -127,30 +155,13 @@ final class E2EEAPIService {
             throw E2EEAPIError.replayedEnvelope
         }
 
-        let sender = try await identity(for: message.senderId, token: token)
-        switch GRUE2EE.shared.trustState(for: message.senderId, identity: sender.identity) {
-        case .keyChanged:
-            throw E2EEAPIError.senderKeyChanged
-        case .firstSeen:
-            throw E2EEAPIError.senderKeyNotTrusted(sender.identity.signingFingerprint)
-        case .trusted:
-            break
-        }
-
-        return try GRUE2EE.shared.decrypt(
-            envelope: envelope,
-            chatID: message.chatId,
-            senderID: message.senderId,
-            receiverID: currentUserID,
-            senderIdentity: sender.identity
-        )
+        return plaintext
     }
 }
 
 enum E2EEAPIError: Error {
     case recipientKeyChanged
     case senderKeyChanged
-    case recipientKeyNotTrusted(String)
-    case senderKeyNotTrusted(String)
     case replayedEnvelope
+    case senderCopyUnavailable
 }
