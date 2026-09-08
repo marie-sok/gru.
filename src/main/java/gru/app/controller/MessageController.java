@@ -33,69 +33,37 @@ public class MessageController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping("/messages")
-    public Message send(
-            Authentication authentication,
-            @RequestBody SendMessageRequest request
-    ) {
-        Message message = messageService.send(
-                authentication.getName(),
-                request
-        );
+    public Message send(Authentication authentication, @RequestBody SendMessageRequest request) {
+        Message message = messageService.send(authentication.getName(), request);
         broadcast(message);
         return message;
     }
 
     @GetMapping("/chats/{chatId}/messages")
-    public List<Message> getMessages(
-            Authentication authentication,
-            @PathVariable String chatId
-    ) {
-        return messageService.getMessages(
-                authentication.getName(),
-                chatId
-        );
+    public List<Message> getMessages(Authentication authentication, @PathVariable String chatId) {
+        return messageService.getMessages(authentication.getName(), chatId);
     }
 
     @PostMapping("/messages/{messageId}/delivered")
-    public Message markDelivered(
-            Authentication authentication,
-            @PathVariable String messageId
-    ) {
-        Message message = messageService.markDelivered(
-                authentication.getName(),
-                messageId
-        );
+    public Message markDelivered(Authentication authentication, @PathVariable String messageId) {
+        Message message = messageService.markDelivered(authentication.getName(), messageId);
         broadcast(message);
         return message;
     }
 
     @PostMapping("/messages/{messageId}/read")
-    public Message markRead(
-            Authentication authentication,
-            @PathVariable String messageId
-    ) {
-        Message message = messageService.markRead(
-                authentication.getName(),
-                messageId
-        );
+    public Message markRead(Authentication authentication, @PathVariable String messageId) {
+        Message message = messageService.markRead(authentication.getName(), messageId);
         broadcast(message);
         return message;
     }
 
     @PostMapping("/chats/{chatId}/read")
-    public List<Message> markChatRead(
-            Authentication authentication,
-            @PathVariable String chatId
-    ) {
-        List<Message> messages = messageService.markChatRead(
-                authentication.getName(),
-                chatId
-        );
+    public List<Message> markChatRead(Authentication authentication, @PathVariable String chatId) {
+        List<Message> messages = messageService.markChatRead(authentication.getName(), chatId);
         messages.forEach(this::broadcast);
         return messages;
     }
-
-    // MARK: - Edit Message
 
     @PatchMapping("/messages/{messageId}")
     public Message editMessage(
@@ -112,8 +80,6 @@ public class MessageController {
         return message;
     }
 
-    // MARK: - Media
-
     @PostMapping(value = "/messages/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Message sendPhoto(
             Authentication authentication,
@@ -123,17 +89,7 @@ public class MessageController {
             @RequestParam(required = false) Double height,
             @RequestParam(required = false) String replyToMessageId
     ) {
-        return sendMedia(
-                authentication,
-                chatId,
-                file,
-                "photo",
-                width,
-                height,
-                null,
-                null,
-                replyToMessageId
-        );
+        return sendMedia(authentication, chatId, file, "photo", width, height, null, null, replyToMessageId);
     }
 
     @PostMapping(value = "/messages/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -146,17 +102,7 @@ public class MessageController {
             @RequestParam(required = false) Double duration,
             @RequestParam(required = false) String replyToMessageId
     ) {
-        return sendMedia(
-                authentication,
-                chatId,
-                file,
-                "video",
-                width,
-                height,
-                duration,
-                null,
-                replyToMessageId
-        );
+        return sendMedia(authentication, chatId, file, "video", width, height, duration, null, replyToMessageId);
     }
 
     @PostMapping(value = "/messages/video-note", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -169,17 +115,7 @@ public class MessageController {
             @RequestParam(required = false) Double duration,
             @RequestParam(required = false) String replyToMessageId
     ) {
-        return sendMedia(
-                authentication,
-                chatId,
-                file,
-                "videoNote",
-                width,
-                height,
-                duration,
-                null,
-                replyToMessageId
-        );
+        return sendMedia(authentication, chatId, file, "videoNote", width, height, duration, null, replyToMessageId);
     }
 
     @PostMapping(value = "/messages/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -189,17 +125,7 @@ public class MessageController {
             @RequestParam MultipartFile file,
             @RequestParam(required = false) String replyToMessageId
     ) {
-        return sendMedia(
-                authentication,
-                chatId,
-                file,
-                "document",
-                null,
-                null,
-                null,
-                null,
-                replyToMessageId
-        );
+        return sendMedia(authentication, chatId, file, "document", null, null, null, null, replyToMessageId);
     }
 
     @PostMapping(value = "/messages/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -224,8 +150,6 @@ public class MessageController {
         );
     }
 
-    // MARK: - Reactions
-
     @PostMapping("/messages/{messageId}/reaction")
     public Message setReaction(
             Authentication authentication,
@@ -242,29 +166,20 @@ public class MessageController {
     }
 
     @DeleteMapping("/messages/{messageId}/reaction")
-    public Message removeReaction(
-            Authentication authentication,
-            @PathVariable String messageId
-    ) {
-        Message message = messageService.removeReaction(
-                authentication.getName(),
-                messageId
-        );
+    public Message removeReaction(Authentication authentication, @PathVariable String messageId) {
+        Message message = messageService.removeReaction(authentication.getName(), messageId);
         broadcast(message);
         return message;
     }
 
-    // MARK: - Silent Delete For Everyone
+    @DeleteMapping("/messages/{messageId}/me")
+    public Message deleteForMe(Authentication authentication, @PathVariable String messageId) {
+        return messageService.deleteForMe(authentication.getName(), messageId);
+    }
 
     @DeleteMapping("/messages/{messageId}")
-    public Message deleteForEveryone(
-            Authentication authentication,
-            @PathVariable String messageId
-    ) {
-        Message tombstone = messageService.deleteForEveryone(
-                authentication.getName(),
-                messageId
-        );
+    public Message deleteForEveryone(Authentication authentication, @PathVariable String messageId) {
+        Message tombstone = messageService.deleteForEveryone(authentication.getName(), messageId);
         broadcast(tombstone);
         return tombstone;
     }
@@ -298,7 +213,6 @@ public class MessageController {
                 attachment,
                 replyToMessageId
         );
-
         broadcast(message);
         return message;
     }
@@ -326,11 +240,7 @@ public class MessageController {
         if (message == null || message.getChatId() == null || message.getChatId().isBlank()) {
             return;
         }
-
-        messagingTemplate.convertAndSend(
-                "/topic/chat/" + message.getChatId(),
-                message
-        );
+        messagingTemplate.convertAndSend("/topic/chat/" + message.getChatId(), message);
     }
 
     public record ReactionRequest(String reaction) {}

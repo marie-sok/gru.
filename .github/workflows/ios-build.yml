@@ -36,3 +36,31 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/GRUDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Build Release for physical iPhone architecture
+        run: |
+          xcodebuild \
+            -project swiftui/GRU/gru..xcodeproj \
+            -scheme gru \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/GRUReleaseDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify TestFlight production transport fail-safe
+        run: |
+          CONFIG="swiftui/GRU/gru./Services/APIClient.swift"
+          APP="$RUNNER_TEMP/GRUReleaseDerivedData/Build/Products/Release-iphoneos/gru.app"
+
+          test -d "$APP"
+          grep -F 'private static let defaultProductionHTTPBaseURL = "https://gru-jiqi.onrender.com"' "$CONFIG"
+          grep -F 'private static let defaultProductionWebSocketURL = "wss://gru-jiqi.onrender.com/ws"' "$CONFIG"
+          grep -F '#if !DEBUG' "$CONFIG"
+          grep -F 'return productionHTTPBaseURL' "$CONFIG"
+          grep -F 'return productionWebSocketURL' "$CONFIG"
+
+          # Release must have an HTTPS/WSS source-level fallback even if custom
+          # Info.plist keys are absent from an archived product.
+          ! grep -F 'Release • production URL not configured' "$CONFIG"

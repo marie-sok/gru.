@@ -11,50 +11,62 @@ enum GRUServerConfiguration {
     private static let productionHTTPKey = "GRUProductionHTTPBaseURL"
     private static let productionWebSocketKey = "GRUProductionWebSocketURL"
 
-    // Current development Mac on the local Wi-Fi network.
+    // Development-only physical Mac host. Release code never falls back here.
     private static let physicalDeviceHost = "192.168.31.88"
 
-    static var port: Int {
-        let configured = UserDefaults.standard.integer(forKey: customPortKey)
-        return (1...65_535).contains(configured) ? configured : defaultPort
-    }
+    // Fail-safe production transport for TestFlight/App Store builds.
+    // Info.plist may override these values, but a missing custom plist key must
+    // never route a Release build to a LAN backend.
+    private static let defaultProductionHTTPBaseURL = "https://gru-jiqi.onrender.com"
+    private static let defaultProductionWebSocketURL = "wss://gru-jiqi.onrender.com/ws"
 
-    private static var productionHTTPBaseURL: String? {
+    private static var configuredProductionHTTPBaseURL: String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: productionHTTPKey) as? String else {
             return nil
         }
 
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard clean.lowercased().hasPrefix("https://"),
-              URL(string: clean) != nil else {
+        guard clean.lowercased().hasPrefix("https://"), URL(string: clean) != nil else {
             return nil
         }
 
         return clean.hasSuffix("/") ? String(clean.dropLast()) : clean
     }
 
-    private static var productionWebSocketURL: String? {
+    private static var configuredProductionWebSocketURL: String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: productionWebSocketKey) as? String else {
             return nil
         }
 
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard clean.lowercased().hasPrefix("wss://"),
-              URL(string: clean) != nil else {
+        guard clean.lowercased().hasPrefix("wss://"), URL(string: clean) != nil else {
             return nil
         }
 
         return clean
     }
 
+    private static var productionHTTPBaseURL: String {
+        configuredProductionHTTPBaseURL ?? defaultProductionHTTPBaseURL
+    }
+
+    private static var productionWebSocketURL: String {
+        configuredProductionWebSocketURL ?? defaultProductionWebSocketURL
+    }
+
+    static var port: Int {
+        #if !DEBUG
+        return URL(string: productionHTTPBaseURL)?.port ?? 443
+        #else
+        let configured = UserDefaults.standard.integer(forKey: customPortKey)
+        return (1...65_535).contains(configured) ? configured : defaultPort
+        #endif
+    }
+
     static var host: String {
         #if !DEBUG
-        if let productionHTTPBaseURL,
-           let productionHost = URL(string: productionHTTPBaseURL)?.host {
-            return productionHost
-        }
-        #endif
-
+        return URL(string: productionHTTPBaseURL)?.host ?? "gru-jiqi.onrender.com"
+        #else
         if let customHost = UserDefaults.standard.string(forKey: customHostKey),
            isValidHost(customHost) {
             return normalizedHost(customHost)
@@ -65,37 +77,29 @@ enum GRUServerConfiguration {
         #else
         return physicalDeviceHost
         #endif
+        #endif
     }
 
     static var httpBaseURL: String {
         #if !DEBUG
-        if let productionHTTPBaseURL {
-            return productionHTTPBaseURL
-        }
-        #endif
-
+        return productionHTTPBaseURL
+        #else
         return "http://\(host):\(port)"
+        #endif
     }
 
     static var webSocketURL: String {
         #if !DEBUG
-        if let productionWebSocketURL {
-            return productionWebSocketURL
-        }
-        #endif
-
+        return productionWebSocketURL
+        #else
         return "ws://\(host):\(port)/ws"
+        #endif
     }
 
     static var automaticHost: String {
         #if !DEBUG
-        if let productionHTTPBaseURL,
-           let productionHost = URL(string: productionHTTPBaseURL)?.host {
-            return productionHost
-        }
-        #endif
-
-        #if targetEnvironment(simulator)
+        return URL(string: productionHTTPBaseURL)?.host ?? "gru-jiqi.onrender.com"
+        #elseif targetEnvironment(simulator)
         return "127.0.0.1"
         #else
         return physicalDeviceHost
@@ -104,9 +108,7 @@ enum GRUServerConfiguration {
 
     static var environmentTitle: String {
         #if !DEBUG
-        return productionHTTPBaseURL == nil
-            ? "Release • production URL not configured"
-            : "Production"
+        return "Production"
         #elseif targetEnvironment(simulator)
         return "iPhone Simulator"
         #else
@@ -131,7 +133,15 @@ enum GRUServerConfiguration {
     }
 
     static var isProductionTransportConfigured: Bool {
-        productionHTTPBaseURL != nil && productionWebSocketURL != nil
+        guard let http = URL(string: productionHTTPBaseURL),
+              http.scheme?.lowercased() == "https",
+              http.host != nil,
+              let webSocket = URL(string: productionWebSocketURL),
+              webSocket.scheme?.lowercased() == "wss",
+              webSocket.host != nil else {
+            return false
+        }
+        return true
     }
 
     @discardableResult
@@ -155,7 +165,6 @@ enum GRUServerConfiguration {
               (1...65_535).contains(parsed) else {
             return false
         }
-
         UserDefaults.standard.set(parsed, forKey: customPortKey)
         return true
         #endif
@@ -171,8 +180,7 @@ enum GRUServerConfiguration {
     private static func normalizedHost(_ value: String) -> String {
         var clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if let url = URL(string: clean),
-           let urlHost = url.host {
+        if let url = URL(string: clean), let urlHost = url.host {
             clean = urlHost
         }
 
@@ -190,7 +198,6 @@ enum GRUServerConfiguration {
 
     private static func isValidHost(_ value: String) -> Bool {
         let clean = normalizedHost(value)
-
         guard !clean.isEmpty,
               clean.count <= 253,
               !clean.contains("/"),
@@ -199,11 +206,7 @@ enum GRUServerConfiguration {
         }
 
         return clean.allSatisfy {
-            $0.isLetter ||
-            $0.isNumber ||
-            $0 == "." ||
-            $0 == "-" ||
-            $0 == ":"
+            $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == ":"
         }
     }
 }
@@ -252,11 +255,11 @@ enum APIError: LocalizedError {
 
             switch urlError.code {
             case .cannotConnectToHost, .cannotFindHost:
-                return "Сервер GRU недоступен по адресу \(GRUServerConfiguration.httpBaseURL). Запустите backend на порту \(GRUServerConfiguration.port)"
+                return "Сервер GRU недоступен по адресу \(GRUServerConfiguration.httpBaseURL)"
             case .notConnectedToInternet:
-                return "Нет доступа к сети. Для iPhone также проверьте разрешение «Локальная сеть» у GRU"
+                return "Нет доступа к сети"
             case .timedOut:
-                return "Сервер GRU не ответил вовремя. Проверьте backend и адрес \(GRUServerConfiguration.host)"
+                return "Сервер GRU не ответил вовремя. Проверьте адрес \(GRUServerConfiguration.host)"
             default:
                 return "Ошибка сети: \(urlError.localizedDescription)"
             }
@@ -278,23 +281,15 @@ final class APIClient {
 
     // MARK: Server probe
 
-    func probeServer(
-        token: String? = nil
-    ) async -> GRUServerProbeResult {
+    func probeServer(token: String? = nil) async -> GRUServerProbeResult {
         let resolvedToken: String?
-
         if let token {
             resolvedToken = token
         } else {
-            resolvedToken = await MainActor.run {
-                TokenStorage.shared.token
-            }
+            resolvedToken = await MainActor.run { TokenStorage.shared.token }
         }
 
-        // With a token we deliberately probe a protected endpoint so a 2xx
-        // means "this exact JWT is accepted", not merely "the server is up".
         let path = resolvedToken == nil ? "/actuator/health" : "/chats"
-
         guard let url = URL(string: baseURL + path) else {
             return GRUServerProbeResult(
                 isReachable: false,
@@ -310,10 +305,8 @@ final class APIClient {
         applyAuthorization(resolvedToken, to: &request)
 
         let startedAt = Date()
-
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
-
             guard let http = response as? HTTPURLResponse else {
                 return GRUServerProbeResult(
                     isReachable: false,
@@ -325,12 +318,9 @@ final class APIClient {
 
             let latency = Int(Date().timeIntervalSince(startedAt) * 1_000)
             let message: String
-
             switch http.statusCode {
             case 200...299:
-                message = resolvedToken == nil
-                    ? "Backend GRU доступен"
-                    : "Сессия подтверждена backend"
+                message = resolvedToken == nil ? "Backend GRU доступен" : "Сессия подтверждена backend"
             case 401, 403:
                 message = "Backend доступен, но JWT отклонён"
             default:
@@ -344,9 +334,7 @@ final class APIClient {
                 message: message
             )
         } catch {
-            let description = (error as? URLError)?.localizedDescription
-                ?? error.localizedDescription
-
+            let description = (error as? URLError)?.localizedDescription ?? error.localizedDescription
             return GRUServerProbeResult(
                 isReachable: false,
                 statusCode: nil,
@@ -365,15 +353,12 @@ final class APIClient {
         body: Data? = nil
     ) async throws -> Data {
         let url = try makeURL(path: path)
-
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         if body != nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-
         applyAuthorization(token, to: &request)
         request.httpBody = body
 
@@ -384,10 +369,7 @@ final class APIClient {
         if let body { print("📤 BODY:", debugJSONDescription(body)) }
         #endif
 
-        return try await perform(
-            request,
-            printResponseBody: true
-        )
+        return try await perform(request, printResponseBody: true)
     }
 
     // MARK: Multipart upload
@@ -421,10 +403,7 @@ final class APIClient {
         var request = URLRequest(url: url, timeoutInterval: 60)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(
-            "multipart/form-data; boundary=\(boundary)",
-            forHTTPHeaderField: "Content-Type"
-        )
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         applyAuthorization(token, to: &request)
         request.httpBody = body
 
@@ -436,20 +415,13 @@ final class APIClient {
         print("📎 FILE:", fileName, "(\(fileData.count) bytes)")
         #endif
 
-        return try await perform(
-            request,
-            printResponseBody: true
-        )
+        return try await perform(request, printResponseBody: true)
     }
 
     // MARK: Authenticated download
 
-    func download(
-        path: String,
-        token: String
-    ) async throws -> Data {
+    func download(path: String, token: String) async throws -> Data {
         let url = try makeURL(path: path)
-
         var request = URLRequest(url: url, timeoutInterval: 60)
         request.httpMethod = "GET"
         request.setValue("*/*", forHTTPHeaderField: "Accept")
@@ -461,21 +433,14 @@ final class APIClient {
         print("🔐 Authorization: Bearer ***")
         #endif
 
-        return try await perform(
-            request,
-            printResponseBody: false
-        )
+        return try await perform(request, printResponseBody: false)
     }
 
     // MARK: Transport
 
-    private func perform(
-        _ request: URLRequest,
-        printResponseBody: Bool
-    ) async throws -> Data {
+    private func perform(_ request: URLRequest, printResponseBody: Bool) async throws -> Data {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
@@ -493,25 +458,19 @@ final class APIClient {
             }
 
             let serverMessage = extractServerMessage(from: data)
-
             if shouldInvalidateSession(
                 statusCode: http.statusCode,
                 serverMessage: serverMessage,
                 request: request
             ) {
-                await invalidateCurrentSession(
-                    statusCode: http.statusCode,
-                    request: request
-                )
+                await invalidateCurrentSession(statusCode: http.statusCode, request: request)
             }
 
             switch http.statusCode {
             case 401:
                 throw APIError.unauthorized
             case 403:
-                let hasSession = await MainActor.run {
-                    TokenStorage.shared.token != nil
-                }
+                let hasSession = await MainActor.run { TokenStorage.shared.token != nil }
                 throw hasSession ? APIError.forbidden : APIError.unauthorized
             case 404:
                 throw APIError.notFound
@@ -537,27 +496,15 @@ final class APIClient {
         serverMessage: String,
         request: URLRequest
     ) -> Bool {
-        guard bearerToken(from: request) != nil else {
-            return false
-        }
-
-        if statusCode == 401 {
-            return true
-        }
-
-        guard statusCode == 403 else {
-            return false
-        }
+        guard bearerToken(from: request) != nil else { return false }
+        if statusCode == 401 { return true }
+        guard statusCode == 403 else { return false }
 
         let normalized = serverMessage
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-
         let path = request.url?.path ?? ""
-
-        if path == "/chats" {
-            return true
-        }
+        if path == "/chats" { return true }
 
         return normalized == "unauthorized" ||
             normalized.contains("jwt") ||
@@ -567,19 +514,12 @@ final class APIClient {
             normalized.contains("invalid token")
     }
 
-    private func invalidateCurrentSession(
-        statusCode: Int,
-        request: URLRequest
-    ) async {
-        guard let failedToken = bearerToken(from: request) else {
-            return
-        }
+    private func invalidateCurrentSession(statusCode: Int, request: URLRequest) async {
+        guard let failedToken = bearerToken(from: request) else { return }
 
         let didInvalidate = await MainActor.run { () -> Bool in
             guard let currentToken = TokenStorage.shared.token,
                   currentToken == failedToken else {
-                // Critical race fix: an old request is allowed to fail, but it
-                // must never erase a newer JWT saved after that request began.
                 return false
             }
 
@@ -589,12 +529,7 @@ final class APIClient {
             ChatService.shared.clearAuthenticatedUser()
             NotificationService.shared.removeAllNotifications()
             NotificationService.shared.clearBadge()
-
-            NotificationCenter.default.post(
-                name: .gruSessionInvalidated,
-                object: nil
-            )
-
+            NotificationCenter.default.post(name: .gruSessionInvalidated, object: nil)
             return true
         }
 
@@ -607,9 +542,7 @@ final class APIClient {
         #endif
     }
 
-    private func bearerToken(
-        from request: URLRequest
-    ) -> String? {
+    private func bearerToken(from request: URLRequest) -> String? {
         guard let header = request.value(forHTTPHeaderField: "Authorization"),
               header.hasPrefix("Bearer ") else {
             return nil
@@ -617,121 +550,79 @@ final class APIClient {
 
         let token = String(header.dropFirst("Bearer ".count))
             .trimmingCharacters(in: .whitespacesAndNewlines)
-
         return token.isEmpty ? nil : token
     }
 
     // MARK: URL / Auth
 
-    private func makeURL(
-        path: String
-    ) throws -> URL {
-        if let absolute = URL(string: path),
-           absolute.scheme != nil {
+    private func makeURL(path: String) throws -> URL {
+        if let absolute = URL(string: path), absolute.scheme != nil {
             return absolute
         }
 
         let normalizedPath = path.hasPrefix("/") ? path : "/" + path
-
         guard let url = URL(string: baseURL + normalizedPath) else {
             throw APIError.invalidURL
         }
-
         return url
     }
 
-    private func applyAuthorization(
-        _ token: String?,
-        to request: inout URLRequest
-    ) {
-        guard let token,
-              !token.isEmpty else {
-            return
-        }
-
-        request.setValue(
-            "Bearer \(token)",
-            forHTTPHeaderField: "Authorization"
-        )
+    private func applyAuthorization(_ token: String?, to request: inout URLRequest) {
+        guard let token, !token.isEmpty else { return }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
 
     // MARK: Response / debug helpers
 
-    private func extractServerMessage(
-        from data: Data
-    ) -> String {
+    private func extractServerMessage(from data: Data) -> String {
         guard !data.isEmpty else { return "" }
 
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let message = json["message"] as? String,
-               !message.isEmpty {
+            if let message = json["message"] as? String, !message.isEmpty {
                 return message
             }
-
-            if let error = json["error"] as? String,
-               !error.isEmpty {
+            if let error = json["error"] as? String, !error.isEmpty {
                 return error
             }
         }
 
         return String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? ""
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    private func debugJSONDescription(
-        _ data: Data
-    ) -> String {
+    private func debugJSONDescription(_ data: Data) -> String {
         guard var object = try? JSONSerialization.jsonObject(with: data) else {
             return "<\(data.count) bytes>"
         }
-
         object = redactSecrets(in: object)
-
-        guard let safeData = try? JSONSerialization.data(
-            withJSONObject: object,
-            options: [.sortedKeys]
-        ),
-        let safeString = String(data: safeData, encoding: .utf8) else {
+        guard let safeData = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let safeString = String(data: safeData, encoding: .utf8) else {
             return "<redacted JSON>"
         }
-
         return safeString
     }
 
-    private func redactSecrets(
-        in value: Any
-    ) -> Any {
+    private func redactSecrets(in value: Any) -> Any {
         if let dictionary = value as? [String: Any] {
             return dictionary.reduce(into: [String: Any]()) { result, item in
                 let key = item.key.lowercased()
-
-                if key.contains("password") ||
-                    key.contains("token") ||
-                    key.contains("secret") {
+                if key.contains("password") || key.contains("token") || key.contains("secret") {
                     result[item.key] = "***"
                 } else {
                     result[item.key] = redactSecrets(in: item.value)
                 }
             }
         }
-
         if let array = value as? [Any] {
             return array.map { redactSecrets(in: $0) }
         }
-
         return value
     }
 }
 
 private extension Data {
-    mutating func appendMultipartString(
-        _ string: String
-    ) {
-        guard let data = string.data(using: .utf8) else {
-            return
-        }
-
+    mutating func appendMultipartString(_ string: String) {
+        guard let data = string.data(using: .utf8) else { return }
         append(data)
     }
 }
