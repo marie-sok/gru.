@@ -3,6 +3,7 @@ package gru.app.service;
 import gru.app.dto.E2EEMessageRequest;
 import gru.app.model.Chat;
 import gru.app.model.Message;
+import gru.app.model.ReplyReference;
 import gru.app.model.User;
 import gru.app.repository.ChatRepository;
 import gru.app.repository.MessageRepository;
@@ -30,9 +31,7 @@ public class E2EEMessageService {
 
     public Message send(String senderId, E2EEMessageRequest request) {
         User sender = requireUser(senderId);
-        if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request is required");
-        }
+        if (request == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request is required");
 
         requireText(request.getChatId(), "chatId", 120);
         requireText(request.getClientMessageId(), "clientMessageId", 64);
@@ -53,7 +52,6 @@ public class E2EEMessageService {
 
         Chat chat = chatRepository.findById(request.getChatId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat not found"));
-
         List<String> participants = chat.getParticipants();
         if (participants == null || !participants.contains(senderId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a chat participant");
@@ -62,8 +60,7 @@ public class E2EEMessageService {
         List<String> receivers = participants.stream()
                 .filter(id -> id != null && !id.isBlank())
                 .filter(id -> !id.equals(senderId))
-                .distinct()
-                .toList();
+                .distinct().toList();
         if (receivers.size() != 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "E2EE v1 supports direct chats only");
         }
@@ -84,26 +81,26 @@ public class E2EEMessageService {
             return existing;
         }
 
-        if (!cryptoVerifier.fingerprintMatches(
-                sender.getE2eeSigningPublicKey(),
-                request.getSenderKeyFingerprint()
-        )) {
+        if (!cryptoVerifier.fingerprintMatches(sender.getE2eeSigningPublicKey(), request.getSenderKeyFingerprint())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Sender key fingerprint mismatch");
         }
-
         if (!cryptoVerifier.verifyMessageSignature(
-                sender.getE2eeSigningPublicKey(),
-                request.getEncryptionVersion(),
-                chat.getId(),
-                senderId,
-                receiver.getId(),
-                request.getClientMessageId(),
-                request.getSenderEphemeralPublicKey(),
-                request.getEncryptedPayload(),
-                request.getSenderKeyFingerprint(),
-                request.getSignature()
-        )) {
+                sender.getE2eeSigningPublicKey(), request.getEncryptionVersion(), chat.getId(), senderId,
+                receiver.getId(), request.getClientMessageId(), request.getSenderEphemeralPublicKey(),
+                request.getEncryptedPayload(), request.getSenderKeyFingerprint(), request.getSignature())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid E2EE envelope signature");
+        }
+
+        ReplyReference replyReference = null;
+        String replyId = request.getReplyToMessageId();
+        if (replyId != null && !replyId.isBlank()) {
+            Message original = messageRepository.findById(replyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply message not found"));
+            if (!chat.getId().equals(original.getChatId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply message belongs to another chat");
+            }
+            // Server keeps routing metadata only. It never needs the replied-to plaintext.
+            replyReference = new ReplyReference(original.getId(), original.getSenderId(), "");
         }
 
         Message message = new Message();
@@ -111,6 +108,7 @@ public class E2EEMessageService {
         message.setSenderId(senderId);
         message.setReceiverId(receiver.getId());
         message.setText("");
+        message.setReplyTo(replyReference);
         message.setE2eeClientMessageId(request.getClientMessageId());
         message.setEncryptedPayload(request.getEncryptedPayload());
         message.setEncryptionVersion(request.getEncryptionVersion());
@@ -138,18 +136,13 @@ public class E2EEMessageService {
     }
 
     private void requireText(String value, String field, int max) {
-        if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required");
-        }
-        if (value.length() > max) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is too long");
-        }
+        if (value == null || value.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required");
+        if (value.length() > max) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is too long");
     }
 
     private void requireUUID(String value, String field) {
-        try {
-            UUID.fromString(value);
-        } catch (IllegalArgumentException error) {
+        try { UUID.fromString(value); }
+        catch (IllegalArgumentException error) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be a UUID");
         }
     }
