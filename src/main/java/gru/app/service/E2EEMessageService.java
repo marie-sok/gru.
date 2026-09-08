@@ -7,6 +7,7 @@ import gru.app.model.User;
 import gru.app.repository.ChatRepository;
 import gru.app.repository.MessageRepository;
 import gru.app.repository.UserRepository;
+import gru.app.security.E2EECryptoVerifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class E2EEMessageService {
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
     private final UserRepository userRepository;
+    private final E2EECryptoVerifier cryptoVerifier;
 
     public Message send(String senderId, E2EEMessageRequest request) {
         User sender = requireUser(senderId);
@@ -32,6 +35,8 @@ public class E2EEMessageService {
         }
 
         requireText(request.getChatId(), "chatId", 120);
+        requireText(request.getClientMessageId(), "clientMessageId", 64);
+        requireUUID(request.getClientMessageId(), "clientMessageId");
         requireText(request.getEncryptionVersion(), "encryptionVersion", 40);
         if (!"gru-e2ee-v1".equals(request.getEncryptionVersion())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported encryption version");
@@ -69,13 +74,44 @@ public class E2EEMessageService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Receiver E2EE identity key is not registered");
         }
 
+        Message existing = messageRepository
+                .findFirstBySenderIdAndE2eeClientMessageId(senderId, request.getClientMessageId())
+                .orElse(null);
+        if (existing != null) {
+            if (!chat.getId().equals(existing.getChatId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "clientMessageId already used in another chat");
+            }
+            return existing;
+        }
+
+        if (!cryptoVerifier.fingerprintMatches(
+                sender.getE2eeSigningPublicKey(),
+                request.getSenderKeyFingerprint()
+        )) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Sender key fingerprint mismatch");
+        }
+
+        if (!cryptoVerifier.verifyMessageSignature(
+                sender.getE2eeSigningPublicKey(),
+                request.getEncryptionVersion(),
+                chat.getId(),
+                senderId,
+                receiver.getId(),
+                request.getClientMessageId(),
+                request.getSenderEphemeralPublicKey(),
+                request.getEncryptedPayload(),
+                request.getSenderKeyFingerprint(),
+                request.getSignature()
+        )) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid E2EE envelope signature");
+        }
+
         Message message = new Message();
         message.setChatId(chat.getId());
         message.setSenderId(senderId);
         message.setReceiverId(receiver.getId());
-        // Legacy clients require a non-null JSON string. The content itself is
-        // exclusively in encryptedPayload and remains opaque to the server.
         message.setText("");
+        message.setE2eeClientMessageId(request.getClientMessageId());
         message.setEncryptedPayload(request.getEncryptedPayload());
         message.setEncryptionVersion(request.getEncryptionVersion());
         message.setSenderEphemeralPublicKey(request.getSenderEphemeralPublicKey());
@@ -107,6 +143,14 @@ public class E2EEMessageService {
         }
         if (value.length() > max) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is too long");
+        }
+    }
+
+    private void requireUUID(String value, String field) {
+        try {
+            UUID.fromString(value);
+        } catch (IllegalArgumentException error) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be a UUID");
         }
     }
 
