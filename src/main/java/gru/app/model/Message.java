@@ -14,7 +14,7 @@ import java.util.Set;
         name = "uniq_e2ee_sender_client_message",
         def = "{'senderId': 1, 'e2eeClientMessageId': 1}",
         unique = true,
-        sparse = true
+        partialFilter = "{'e2eeClientMessageId': {'$type': 'string'}}"
 )
 @Data
 public class Message {
