@@ -39,7 +39,7 @@ public class E2EEMessageService {
 
         Message existing = findExisting(senderId, request, chat);
         if (existing != null) {
-            return ensureSenderKey(existing, sender);
+            return ensureSenderIdentity(existing, sender);
         }
 
         verifyEnvelope(sender, receiver, chat, request);
@@ -70,7 +70,7 @@ public class E2EEMessageService {
 
         Message existing = findExisting(senderId, request, chat);
         if (existing != null) {
-            return ensureSenderKey(existing, sender);
+            return ensureSenderIdentity(existing, sender);
         }
 
         verifyEnvelope(sender, receiver, chat, request);
@@ -161,12 +161,17 @@ public class E2EEMessageService {
         return existing;
     }
 
-    private Message ensureSenderKey(Message existing, User sender) {
+    private Message ensureSenderIdentity(Message existing, User sender) {
+        boolean changed = false;
         if (existing.getSenderSigningPublicKey() == null) {
             existing.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
-            return messageRepository.save(existing);
+            changed = true;
         }
-        return existing;
+        if (existing.getSenderKeyAgreementPublicKey() == null) {
+            existing.setSenderKeyAgreementPublicKey(sender.getE2eeKeyAgreementPublicKey());
+            changed = true;
+        }
+        return changed ? messageRepository.save(existing) : existing;
     }
 
     private void validateRequest(E2EEMessageRequest request) {
@@ -254,6 +259,7 @@ public class E2EEMessageService {
         message.setE2eeSignature(request.getSignature());
         message.setSenderKeyFingerprint(request.getSenderKeyFingerprint());
         message.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
+        message.setSenderKeyAgreementPublicKey(sender.getE2eeKeyAgreementPublicKey());
     }
 
     private ReplyReference buildReplyReference(Chat chat, String replyId) {
