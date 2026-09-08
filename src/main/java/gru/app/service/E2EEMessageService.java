@@ -1,6 +1,7 @@
 package gru.app.service;
 
 import gru.app.dto.E2EEMessageRequest;
+import gru.app.model.Attachment;
 import gru.app.model.Chat;
 import gru.app.model.Message;
 import gru.app.model.ReplyReference;
@@ -36,34 +37,52 @@ public class E2EEMessageService {
         Chat chat = requireDirectChat(request.getChatId(), senderId);
         User receiver = requireReceiver(chat, senderId, sender);
 
-        Message existing = messageRepository
-                .findFirstBySenderIdAndE2eeClientMessageId(senderId, request.getClientMessageId())
-                .orElse(null);
+        Message existing = findExisting(senderId, request, chat);
         if (existing != null) {
-            if (!chat.getId().equals(existing.getChatId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "clientMessageId already used in another chat");
-            }
-            if (existing.getSenderSigningPublicKey() == null) {
-                existing.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
-                existing = messageRepository.save(existing);
-            }
-            return existing;
+            return ensureSenderKey(existing, sender);
         }
 
         verifyEnvelope(sender, receiver, chat, request);
 
-        ReplyReference replyReference = buildReplyReference(chat, request.getReplyToMessageId());
-
-        Message message = new Message();
-        message.setChatId(chat.getId());
-        message.setSenderId(senderId);
-        message.setReceiverId(receiver.getId());
-        message.setText("");
-        message.setReplyTo(replyReference);
+        Message message = baseMessage(
+                senderId,
+                receiver.getId(),
+                chat,
+                buildReplyReference(chat, request.getReplyToMessageId())
+        );
         applyEnvelope(message, sender, request);
-        message.setCreatedAt(Instant.now());
-        message.setDeliveredAt(null);
-        message.setReadAt(null);
+        return messageRepository.save(message);
+    }
+
+    public Message sendMedia(
+            String senderId,
+            E2EEMessageRequest request,
+            Attachment attachment
+    ) {
+        if (attachment == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attachment is required");
+        }
+
+        User sender = requireUser(senderId);
+        validateRequest(request);
+        Chat chat = requireDirectChat(request.getChatId(), senderId);
+        User receiver = requireReceiver(chat, senderId, sender);
+
+        Message existing = findExisting(senderId, request, chat);
+        if (existing != null) {
+            return ensureSenderKey(existing, sender);
+        }
+
+        verifyEnvelope(sender, receiver, chat, request);
+
+        Message message = baseMessage(
+                senderId,
+                receiver.getId(),
+                chat,
+                buildReplyReference(chat, request.getReplyToMessageId())
+        );
+        message.setAttachment(attachment);
+        applyEnvelope(message, sender, request);
         return messageRepository.save(message);
     }
 
@@ -112,6 +131,42 @@ public class E2EEMessageService {
         message.setIsEdited(true);
         message.setEditedAt(Instant.now());
         return messageRepository.save(message);
+    }
+
+    private Message baseMessage(
+            String senderId,
+            String receiverId,
+            Chat chat,
+            ReplyReference replyReference
+    ) {
+        Message message = new Message();
+        message.setChatId(chat.getId());
+        message.setSenderId(senderId);
+        message.setReceiverId(receiverId);
+        message.setText("");
+        message.setReplyTo(replyReference);
+        message.setCreatedAt(Instant.now());
+        message.setDeliveredAt(null);
+        message.setReadAt(null);
+        return message;
+    }
+
+    private Message findExisting(String senderId, E2EEMessageRequest request, Chat chat) {
+        Message existing = messageRepository
+                .findFirstBySenderIdAndE2eeClientMessageId(senderId, request.getClientMessageId())
+                .orElse(null);
+        if (existing != null && !chat.getId().equals(existing.getChatId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "clientMessageId already used in another chat");
+        }
+        return existing;
+    }
+
+    private Message ensureSenderKey(Message existing, User sender) {
+        if (existing.getSenderSigningPublicKey() == null) {
+            existing.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
+            return messageRepository.save(existing);
+        }
+        return existing;
     }
 
     private void validateRequest(E2EEMessageRequest request) {
