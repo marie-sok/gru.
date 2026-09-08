@@ -14,18 +14,18 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    private static final String DEVELOPMENT_SECRET =
-            "functional_unique_creator_kerry_wtf???_really??_fuck_rkn";
-
     private final SecretKey key;
 
     public JwtService(
             @Value("${gru.security.jwt-secret:${GRU_JWT_SECRET:}}") String configuredSecret
     ) {
-        String secret = configuredSecret == null || configuredSecret.isBlank()
-                ? DEVELOPMENT_SECRET
-                : configuredSecret.trim();
+        if (configuredSecret == null || configuredSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "GRU_JWT_SECRET is required; refusing to start with a built-in fallback secret"
+            );
+        }
 
+        String secret = configuredSecret.trim();
         if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("GRU_JWT_SECRET must contain at least 32 bytes");
         }
@@ -61,7 +61,7 @@ public class JwtService {
                     .build()
                     .parseSignedClaims(token);
             return true;
-        } catch (JwtException e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
