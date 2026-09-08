@@ -4,14 +4,12 @@ import UIKit
 @MainActor
 struct GRUReleaseSettingsView: View {
     @State private var showLogoutConfirmation = false
-    @State private var backendProbe: GRUServerProbeResult?
 
     @AppStorage(GRUTheme.selectionKey)
     private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
 
     @AppStorage(GRUAppLanguage.storageKey)
-    private var languageRaw =
-        GRUAppLanguage.defaultLanguage.rawValue
+    private var languageRaw = GRUAppLanguage.defaultLanguage.rawValue
 
     @AppStorage("showStatus") private var showStatus = true
     @AppStorage("readReceipts") private var readReceipts = true
@@ -24,14 +22,20 @@ struct GRUReleaseSettingsView: View {
 
     private var currentTheme: GRUAppTheme {
         let candidate = GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
-        return GRUThemePolicy.allowed.contains(candidate) ? candidate : .blackMoonCat
+        return GRUThemePolicy.allowed.contains(candidate)
+            ? candidate
+            : .blackMoonCat
+    }
+
+    private var selectedLanguage: GRUAppLanguage {
+        GRUAppLanguage(rawValue: languageRaw) ?? .defaultLanguage
     }
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 14) {
-                    identityCard
+                    profileLink
                     languageCard
                     themeCard
                     messagingCard
@@ -44,65 +48,53 @@ struct GRUReleaseSettingsView: View {
                 .padding(.bottom, 110)
             }
             .background(GRUAppBackdrop())
-            .navigationTitle("Настройки")
+            .navigationTitle(GRUL10n.text("Настройки"))
             .navigationBarTitleDisplayMode(.large)
         }
-        .task {
-            backendProbe = await APIClient.shared.probeServer()
-        }
         .confirmationDialog(
-            "Выйти из gru.?",
+            GRUL10n.text("Выйти из gru.?"),
             isPresented: $showLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Выйти", role: .destructive) {
+            Button(GRUL10n.text("Выйти"), role: .destructive) {
                 logout()
             }
-            Button("Отмена", role: .cancel) {}
+
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("Текущая сессия и локальный кэш аккаунта будут очищены.")
+            Text(
+                GRUL10n.text(
+                    "Текущая сессия и локальный кэш аккаунта будут очищены."
+                )
+            )
         }
     }
 }
 
 private extension GRUReleaseSettingsView {
-    var identityCard: some View {
+    var profileLink: some View {
         NavigationLink {
             ProfileView()
         } label: {
-            HStack(spacing: 13) {
-                GRUNeonIcon(
-                    systemName: "person.crop.circle.fill",
-                    size: 40,
-                    iconSize: 16
-                )
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(GRUColors.accent)
+                    .frame(width: 30, height: 30)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Профиль")
-                        .font(.headline)
-                        .foregroundStyle(GRUColors.text)
-                    Text("имя • nickname • bio • аватар")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(GRUL10n.text("Профиль"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(GRUColors.text)
 
                 Spacer()
-
-                VStack(alignment: .trailing, spacing: 3) {
-                    Circle()
-                        .fill(backendColor)
-                        .frame(width: 8, height: 8)
-                    Text(backendTitle)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
 
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(14)
-            .releaseCard()
+            .padding(.horizontal, 4)
+            .frame(height: 46)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -117,64 +109,42 @@ private extension GRUReleaseSettingsView {
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Язык")
+                    Text(GRUL10n.text("Язык"))
                         .font(.subheadline.weight(.bold))
 
-                    Text(
-                        (
-                            GRUAppLanguage(
-                                rawValue: languageRaw
-                            )
-                            ?? .defaultLanguage
-                        ).nativeTitle
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(selectedLanguage.nativeTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Text(
-                    (
-                        GRUAppLanguage(
-                            rawValue: languageRaw
+                Text(selectedLanguage.badge)
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .black,
+                            design: .rounded
                         )
-                        ?? .defaultLanguage
-                    ).badge
-                )
-                .font(
-                    .system(
-                        size: 10,
-                        weight: .black,
-                        design: .rounded
                     )
-                )
-                .foregroundStyle(GRUColors.accent)
-                .padding(.horizontal, 8)
-                .frame(height: 23)
-                .background(
-                    GRUColors.accent.opacity(0.10),
-                    in: Capsule()
-                )
+                    .foregroundStyle(GRUColors.accent)
+                    .padding(.horizontal, 8)
+                    .frame(height: 23)
+                    .background(
+                        GRUColors.accent.opacity(0.10),
+                        in: Capsule()
+                    )
             }
 
             Picker(
-                "Язык",
+                GRUL10n.text("Язык"),
                 selection: $languageRaw
             ) {
-                Text("Русский")
-                    .tag(
-                        GRUAppLanguage
-                            .russian
-                            .rawValue
-                    )
+                Text(GRUL10n.text("Русский"))
+                    .tag(GRUAppLanguage.russian.rawValue)
 
                 Text("English")
-                    .tag(
-                        GRUAppLanguage
-                            .english
-                            .rawValue
-                    )
+                    .tag(GRUAppLanguage.english.rawValue)
             }
             .pickerStyle(.segmented)
         }
@@ -202,19 +172,35 @@ private extension GRUReleaseSettingsView {
 
                 HStack(alignment: .bottom, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Темы")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                        Text(GRUL10n.text("Темы"))
+                            .font(
+                                .system(
+                                    size: 12,
+                                    weight: .black,
+                                    design: .rounded
+                                )
+                            )
                             .textCase(.uppercase)
                             .tracking(1.2)
                             .foregroundStyle(.white.opacity(0.72))
 
                         Text(GRUThemePolicy.displayName(for: currentTheme))
-                            .font(.system(size: 21, weight: .black, design: .rounded))
+                            .font(
+                                .system(
+                                    size: 21,
+                                    weight: .black,
+                                    design: .rounded
+                                )
+                            )
                             .foregroundStyle(.white)
 
-                        Text("9 фирменных animated micro-art сцен")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.68))
+                        Text(
+                            GRUL10n.text(
+                                "9 фирменных animated micro-art сцен"
+                            )
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.68))
                     }
 
                     Spacer()
@@ -225,10 +211,21 @@ private extension GRUReleaseSettingsView {
                 }
                 .padding(14)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(currentTheme.accent.opacity(0.28), lineWidth: 1)
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+                .stroke(
+                    currentTheme.accent.opacity(0.28),
+                    lineWidth: 1
+                )
             }
         }
         .buttonStyle(.plain)
@@ -236,34 +233,78 @@ private extension GRUReleaseSettingsView {
 
     var messagingCard: some View {
         VStack(spacing: 0) {
-            releaseToggle("Уведомления", icon: "bell.fill", isOn: $notifications)
+            releaseToggle(
+                "Уведомления",
+                icon: "bell.fill",
+                isOn: $notifications
+            )
             releaseDivider
-            releaseToggle("Звук", icon: "speaker.wave.2.fill", isOn: $sounds)
+
+            releaseToggle(
+                "Звук",
+                icon: "speaker.wave.2.fill",
+                isOn: $sounds
+            )
             releaseDivider
-            releaseToggle("Показывать online", icon: "circle.fill", isOn: $showStatus)
+
+            releaseToggle(
+                "Показывать online",
+                icon: "circle.fill",
+                isOn: $showStatus
+            )
             releaseDivider
-            releaseToggle("Отчёты о прочтении", icon: "checkmark.circle.fill", isOn: $readReceipts)
+
+            releaseToggle(
+                "Отчёты о прочтении",
+                icon: "checkmark.circle.fill",
+                isOn: $readReceipts
+            )
             releaseDivider
-            releaseToggle("Показывать «печатает…»", icon: "ellipsis.bubble.fill", isOn: $typing)
+
+            releaseToggle(
+                "Показывать «печатает…»",
+                icon: "ellipsis.bubble.fill",
+                isOn: $typing
+            )
             releaseDivider
-            releaseToggle("Экономия трафика", icon: "antenna.radiowaves.left.and.right", isOn: $dataSaver)
+
+            releaseToggle(
+                "Экономия трафика",
+                icon: "antenna.radiowaves.left.and.right",
+                isOn: $dataSaver
+            )
         }
         .releaseCard()
     }
 
     var securityCard: some View {
         VStack(spacing: 0) {
-            releaseToggle("Face ID / код устройства", icon: "faceid", isOn: $biometrics)
+            releaseToggle(
+                "Face ID / код устройства",
+                icon: "faceid",
+                isOn: $biometrics
+            )
             releaseDivider
-            releaseToggle("Скрывать превью приложения", icon: "eye.slash.fill", isOn: $hideSwitcherPreview)
+
+            releaseToggle(
+                "Скрывать превью приложения",
+                icon: "eye.slash.fill",
+                isOn: $hideSwitcherPreview
+            )
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield.fill")
                     .foregroundStyle(GRUColors.accent)
                     .frame(width: 22)
-                Text("Защита экрана активна для записи и трансляции. Снимок экрана iOS можно обнаружить только после события.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                Text(
+                    GRUL10n.text(
+                        "Защита экрана активна для записи и трансляции. Снимок экрана iOS можно обнаружить только после события."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
@@ -274,20 +315,36 @@ private extension GRUReleaseSettingsView {
 
     var deviceCard: some View {
         Button {
-            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            guard let url = URL(
+                string: UIApplication.openSettingsURLString
+            ) else {
+                return
+            }
             UIApplication.shared.open(url)
         } label: {
             HStack(spacing: 12) {
-                GRUNeonIcon(systemName: "iphone", size: 36, iconSize: 14)
+                GRUNeonIcon(
+                    systemName: "iphone",
+                    size: 36,
+                    iconSize: 14
+                )
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Разрешения iPhone")
+                    Text(GRUL10n.text("Разрешения iPhone"))
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(GRUColors.text)
-                    Text("камера • микрофон • фото • контакты • локальная сеть")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+
+                    Text(
+                        GRUL10n.text(
+                            "камера • микрофон • фото • контакты • локальная сеть"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
+
                 Spacer()
+
                 Image(systemName: "arrow.up.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
@@ -304,34 +361,23 @@ private extension GRUReleaseSettingsView {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                Text("Выйти из аккаунта")
+
+                Text(GRUL10n.text("Выйти из аккаунта"))
                     .fontWeight(.bold)
+
                 Spacer()
             }
             .padding(14)
             .frame(maxWidth: .infinity)
             .background(
                 Color.red.opacity(0.08),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
             )
         }
         .buttonStyle(.plain)
-    }
-
-    var backendTitle: String {
-        guard let backendProbe else { return "checking" }
-        if backendProbe.isReachable {
-            if let code = backendProbe.statusCode, (200...299).contains(code) {
-                return "backend online"
-            }
-            return "backend reachable"
-        }
-        return "backend offline"
-    }
-
-    var backendColor: Color {
-        guard let backendProbe else { return .secondary }
-        return backendProbe.isReachable ? GRUColors.accent : .red
     }
 
     var releaseDivider: some View {
@@ -351,8 +397,12 @@ private extension GRUReleaseSettingsView {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(GRUColors.accent)
                     .frame(width: 28, height: 28)
-                    .background(GRUColors.accent.opacity(0.10), in: Circle())
-                Text(title)
+                    .background(
+                        GRUColors.accent.opacity(0.10),
+                        in: Circle()
+                    )
+
+                Text(GRUL10n.text(title))
                     .font(.subheadline.weight(.semibold))
             }
         }
@@ -394,7 +444,9 @@ struct GRUReleaseThemesView: View {
 
     private var selectedTheme: GRUAppTheme {
         let candidate = GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
-        return GRUThemePolicy.allowed.contains(candidate) ? candidate : .blackMoonCat
+        return GRUThemePolicy.allowed.contains(candidate)
+            ? candidate
+            : .blackMoonCat
     }
 
     var body: some View {
@@ -414,7 +466,7 @@ struct GRUReleaseThemesView: View {
             .padding(.bottom, 40)
         }
         .background(GRUAppBackdrop())
-        .navigationTitle("Темы")
+        .navigationTitle(GRUL10n.text("Темы"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             GRUThemePolicy.migrateIfNeeded()
@@ -443,29 +495,54 @@ private extension GRUReleaseThemesView {
                     Circle()
                         .fill(selectedTheme.accent)
                         .frame(width: 7, height: 7)
-                    Text(dynamicBackground && !reduceMotion ? "LIVE" : "STATIC")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .tracking(1)
-                        .foregroundStyle(.white.opacity(0.75))
+
+                    Text(
+                        dynamicBackground && !reduceMotion
+                            ? "LIVE"
+                            : "STATIC"
+                    )
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .black,
+                            design: .rounded
+                        )
+                    )
+                    .tracking(1)
+                    .foregroundStyle(.white.opacity(0.75))
                 }
 
                 Text(GRUThemePolicy.displayName(for: selectedTheme))
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(
+                        .system(
+                            size: 26,
+                            weight: .black,
+                            design: .rounded
+                        )
+                    )
                     .foregroundStyle(.white)
 
-                Text(selectedTheme.subtitle)
+                Text(GRUL10n.text(selectedTheme.subtitle))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.white.opacity(0.70))
                     .lineLimit(2)
             }
             .padding(16)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .clipShape(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(selectedTheme.accent.opacity(0.40), lineWidth: 1)
+                .stroke(
+                    selectedTheme.accent.opacity(0.40),
+                    lineWidth: 1
+                )
         }
-        .shadow(color: selectedTheme.accent.opacity(0.14), radius: 24)
+        .shadow(
+            color: selectedTheme.accent.opacity(0.14),
+            radius: 24
+        )
     }
 
     var motionControls: some View {
@@ -494,15 +571,26 @@ private extension GRUReleaseThemesView {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
-                Text(title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+
+                Text(GRUL10n.text(title))
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
                     .lineLimit(1)
             }
         }
         .toggleStyle(.switch)
         .tint(GRUColors.accent)
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 76,
+            alignment: .leading
+        )
         .releaseCard()
     }
 
@@ -510,7 +598,12 @@ private extension GRUReleaseThemesView {
         let isSelected = theme == selectedTheme
 
         return Button {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+            withAnimation(
+                .spring(
+                    response: 0.34,
+                    dampingFraction: 0.84
+                )
+            ) {
                 themeRaw = theme.rawValue
             }
             UISelectionFeedbackGenerator().selectionChanged()
@@ -534,7 +627,9 @@ private extension GRUReleaseThemesView {
                         Image(systemName: theme.icon)
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(theme.accent)
+
                         Spacer()
+
                         if isSelected {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 17, weight: .bold))
@@ -543,20 +638,36 @@ private extension GRUReleaseThemesView {
                     }
 
                     Text(GRUThemePolicy.displayName(for: theme))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(
+                            .system(
+                                size: 13,
+                                weight: .black,
+                                design: .rounded
+                            )
+                        )
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                 }
                 .padding(11)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 21, style: .continuous)
-                    .stroke(
-                        isSelected ? theme.accent.opacity(0.95) : Color.white.opacity(0.08),
-                        lineWidth: isSelected ? 1.6 : 1
-                    )
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+                .stroke(
+                    isSelected
+                        ? theme.accent.opacity(0.95)
+                        : Color.white.opacity(0.08),
+                    lineWidth: isSelected ? 1.6 : 1
+                )
             }
             .scaleEffect(isSelected ? 1.0 : 0.985)
         }
@@ -571,11 +682,17 @@ private extension View {
         self
             .background(
                 GRUColors.card.opacity(0.82),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(0.055), lineWidth: 1)
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(Color.white.opacity(0.055), lineWidth: 1)
             }
     }
 }

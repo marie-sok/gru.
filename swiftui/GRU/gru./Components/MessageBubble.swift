@@ -1,4 +1,3 @@
-
 import SwiftUI
 import UIKit
 
@@ -13,8 +12,11 @@ struct MessageBubble: View {
     @State private var dragOffset: CGFloat = 0
     @State private var hasTriggeredReplyHaptic = false
 
-    @AppStorage("gru.settings.chats.swipeReply") private var swipeReplyEnabled = true
-    @AppStorage("gru.settings.chats.quickReactions") private var quickReactions = true
+    @AppStorage("gru.settings.chats.swipeReply")
+    private var swipeReplyEnabled = true
+
+    @AppStorage("gru.settings.chats.quickReactions")
+    private var quickReactions = true
 
     let message: Message
     let isCurrentUser: Bool
@@ -28,13 +30,28 @@ struct MessageBubble: View {
     let isSelected: Bool
     let onSelect: (Message) -> Void
 
+    private var replyProgress: Double {
+        min(max(Double(-dragOffset) / 45.0, 0), 1)
+    }
+
+    private var hasVisiblePayload: Bool {
+        !message.text.isEmpty || message.attachment != nil
+    }
+
     var body: some View {
         HStack(alignment: .bottom) {
             if isCurrentUser {
-                Spacer(minLength: 60)
+                Spacer(minLength: 54)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(
+                alignment: isCurrentUser ? .trailing : .leading,
+                spacing: 7
+            ) {
+                if message.status == .failed || message.isQueuedForRetry {
+                    deliveryBanner
+                }
+
                 if let reply = message.replyTo {
                     ReplyPreview(message: reply)
                 }
@@ -44,89 +61,79 @@ struct MessageBubble: View {
                 }
 
                 if !message.text.isEmpty {
-                    BubbleText(text: message.text, currentUser: isCurrentUser)
+                    BubbleText(
+                        text: message.text,
+                        currentUser: isCurrentUser
+                    )
                 }
 
                 if let reaction = message.reaction {
-                    Text(reaction.emoji)
-                        .font(.title3)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(GRUColors.card)
-                        .clipShape(Capsule())
+                    reactionChip(reaction)
                 }
 
-                HStack(spacing: 5) {
-                    Spacer()
-
-                    Menu {
-                        messageActions
-                    } label: {
-                        GRUNeonIcon(systemName: "ellipsis", size: 26, iconSize: 11)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Действия с сообщением")
-
-                    HStack(spacing: 3) {
-                        if message.isEdited {
-                            Text("изм.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(timeString)
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                    if isCurrentUser {
-                        statusView
-                    }
+                if hasVisiblePayload {
+                    metadataRow
                 }
             }
 
             if !isCurrentUser {
-                Spacer(minLength: 60)
+                Spacer(minLength: 54)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 2)
         .contextMenu {
             messageActions
         }
         .offset(x: dragOffset)
         .overlay(alignment: .trailing) {
-            if dragOffset < -10 {
-                Image(systemName: "arrowshape.turn.up.left.circle.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(GRUColors.accent)
-                    .opacity(min(1.0, Double(-dragOffset) / 45.0))
-                    .scaleEffect(min(1.1, max(0.5, Double(-dragOffset) / 45.0)))
-                    .padding(.trailing, 6)
+            if dragOffset < -8 {
+                replySwipeHUD
+                    .padding(.trailing, 7)
                     .allowsHitTesting(false)
             }
         }
         .gesture(
-            DragGesture(minimumDistance: 20)
+            DragGesture(minimumDistance: 18)
                 .onChanged { value in
-                    guard swipeReplyEnabled, !isSelectionMode else { return }
-                    if value.translation.width < 0 && abs(value.translation.width) > abs(value.translation.height) {
-                        let translation = value.translation.width
-                        if translation < -50 {
-                            dragOffset = -50 + (translation + 50) * 0.2
-                        } else {
-                            dragOffset = translation
-                        }
+                    guard swipeReplyEnabled,
+                          !isSelectionMode else {
+                        return
+                    }
 
-                        if translation < -45 && !hasTriggeredReplyHaptic {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            hasTriggeredReplyHaptic = true
-                        }
+                    guard value.translation.width < 0,
+                          abs(value.translation.width)
+                            > abs(value.translation.height)
+                    else {
+                        return
+                    }
+
+                    let translation = value.translation.width
+
+                    if translation < -52 {
+                        dragOffset = -52 + (translation + 52) * 0.18
+                    } else {
+                        dragOffset = translation
+                    }
+
+                    if translation < -45,
+                       !hasTriggeredReplyHaptic {
+                        UIImpactFeedbackGenerator(style: .medium)
+                            .impactOccurred()
+                        hasTriggeredReplyHaptic = true
                     }
                 }
                 .onEnded { _ in
                     if hasTriggeredReplyHaptic {
                         onReply(message)
                     }
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+
+                    withAnimation(
+                        .spring(
+                            response: 0.34,
+                            dampingFraction: 0.76
+                        )
+                    ) {
                         dragOffset = 0
                         hasTriggeredReplyHaptic = false
                     }
@@ -140,60 +147,263 @@ struct MessageBubble: View {
         }
         .overlay(alignment: .leading) {
             if isSelectionMode {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(isSelected ? GRUColors.accent : Color.secondary)
-                    .padding(.leading, 2)
-                    .allowsHitTesting(false)
+                selectionIndicator
             }
         }
-        .background(isSelected ? GRUColors.accent.opacity(0.08) : Color.clear)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(GRUColors.accent.opacity(0.075))
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                        .stroke(
+                            GRUColors.accent.opacity(0.16),
+                            lineWidth: 1
+                        )
+                    }
+                    .padding(.horizontal, 4)
+            }
+        }
+        .scaleEffect(isSelected ? 0.99 : 1)
+        .animation(
+            .spring(response: 0.28, dampingFraction: 0.80),
+            value: isSelected
+        )
         .confirmationDialog(
-            "Удалить сообщение?",
+            GRUL10n.text("Удалить сообщение?"),
             isPresented: Binding(
                 get: { pendingDeleteScope != nil },
                 set: { visible in
-                    if !visible { pendingDeleteScope = nil }
+                    if !visible {
+                        pendingDeleteScope = nil
+                    }
                 }
             ),
             titleVisibility: .visible
         ) {
             if pendingDeleteScope == .local {
-                Button("Удалить только у себя", role: .destructive) {
+                Button(
+                    GRUL10n.text("Удалить только у себя"),
+                    role: .destructive
+                ) {
                     onDeleteLocal(message)
                     pendingDeleteScope = nil
                 }
             }
 
             if pendingDeleteScope == .everyone {
-                Button("Удалить у себя и собеседника", role: .destructive) {
+                Button(
+                    GRUL10n.text("Удалить у себя и собеседника"),
+                    role: .destructive
+                ) {
                     onDeleteForEveryone(message)
                     pendingDeleteScope = nil
                 }
             }
 
-            Button("Отмена", role: .cancel) {
+            Button(GRUL10n.text("Отмена"), role: .cancel) {
                 pendingDeleteScope = nil
             }
         } message: {
             Text(
-                pendingDeleteScope == .everyone
-                    ? "Сообщение исчезнет у обоих участников чата."
-                    : "Сообщение исчезнет только на этом устройстве."
+                GRUL10n.text(
+                    pendingDeleteScope == .everyone
+                        ? "Сообщение исчезнет у обоих участников чата."
+                        : "Сообщение исчезнет только на этом устройстве."
+                )
             )
         }
     }
 
+    private var deliveryBanner: some View {
+        HStack(spacing: 6) {
+            Image(
+                systemName: message.status == .failed
+                    ? "exclamationmark.triangle.fill"
+                    : "clock.arrow.circlepath"
+            )
+            .font(.system(size: 9, weight: .black))
+
+            Text(
+                GRUL10n.text(
+                    message.status == .failed
+                        ? "НЕ ОТПРАВЛЕНО"
+                        : "В ОЧЕРЕДИ"
+                )
+            )
+            .font(.system(size: 8, weight: .black, design: .rounded))
+            .tracking(0.7)
+
+            if message.status == .failed {
+                Button(GRUL10n.text("повторить")) {
+                    onRetry(message)
+                }
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .buttonStyle(.plain)
+            }
+        }
+        .foregroundStyle(
+            message.status == .failed
+                ? Color.orange
+                : GRUColors.accent
+        )
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .background(
+            (message.status == .failed
+                ? Color.orange
+                : GRUColors.accent)
+                .opacity(0.09),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    (message.status == .failed
+                        ? Color.orange
+                        : GRUColors.accent)
+                        .opacity(0.18),
+                    lineWidth: 1
+                )
+        }
+    }
+
+    private var metadataRow: some View {
+        HStack(spacing: 5) {
+            Menu {
+                messageActions
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 20)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                GRUL10n.text("Действия с сообщением")
+            )
+
+            if message.isEdited {
+                Text(GRUL10n.text("изм."))
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(timeString)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+
+            if isCurrentUser {
+                statusView
+            }
+        }
+        .padding(.horizontal, 7)
+        .frame(height: 23)
+        .background(Color.primary.opacity(0.035), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.primary.opacity(0.045), lineWidth: 0.8)
+        }
+    }
+
+    private var replySwipeHUD: some View {
+        ZStack {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 38, height: 38)
+
+            Circle()
+                .trim(from: 0, to: replyProgress)
+                .stroke(
+                    GRUColors.neonGradient,
+                    style: StrokeStyle(
+                        lineWidth: 2.2,
+                        lineCap: .round
+                    )
+                )
+                .rotationEffect(.degrees(-90))
+                .frame(width: 38, height: 38)
+
+            Image(systemName: "arrowshape.turn.up.left.fill")
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(
+                    replyProgress >= 1
+                        ? GRUColors.accent
+                        : Color.secondary
+                )
+                .scaleEffect(0.78 + replyProgress * 0.22)
+        }
+        .shadow(
+            color: GRUColors.accent.opacity(replyProgress * 0.34),
+            radius: 9
+        )
+    }
+
+    private var selectionIndicator: some View {
+        ZStack {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 29, height: 29)
+
+            Circle()
+                .stroke(
+                    isSelected
+                        ? GRUColors.neonGradient
+                        : LinearGradient(
+                            colors: [
+                                Color.secondary.opacity(0.45),
+                                Color.secondary.opacity(0.18)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                    lineWidth: 1.5
+                )
+                .frame(width: 27, height: 27)
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(GRUColors.accent)
+            }
+        }
+        .padding(.leading, 2)
+        .allowsHitTesting(false)
+    }
+
+    private func reactionChip(_ reaction: ReactionType) -> some View {
+        HStack(spacing: 5) {
+            Text(reaction.emoji)
+                .font(.system(size: 17))
+
+            Image(systemName: "sparkle")
+                .font(.system(size: 8, weight: .black))
+                .foregroundStyle(GRUColors.accent)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 29)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(GRUColors.accent.opacity(0.22), lineWidth: 1)
+        }
+        .shadow(color: GRUColors.accent.opacity(0.12), radius: 7)
+    }
+
     @ViewBuilder
     private var messageActions: some View {
-        // Editing is intentionally first for own text messages so it is easy to
-        // discover through the standard long-press menu. It also remains
-        // available for optimistic/failed messages; unsynced edits stay local.
         if isCurrentUser && !message.text.isEmpty {
             Button {
                 onEdit(message)
             } label: {
-                Label("Редактировать", systemImage: "pencil")
+                Label(
+                    GRUL10n.text("Редактировать"),
+                    systemImage: "pencil"
+                )
             }
         }
 
@@ -201,7 +411,10 @@ struct MessageBubble: View {
             Button {
                 onReply(message)
             } label: {
-                Label("Ответить", systemImage: "arrowshape.turn.up.left")
+                Label(
+                    GRUL10n.text("Ответить"),
+                    systemImage: "arrowshape.turn.up.left"
+                )
             }
         }
 
@@ -209,12 +422,15 @@ struct MessageBubble: View {
             Button {
                 UIPasteboard.general.string = message.text
             } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+                Label(
+                    GRUL10n.text("Копировать"),
+                    systemImage: "doc.on.doc"
+                )
             }
         }
 
         if quickReactions {
-            Menu("Реакция") {
+            Menu(GRUL10n.text("Реакция")) {
                 ForEach(ReactionType.allCases) { reaction in
                     Button(reaction.emoji) {
                         onReaction(reaction, message)
@@ -227,14 +443,23 @@ struct MessageBubble: View {
             onSelect(message)
         } label: {
             Label(
-                isSelected ? "Снять выбор" : "Выбрать",
-                systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
+                GRUL10n.text(
+                    isSelected ? "Снять выбор" : "Выбрать"
+                ),
+                systemImage: isSelected
+                    ? "checkmark.circle.fill"
+                    : "checkmark.circle"
             )
         }
 
         if message.status == .failed {
-            Button { onRetry(message) } label: {
-                Label("Повторить отправку", systemImage: "arrow.clockwise")
+            Button {
+                onRetry(message)
+            } label: {
+                Label(
+                    GRUL10n.text("Повторить отправку"),
+                    systemImage: "arrow.clockwise"
+                )
             }
         }
 
@@ -243,14 +468,20 @@ struct MessageBubble: View {
         Button(role: .destructive) {
             pendingDeleteScope = .local
         } label: {
-            Label("Удалить только у себя", systemImage: "trash")
+            Label(
+                GRUL10n.text("Удалить только у себя"),
+                systemImage: "trash"
+            )
         }
 
         if isCurrentUser {
             Button(role: .destructive) {
                 pendingDeleteScope = .everyone
             } label: {
-                Label("Удалить у всех", systemImage: "trash.slash")
+                Label(
+                    GRUL10n.text("Удалить у всех"),
+                    systemImage: "trash.slash"
+                )
             }
         }
     }
@@ -260,37 +491,42 @@ struct MessageBubble: View {
         switch message.status {
         case .sending:
             if message.isQueuedForRetry {
-                HStack(spacing: 3) {
-                    Image(systemName: "clock.arrow.circlepath")
-                    Text("очередь")
-                }
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Сообщение в очереди на отправку")
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        GRUL10n.text("Сообщение в очереди на отправку")
+                    )
             } else {
                 Image(systemName: "clock")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Сообщение отправляется")
+                    .accessibilityLabel(
+                        GRUL10n.text("Сообщение отправляется")
+                    )
             }
+
         case .sent:
             Text("✓")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
+
         case .delivered:
             Text("✓✓")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .tracking(-2)
                 .foregroundStyle(.secondary)
+
         case .read:
             Text("✓✓")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 10, weight: .black))
                 .tracking(-2)
                 .foregroundStyle(GRUColors.accent)
+
         case .failed:
             Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.red)
+                .font(.system(size: 10))
+                .foregroundStyle(.orange)
         }
     }
 
@@ -305,41 +541,151 @@ private struct BubbleText: View {
     let text: String
     let currentUser: Bool
 
-    @AppStorage("gru.settings.chats.textScale") private var textScale = 1.0
-    @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
+    @AppStorage("gru.settings.chats.textScale")
+    private var textScale = 1.0
+
+    @AppStorage("gru.settings.appearance.gradientBubbles")
+    private var gradientBubbles = true
 
     var body: some View {
         Text(text)
-            .font(.system(size: 16.5 * textScale))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .font(
+                .system(
+                    size: 16.5 * textScale,
+                    weight: .regular,
+                    design: .rounded
+                )
+            )
+            .lineSpacing(1.5)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 10.5)
             .background(
                 currentUser
-                    ? (gradientBubbles ? GRUColors.outgoingBubble : GRUColors.card)
+                    ? (gradientBubbles
+                        ? GRUColors.outgoingBubble
+                        : GRUColors.card)
                     : GRUColors.incomingBubble
             )
             .foregroundStyle(GRUColors.text)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(GRUChatBubbleShape(currentUser: currentUser))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                GRUChatBubbleShape(currentUser: currentUser)
                     .stroke(
                         currentUser && gradientBubbles
                             ? GRUColors.neonGradient
                             : LinearGradient(
                                 colors: [
-                                    GRUColors.accent.opacity(0.18),
-                                    Color.white.opacity(0.04)
+                                    GRUColors.accent.opacity(0.15),
+                                    Color.white.opacity(0.035)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                        lineWidth: currentUser ? 1.15 : 0.75
+                        lineWidth: currentUser ? 1.05 : 0.75
                     )
             }
             .shadow(
-                color: currentUser ? GRUColors.accent.opacity(0.18) : .clear,
-                radius: 8
+                color: currentUser
+                    ? GRUColors.accent.opacity(0.16)
+                    : Color.black.opacity(0.08),
+                radius: currentUser ? 10 : 5,
+                y: 3
             )
+    }
+}
+
+private struct GRUChatBubbleShape: Shape {
+    let currentUser: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let large: CGFloat = 19
+        let small: CGFloat = 7
+
+        let corners = UIRectCorner(
+            rawValue:
+                (currentUser
+                    ? UIRectCorner.topLeft.rawValue
+                    : UIRectCorner.topRight.rawValue)
+                | UIRectCorner.topLeft.rawValue
+                | UIRectCorner.topRight.rawValue
+                | (currentUser
+                    ? UIRectCorner.bottomLeft.rawValue
+                    : UIRectCorner.bottomRight.rawValue)
+        )
+
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: large, height: large)
+        )
+
+        var result = Path(path.cgPath)
+
+        if currentUser {
+            let tail = Path { tail in
+                tail.move(
+                    to: CGPoint(
+                        x: rect.maxX - small - 3,
+                        y: rect.maxY - 13
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.maxX + 5,
+                        y: rect.maxY - 2
+                    ),
+                    control: CGPoint(
+                        x: rect.maxX + 1,
+                        y: rect.maxY - 8
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.maxX - 8,
+                        y: rect.maxY - 4
+                    ),
+                    control: CGPoint(
+                        x: rect.maxX - 1,
+                        y: rect.maxY
+                    )
+                )
+                tail.closeSubpath()
+            }
+            result.addPath(tail)
+        } else {
+            let tail = Path { tail in
+                tail.move(
+                    to: CGPoint(
+                        x: rect.minX + small + 3,
+                        y: rect.maxY - 13
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.minX - 5,
+                        y: rect.maxY - 2
+                    ),
+                    control: CGPoint(
+                        x: rect.minX - 1,
+                        y: rect.maxY - 8
+                    )
+                )
+                tail.addQuadCurve(
+                    to: CGPoint(
+                        x: rect.minX + 8,
+                        y: rect.maxY - 4
+                    ),
+                    control: CGPoint(
+                        x: rect.minX + 1,
+                        y: rect.maxY
+                    )
+                )
+                tail.closeSubpath()
+            }
+            result.addPath(tail)
+        }
+
+        return result
     }
 }
 
@@ -347,22 +693,49 @@ private struct ReplyPreview: View {
     let message: Message
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Ответ")
-                .font(.caption2.bold())
+        HStack(spacing: 9) {
+            Capsule()
+                .fill(GRUColors.neonGradient)
+                .frame(width: 3, height: 34)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.system(size: 9, weight: .black))
+
+                    Text(GRUL10n.text("ОТВЕТ"))
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .tracking(0.8)
+                }
                 .foregroundStyle(GRUColors.accent)
 
-            if let attachment = message.attachment {
-                AttachmentContent(attachment: attachment)
-            } else {
-                Text(message.text)
+                if let attachment = message.attachment {
+                    Text(
+                        attachment.fileName.isEmpty
+                            ? GRUL10n.text("Вложение")
+                            : attachment.fileName
+                    )
                     .font(.caption)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
+                } else {
+                    Text(message.text)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
-        .padding(8)
-        .background(Color.gray.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(GRUColors.accent.opacity(0.14), lineWidth: 1)
+        }
     }
 }
 

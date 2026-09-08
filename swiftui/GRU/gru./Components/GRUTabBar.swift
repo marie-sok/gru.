@@ -4,6 +4,13 @@ import UIKit
 struct GRUTabBar: View {
     @Binding var selectedTab: AppTab
 
+    @AppStorage(GRUTheme.selectionKey)
+    private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
+
+    private var currentTheme: GRUAppTheme {
+        GRUAppTheme(rawValue: themeRaw) ?? .blackMoonCat
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             tabItem(.contacts, image: "person.2.fill", label: "Люди")
@@ -17,16 +24,26 @@ struct GRUTabBar: View {
                 .fill(.ultraThinMaterial)
                 .background(
                     RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(GRUColors.card.opacity(0.82))
+                        .fill(GRUColors.card.opacity(0.84))
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 30, style: .continuous)
                         .stroke(GRUColors.neonGradient, lineWidth: 1.15)
-                        .opacity(0.72)
+                        .opacity(0.78)
                 }
-                .shadow(color: GRUColors.accent.opacity(0.24), radius: 24, y: 9)
+                .shadow(color: currentTheme.accent.opacity(0.28), radius: 24, y: 9)
+                .shadow(color: currentTheme.secondaryAccent.opacity(0.10), radius: 34, y: 12)
         )
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(GRUColors.neonGradient)
+                .frame(width: 62, height: 1.5)
+                .blur(radius: 0.2)
+                .opacity(0.72)
+                .offset(y: 1)
+        }
         .padding(.horizontal, 14)
+        .animation(.spring(response: 0.34, dampingFraction: 0.84), value: themeRaw)
     }
 
     private func tabItem(
@@ -45,28 +62,41 @@ struct GRUTabBar: View {
         } label: {
             HStack(spacing: active ? 8 : 0) {
                 ZStack {
-                    Circle()
-                        .fill(active ? GRUColors.accent.opacity(0.16) : .clear)
-                        .frame(width: 38, height: 38)
+                    if active {
+                        Circle()
+                            .fill(currentTheme.accent.opacity(0.12))
+                            .frame(width: 40, height: 40)
+                            .overlay {
+                                Circle()
+                                    .stroke(GRUColors.neonGradient, lineWidth: 1.2)
+                                    .opacity(0.76)
+                            }
+                            .shadow(color: currentTheme.accent.opacity(0.30), radius: 9)
+                    } else {
+                        Circle()
+                            .fill(Color.white.opacity(0.025))
+                            .frame(width: 38, height: 38)
+                    }
 
                     if usesEnvelope {
                         GRUEnvelope()
                             .stroke(
-                                active ? GRUColors.accent : GRUColors.secondary,
+                                active ? currentTheme.accent : GRUColors.secondary,
                                 style: StrokeStyle(lineWidth: 2, lineJoin: .round)
                             )
                             .frame(width: 22, height: 16)
                     } else {
                         Image(systemName: image)
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(active ? GRUColors.accent : GRUColors.secondary)
+                            .foregroundStyle(active ? currentTheme.accent : GRUColors.secondary)
                     }
                 }
+                .scaleEffect(active ? 1.04 : 1.0)
 
                 if active {
                     Text(GRUL10n.text(label))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(GRUColors.text)
                         .transition(.opacity.combined(with: .move(edge: .leading)))
                 }
             }
@@ -74,12 +104,21 @@ struct GRUTabBar: View {
             .frame(height: 48)
             .background(
                 Capsule()
-                    .fill(active ? GRUColors.accent.opacity(0.09) : .clear)
+                    .fill(active ? currentTheme.accent.opacity(0.085) : .clear)
             )
             .overlay {
                 if active {
                     Capsule()
-                        .stroke(GRUColors.accent.opacity(0.22), lineWidth: 1)
+                        .stroke(currentTheme.accent.opacity(0.20), lineWidth: 1)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if active {
+                    Capsule()
+                        .fill(GRUColors.neonGradient)
+                        .frame(width: 18, height: 2)
+                        .offset(y: 1)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
         }

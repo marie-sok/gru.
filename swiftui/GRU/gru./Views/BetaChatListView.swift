@@ -44,7 +44,10 @@ struct BetaChatListView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(GRUColors.accent)
                             .frame(width: 36, height: 36)
-                            .background(GRUColors.accent.opacity(0.09), in: Circle())
+                            .background(
+                                GRUColors.accent.opacity(0.09),
+                                in: Circle()
+                            )
                     }
                     .accessibilityLabel("gru.bot")
                 }
@@ -58,7 +61,7 @@ struct BetaChatListView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     GRUNeonIconButton(
                         systemName: "envelope.fill",
-                        accessibilityLabel: "Новый чат",
+                        accessibilityLabel: GRUL10n.text("Новый чат"),
                         size: 36,
                         iconSize: 14
                     ) {
@@ -68,13 +71,16 @@ struct BetaChatListView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
         }
-        .sheet(isPresented: $showingNewChat, onDismiss: {
-            Task {
-                await service.loadChats()
-                syncRealtimeSubscriptions()
-                connectWebSocket()
+        .sheet(
+            isPresented: $showingNewChat,
+            onDismiss: {
+                Task {
+                    await service.loadChats()
+                    syncRealtimeSubscriptions()
+                    connectWebSocket()
+                }
             }
-        }) {
+        ) {
             NewChatView()
         }
         .task {
@@ -85,24 +91,35 @@ struct BetaChatListView: View {
             connectWebSocket()
         }
         .confirmationDialog(
-            "Удалить чат целиком?",
+            GRUL10n.text("Удалить чат целиком?"),
             isPresented: Binding(
                 get: { pendingDeleteChat != nil },
-                set: { if !$0 { pendingDeleteChat = nil } }
+                set: {
+                    if !$0 {
+                        pendingDeleteChat = nil
+                    }
+                }
             ),
             titleVisibility: .visible
         ) {
-            Button("Удалить чат у обоих", role: .destructive) {
+            Button(
+                GRUL10n.text("Удалить чат у обоих"),
+                role: .destructive
+            ) {
                 if let chat = pendingDeleteChat {
                     deleteChatEverywhere(chat)
                 }
             }
 
-            Button("Отмена", role: .cancel) {
+            Button(GRUL10n.text("Отмена"), role: .cancel) {
                 pendingDeleteChat = nil
             }
         } message: {
-            Text("История и вложения будут удалены с сервера.")
+            Text(
+                GRUL10n.text(
+                    "История и вложения будут удалены с сервера."
+                )
+            )
         }
     }
 
@@ -115,8 +132,12 @@ struct BetaChatListView: View {
                 if showsTestChat {
                     NavigationLink {
                         GRUBetaTestChatView()
-                            .onAppear { onChatPresentationChanged(true) }
-                            .onDisappear { onChatPresentationChanged(false) }
+                            .onAppear {
+                                onChatPresentationChanged(true)
+                            }
+                            .onDisappear {
+                                onChatPresentationChanged(false)
+                            }
                     } label: {
                         testChatRow
                     }
@@ -124,7 +145,12 @@ struct BetaChatListView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(
-                        EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
+                        EdgeInsets(
+                            top: 4,
+                            leading: 10,
+                            bottom: 4,
+                            trailing: 10
+                        )
                     )
                 }
 
@@ -134,9 +160,13 @@ struct BetaChatListView: View {
                             .controlSize(.small)
                             .tint(GRUColors.accent)
 
-                        Text("Синхронизирую реальные чаты…")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                        Text(
+                            GRUL10n.text(
+                                "Синхронизирую реальные чаты…"
+                            )
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
                         Spacer()
                     }
@@ -157,19 +187,34 @@ struct BetaChatListView: View {
                             }
                     } label: {
                         ChatRow(chat: chat)
-                            .opacity(deletingChatServerID == chat.serverID ? 0.42 : 1)
+                            .opacity(
+                                deletingChatServerID == chat.serverID
+                                    ? 0.42
+                                    : 1
+                            )
                     }
                     .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(
-                        EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
+                        EdgeInsets(
+                            top: 4,
+                            leading: 10,
+                            bottom: 4,
+                            trailing: 10
+                        )
                     )
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    .swipeActions(
+                        edge: .trailing,
+                        allowsFullSwipe: false
+                    ) {
                         Button(role: .destructive) {
                             pendingDeleteChat = chat
                         } label: {
-                            Label("Удалить", systemImage: "trash")
+                            Label(
+                                GRUL10n.text("Удалить"),
+                                systemImage: "trash"
+                            )
                         }
                         .disabled(deletingChatServerID != nil)
                     }
@@ -204,21 +249,40 @@ struct BetaChatListView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text("gru. test lab")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
 
                     Text("RC")
-                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .black,
+                                design: .rounded
+                            )
+                        )
                         .tracking(0.8)
                         .foregroundStyle(GRUColors.accent)
                         .padding(.horizontal, 6)
                         .frame(height: 17)
-                        .background(GRUColors.accent.opacity(0.10), in: Capsule())
+                        .background(
+                            GRUColors.accent.opacity(0.10),
+                            in: Capsule()
+                        )
                 }
 
-                Text("Полный локальный чат: voice • кото-кружки • actions")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Text(
+                    GRUL10n.text(
+                        "Полный локальный чат: voice • кото-кружки • actions"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
 
             Spacer()
@@ -245,8 +309,11 @@ struct BetaChatListView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            TextField("Поиск", text: $searchText)
-                .textFieldStyle(.plain)
+            TextField(
+                GRUL10n.text("Поиск"),
+                text: $searchText
+            )
+            .textFieldStyle(.plain)
 
             if !searchText.isEmpty {
                 Button {
@@ -256,6 +323,7 @@ struct BetaChatListView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(GRUL10n.text("Очистить поиск"))
             }
         }
         .padding(.horizontal, 12)
@@ -272,8 +340,12 @@ struct BetaChatListView: View {
 
     private var compactConnectionNotice: some View {
         HStack(spacing: 7) {
-            Image(systemName: socket.isConnected ? "checkmark.circle.fill" : "wifi.slash")
-                .font(.system(size: 11, weight: .bold))
+            Image(
+                systemName: socket.isConnected
+                    ? "checkmark.circle.fill"
+                    : "wifi.slash"
+            )
+            .font(.system(size: 11, weight: .bold))
 
             Text(
                 GRUL10n.text(
@@ -290,7 +362,10 @@ struct BetaChatListView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .frame(height: 28)
-        .background(GRUColors.card.opacity(0.52), in: Capsule())
+        .background(
+            GRUColors.card.opacity(0.52),
+            in: Capsule()
+        )
     }
 
     private var emptyState: some View {
@@ -301,7 +376,7 @@ struct BetaChatListView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(GRUColors.accent)
 
-            Text("Ничего не найдено")
+            Text(GRUL10n.text("Ничего не найдено"))
                 .font(.headline)
 
             Spacer()
@@ -310,24 +385,38 @@ struct BetaChatListView: View {
     }
 
     private var showsTestChat: Bool {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return true }
+        let query = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else {
+            return true
+        }
 
         return "gru. test lab тестовый чат rc local voice кото кружок"
             .localizedCaseInsensitiveContains(query)
     }
 
     private var filteredChats: [Chat] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return service.chats }
+        let query = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else {
+            return service.chats
+        }
 
         return service.chats.filter { chat in
             let usersMatch = chat.users.contains {
                 $0.displayName.localizedCaseInsensitiveContains(query) ||
                 $0.username.localizedCaseInsensitiveContains(query)
             }
-            let titleMatch = chat.title?.localizedCaseInsensitiveContains(query) == true
-            let messageMatch = chat.messages.last?.text.localizedCaseInsensitiveContains(query) == true
+
+            let titleMatch =
+                chat.title?.localizedCaseInsensitiveContains(query) == true
+
+            let messageMatch =
+                chat.messages.last?.text
+                    .localizedCaseInsensitiveContains(query) == true
+
             return usersMatch || titleMatch || messageMatch
         }
     }
@@ -339,7 +428,11 @@ struct BetaChatListView: View {
     }
 
     private func connectWebSocket() {
-        guard let token = TokenStorage.shared.token, !token.isEmpty else { return }
+        guard let token = TokenStorage.shared.token,
+              !token.isEmpty else {
+            return
+        }
+
         WebSocketService.shared.connect(token: token)
     }
 
@@ -348,7 +441,9 @@ struct BetaChatListView: View {
 
         for chatID in Array(realtimeListeners.keys) {
             guard !serverChatIDs.contains(chatID),
-                  let listenerID = realtimeListeners[chatID] else { continue }
+                  let listenerID = realtimeListeners[chatID] else {
+                continue
+            }
 
             WebSocketService.shared.removeListener(
                 chatID: chatID,
@@ -359,18 +454,25 @@ struct BetaChatListView: View {
 
         for chat in service.chats {
             guard let chatID = chat.serverID,
-                  realtimeListeners[chatID] == nil else { continue }
+                  realtimeListeners[chatID] == nil else {
+                continue
+            }
 
-            let listenerID = WebSocketService.shared.addListener(chatID: chatID) { message in
+            let listenerID = WebSocketService.shared.addListener(
+                chatID: chatID
+            ) { message in
                 handleRealtimeMessage(message)
             }
+
             realtimeListeners[chatID] = listenerID
         }
     }
 
     private func handleRealtimeMessage(_ message: ServerMessageDTO) {
         if message.text == "__GRU_CHAT_DELETED__" {
-            if let chat = service.chats.first(where: { $0.serverID == message.chatId }) {
+            if let chat = service.chats.first(
+                where: { $0.serverID == message.chatId }
+            ) {
                 service.deleteChat(chat.id)
                 syncRealtimeSubscriptions()
             }
@@ -397,7 +499,10 @@ struct BetaChatListView: View {
                     token: token
                 )
             } catch {
-                print("❌ Mark delivered error:", error.localizedDescription)
+                print(
+                    "❌ Mark delivered error:",
+                    error.localizedDescription
+                )
             }
         }
     }
@@ -414,7 +519,9 @@ struct BetaChatListView: View {
         deletingChatServerID = serverID
 
         Task {
-            defer { deletingChatServerID = nil }
+            defer {
+                deletingChatServerID = nil
+            }
 
             do {
                 try await ChatAPIService.shared.deleteChat(
