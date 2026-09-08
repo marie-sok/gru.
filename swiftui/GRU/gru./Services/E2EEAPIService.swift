@@ -7,48 +7,27 @@ struct E2EEKeyDTO: Codable {
     let updatedAt: Date?
 
     var identity: GRUE2EEPublicIdentity {
-        GRUE2EEPublicIdentity(
-            keyAgreementPublicKey: keyAgreementPublicKey,
-            signingPublicKey: signingPublicKey
-        )
+        GRUE2EEPublicIdentity(keyAgreementPublicKey: keyAgreementPublicKey, signingPublicKey: signingPublicKey)
     }
 }
 
 final class E2EEAPIService {
-
     static let shared = E2EEAPIService()
-
     private init() {}
 
     func publishIdentity(token: String) async throws -> E2EEKeyDTO {
         let identity = try GRUE2EE.shared.publicIdentity()
-        struct Request: Codable {
-            let keyAgreementPublicKey: String
-            let signingPublicKey: String
-        }
-
-        let body = try JSONCoding.encoder.encode(
-            Request(
-                keyAgreementPublicKey: identity.keyAgreementPublicKey,
-                signingPublicKey: identity.signingPublicKey
-            )
-        )
-
-        let data = try await APIClient.shared.request(
-            path: "/e2ee/keys/me",
-            method: "PUT",
-            token: token,
-            body: body
-        )
+        struct Request: Codable { let keyAgreementPublicKey: String; let signingPublicKey: String }
+        let body = try JSONCoding.encoder.encode(Request(
+            keyAgreementPublicKey: identity.keyAgreementPublicKey,
+            signingPublicKey: identity.signingPublicKey
+        ))
+        let data = try await APIClient.shared.request(path: "/e2ee/keys/me", method: "PUT", token: token, body: body)
         return try JSONCoding.decoder.decode(E2EEKeyDTO.self, from: data)
     }
 
     func identity(for userID: String, token: String) async throws -> E2EEKeyDTO {
-        let data = try await APIClient.shared.request(
-            path: "/e2ee/keys/\(userID)",
-            method: "GET",
-            token: token
-        )
+        let data = try await APIClient.shared.request(path: "/e2ee/keys/\(userID)", method: "GET", token: token)
         return try JSONCoding.decoder.decode(E2EEKeyDTO.self, from: data)
     }
 
@@ -57,17 +36,15 @@ final class E2EEAPIService {
         senderID: String,
         receiverID: String,
         plaintext: String,
+        replyToMessageID: String? = nil,
         clientMessageID: String = UUID().uuidString.lowercased(),
         token: String
     ) async throws -> ServerMessageDTO {
         let recipient = try await identity(for: receiverID, token: token)
-
         switch GRUE2EE.shared.trustState(for: receiverID, identity: recipient.identity) {
         case .keyChanged:
             throw E2EEAPIError.recipientKeyChanged
         case .firstSeen:
-            // Trust On First Use: first observed key is pinned in Keychain.
-            // Any later key change is fail-closed until explicitly re-verified.
             try GRUE2EE.shared.trust(identity: recipient.identity, for: receiverID)
         case .trusted:
             break
@@ -90,52 +67,30 @@ final class E2EEAPIService {
             let senderEphemeralPublicKey: String
             let signature: String
             let senderKeyFingerprint: String
+            let replyToMessageId: String?
         }
-
-        let body = try JSONCoding.encoder.encode(
-            Request(
-                chatId: chatID,
-                clientMessageId: envelope.clientMessageId,
-                encryptedPayload: envelope.encryptedPayload,
-                encryptionVersion: envelope.version,
-                senderEphemeralPublicKey: envelope.senderEphemeralPublicKey,
-                signature: envelope.signature,
-                senderKeyFingerprint: envelope.senderKeyFingerprint
-            )
-        )
-
-        let data = try await APIClient.shared.request(
-            path: "/messages/e2ee",
-            method: "POST",
-            token: token,
-            body: body
-        )
+        let body = try JSONCoding.encoder.encode(Request(
+            chatId: chatID,
+            clientMessageId: envelope.clientMessageId,
+            encryptedPayload: envelope.encryptedPayload,
+            encryptionVersion: envelope.version,
+            senderEphemeralPublicKey: envelope.senderEphemeralPublicKey,
+            signature: envelope.signature,
+            senderKeyFingerprint: envelope.senderKeyFingerprint,
+            replyToMessageId: replyToMessageID
+        ))
+        let data = try await APIClient.shared.request(path: "/messages/e2ee", method: "POST", token: token, body: body)
         return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
     }
 
-    func decrypt(
-        message: ServerMessageDTO,
-        currentUserID: String,
-        token: String
-    ) async throws -> String {
-        guard let envelope = message.e2eeEnvelope else {
-            return message.text
-        }
-
-        // A sender cannot decrypt its own recipient envelope in v1. Its
-        // plaintext remains in the protected local chat cache.
-        if message.senderId == currentUserID {
-            throw E2EEAPIError.senderCopyUnavailable
-        }
+    func decrypt(message: ServerMessageDTO, currentUserID: String, token: String) async throws -> String {
+        guard let envelope = message.e2eeEnvelope else { return message.text }
+        if message.senderId == currentUserID { throw E2EEAPIError.senderCopyUnavailable }
 
         let sender = try await identity(for: message.senderId, token: token)
         let trustState = GRUE2EE.shared.trustState(for: message.senderId, identity: sender.identity)
-        if case .keyChanged = trustState {
-            throw E2EEAPIError.senderKeyChanged
-        }
+        if case .keyChanged = trustState { throw E2EEAPIError.senderKeyChanged }
 
-        // Verify signature + AEAD before recording replay state. This prevents
-        // an invalid packet from poisoning a legitimate clientMessageId.
         let plaintext = try GRUE2EE.shared.decrypt(
             envelope: envelope,
             chatID: message.chatId,
@@ -143,18 +98,13 @@ final class E2EEAPIService {
             receiverID: currentUserID,
             senderIdentity: sender.identity
         )
-
         if case .firstSeen = trustState {
             try GRUE2EE.shared.trust(identity: sender.identity, for: message.senderId)
         }
-
         guard GRUE2EEReplayGuard.shared.accept(
             clientMessageID: envelope.clientMessageId,
             serverMessageID: message.id
-        ) else {
-            throw E2EEAPIError.replayedEnvelope
-        }
-
+        ) else { throw E2EEAPIError.replayedEnvelope }
         return plaintext
     }
 }
