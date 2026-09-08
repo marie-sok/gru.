@@ -5,6 +5,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 
 @Document(collection = "messages")
 @Data
@@ -38,4 +40,10 @@ public class Message {
     private Instant editedAt;
 
     private ReplyReference replyTo;
+
+    /**
+     * Per-account soft-hide state for "delete for me".
+     * Kept on the message so history filtering survives app restarts and reloads.
+     */
+    private Set<String> hiddenForUserIds = new HashSet<>();
 }
