@@ -68,6 +68,10 @@ final class TokenStorage {
         saveToKeychain(value: cleanToken, service: service, account: tokenAccount)
         saveToKeychain(value: cleanUserID, service: service, account: userIDAccount)
         removeLegacyDefaults()
+
+        // The authenticated session is now complete and backend-bound. Security
+        // services may safely publish the device's public E2EE identity.
+        NotificationCenter.default.post(name: .gruSessionDidAuthenticate, object: nil)
     }
 
     func save(_ token: String) {
@@ -191,4 +195,5 @@ final class TokenStorage {
 
 extension Notification.Name {
     static let gruSessionInvalidated = Notification.Name("gru.session.invalidated")
+    static let gruSessionDidAuthenticate = Notification.Name("gru.session.did-authenticate")
 }
