@@ -11,7 +11,7 @@ services:
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/gru
       PORT: 8081
-      GRU_JWT_SECRET: ${GRU_JWT_SECRET:-gru-local-server-secret-change-before-production-2026}
+      GRU_JWT_SECRET: ${GRU_JWT_SECRET:?GRU_JWT_SECRET must be set explicitly}
     restart: unless-stopped
 
   mongo:
