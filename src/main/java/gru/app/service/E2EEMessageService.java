@@ -78,6 +78,10 @@ public class E2EEMessageService {
             if (!chat.getId().equals(existing.getChatId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "clientMessageId already used in another chat");
             }
+            if (existing.getSenderSigningPublicKey() == null) {
+                existing.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
+                existing = messageRepository.save(existing);
+            }
             return existing;
         }
 
@@ -115,6 +119,7 @@ public class E2EEMessageService {
         message.setSenderEphemeralPublicKey(request.getSenderEphemeralPublicKey());
         message.setE2eeSignature(request.getSignature());
         message.setSenderKeyFingerprint(request.getSenderKeyFingerprint());
+        message.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
         message.setCreatedAt(Instant.now());
         message.setDeliveredAt(null);
         message.setReadAt(null);
