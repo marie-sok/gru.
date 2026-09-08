@@ -13,6 +13,7 @@ struct ServerMessageDTO: Codable {
     let receiverId: String?
     let text: String
 
+    let e2eeClientMessageId: String?
     let encryptedPayload: String?
     let encryptionVersion: String?
     let senderEphemeralPublicKey: String?
@@ -36,7 +37,8 @@ struct ServerMessageDTO: Codable {
     }
 
     var e2eeEnvelope: GRUE2EEEnvelope? {
-        guard let encryptedPayload,
+        guard let e2eeClientMessageId,
+              let encryptedPayload,
               let encryptionVersion,
               let senderEphemeralPublicKey,
               let e2eeSignature,
@@ -45,6 +47,7 @@ struct ServerMessageDTO: Codable {
 
         return GRUE2EEEnvelope(
             version: encryptionVersion,
+            clientMessageId: e2eeClientMessageId,
             encryptedPayload: encryptedPayload,
             senderEphemeralPublicKey: senderEphemeralPublicKey,
             signature: e2eeSignature,
