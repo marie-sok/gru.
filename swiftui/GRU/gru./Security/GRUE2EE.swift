@@ -13,6 +13,7 @@ struct GRUE2EEPublicIdentity: Codable, Equatable {
 
 struct GRUE2EEEnvelope: Codable, Equatable {
     let version: String
+    let clientMessageId: String
     let encryptedPayload: String
     let senderEphemeralPublicKey: String
     let signature: String
@@ -29,8 +30,10 @@ final class GRUE2EE {
 
     static let shared = GRUE2EE()
     static let protocolVersion = "gru-e2ee-v1"
+    static let keyRotationVersion = "gru-e2ee-key-rotation-v1"
 
     private let keychainService = "sok.com.gru.e2ee.identity.v1"
+    private let trustKeychainService = "sok.com.gru.e2ee.trust.v1"
     private let agreementAccount = "x25519-private"
     private let signingAccount = "ed25519-private"
 
@@ -50,8 +53,12 @@ final class GRUE2EE {
         chatID: String,
         senderID: String,
         receiverID: String,
-        receiverIdentity: GRUE2EEPublicIdentity
+        receiverIdentity: GRUE2EEPublicIdentity,
+        clientMessageID: String = UUID().uuidString.lowercased()
     ) throws -> GRUE2EEEnvelope {
+        guard UUID(uuidString: clientMessageID) != nil else {
+            throw GRUE2EEError.invalidClientMessageID
+        }
         guard let recipientAgreementData = Data(base64Encoded: receiverIdentity.keyAgreementPublicKey) else {
             throw GRUE2EEError.invalidPublicKey
         }
@@ -78,6 +85,7 @@ final class GRUE2EE {
             chatID: chatID,
             senderID: senderID,
             receiverID: receiverID,
+            clientMessageID: clientMessageID,
             ephemeralPublicKey: ephemeralPublicKey,
             encryptedPayload: encryptedPayload,
             senderKeyFingerprint: fingerprint
@@ -86,6 +94,7 @@ final class GRUE2EE {
 
         return GRUE2EEEnvelope(
             version: Self.protocolVersion,
+            clientMessageId: clientMessageID,
             encryptedPayload: encryptedPayload,
             senderEphemeralPublicKey: ephemeralPublicKey,
             signature: signature,
@@ -102,6 +111,9 @@ final class GRUE2EE {
     ) throws -> String {
         guard envelope.version == Self.protocolVersion else {
             throw GRUE2EEError.unsupportedVersion
+        }
+        guard UUID(uuidString: envelope.clientMessageId) != nil else {
+            throw GRUE2EEError.invalidClientMessageID
         }
 
         let expectedFingerprint = senderIdentity.signingFingerprint
@@ -122,6 +134,7 @@ final class GRUE2EE {
             chatID: chatID,
             senderID: senderID,
             receiverID: receiverID,
+            clientMessageID: envelope.clientMessageId,
             ephemeralPublicKey: envelope.senderEphemeralPublicKey,
             encryptedPayload: envelope.encryptedPayload,
             senderKeyFingerprint: envelope.senderKeyFingerprint
@@ -149,10 +162,22 @@ final class GRUE2EE {
         return text
     }
 
+    func keyRotationSignature(
+        userID: String,
+        newIdentity: GRUE2EEPublicIdentity
+    ) throws -> String {
+        let canonical = Data([
+            Self.keyRotationVersion,
+            userID,
+            newIdentity.keyAgreementPublicKey,
+            newIdentity.signingPublicKey
+        ].joined(separator: "|").utf8)
+        return try signingPrivateKey().signature(for: canonical).base64EncodedString()
+    }
+
     func trustState(for userID: String, identity: GRUE2EEPublicIdentity) -> GRUE2EETrustState {
         let current = identity.signingFingerprint
-        let key = trustKey(userID)
-        guard let previous = UserDefaults.standard.string(forKey: key) else {
+        guard let previous = loadTrustedFingerprint(for: userID) else {
             return .firstSeen
         }
         return constantTimeEqual(previous, current)
@@ -160,10 +185,19 @@ final class GRUE2EE {
             : .keyChanged(previous: previous, current: current)
     }
 
-    /// Call only after the UI has informed the user about a first-seen key or
-    /// an intentional key rotation. Key changes must never be silently trusted.
-    func trust(identity: GRUE2EEPublicIdentity, for userID: String) {
-        UserDefaults.standard.set(identity.signingFingerprint, forKey: trustKey(userID))
+    func trust(identity: GRUE2EEPublicIdentity, for userID: String) throws {
+        try storeTrustedFingerprint(identity.signingFingerprint, for: userID)
+        UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
+    }
+
+    func clearTrust(for userID: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: trustKeychainService,
+            kSecAttrAccount as String: trustAccount(userID)
+        ]
+        SecItemDelete(query as CFDictionary)
+        UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
     }
 
     static func fingerprint(base64PublicKey: String) -> String {
@@ -200,6 +234,7 @@ final class GRUE2EE {
         chatID: String,
         senderID: String,
         receiverID: String,
+        clientMessageID: String,
         ephemeralPublicKey: String,
         encryptedPayload: String,
         senderKeyFingerprint: String
@@ -209,13 +244,67 @@ final class GRUE2EE {
             chatID,
             senderID,
             receiverID,
+            clientMessageID,
             ephemeralPublicKey,
             encryptedPayload,
             senderKeyFingerprint
         ].joined(separator: "|").utf8)
     }
 
-    private func trustKey(_ userID: String) -> String {
+    private func loadTrustedFingerprint(for userID: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: trustKeychainService,
+            kSecAttrAccount as String: trustAccount(userID),
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecSuccess,
+           let data = item as? Data,
+           let value = String(data: data, encoding: .utf8) {
+            return value
+        }
+
+        if let legacy = UserDefaults.standard.string(forKey: legacyTrustKey(userID)) {
+            try? storeTrustedFingerprint(legacy, for: userID)
+            UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
+            return legacy
+        }
+        return nil
+    }
+
+    private func storeTrustedFingerprint(_ fingerprint: String, for userID: String) throws {
+        let account = trustAccount(userID)
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: trustKeychainService,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        guard let data = fingerprint.data(using: .utf8) else {
+            throw GRUE2EEError.invalidFingerprint
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: trustKeychainService,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw GRUE2EEError.keychain(status)
+        }
+    }
+
+    private func trustAccount(_ userID: String) -> String {
+        "peer-" + userID
+    }
+
+    private func legacyTrustKey(_ userID: String) -> String {
         "gru.e2ee.trusted-signing-fingerprint.v1.\(userID)"
     }
 
@@ -270,6 +359,8 @@ enum GRUE2EEError: Error {
     case invalidEnvelope
     case invalidSignature
     case invalidPlaintext
+    case invalidClientMessageID
+    case invalidFingerprint
     case identityMismatch
     case unsupportedVersion
     case keychain(OSStatus)
