@@ -56,6 +56,7 @@ struct ServerMessageDTO: Codable {
         let decodedSignature = try c.decodeIfPresent(String.self, forKey: .e2eeSignature)
         let decodedFingerprint = try c.decodeIfPresent(String.self, forKey: .senderKeyFingerprint)
         let decodedSigningKey = try c.decodeIfPresent(String.self, forKey: .senderSigningPublicKey)
+        let decodedAttachment = try c.decodeIfPresent(Attachment.self, forKey: .attachment)
 
         id = decodedID
         chatId = decodedChatID
@@ -77,7 +78,7 @@ struct ServerMessageDTO: Codable {
         editedAt = try c.decodeIfPresent(Date.self, forKey: .editedAt)
         reaction = try c.decodeIfPresent(ReactionType.self, forKey: .reaction)
         replyTo = try c.decodeIfPresent(ServerReplyReferenceDTO.self, forKey: .replyTo)
-        attachment = try c.decodeIfPresent(Attachment.self, forKey: .attachment)
+        attachment = decodedAttachment
 
         if let clientID = decodedClientID,
            let payload = decodedPayload,
@@ -100,7 +101,8 @@ struct ServerMessageDTO: Codable {
                 chatID: decodedChatID,
                 senderID: decodedSenderID,
                 receiverID: decodedReceiverID,
-                senderSigningPublicKey: decodedSigningKey
+                senderSigningPublicKey: decodedSigningKey,
+                attachmentRemoteURL: decodedAttachment?.remoteURL
             )
         } else {
             text = legacyText
@@ -235,16 +237,23 @@ struct ServerMessageDTO: Codable {
         chatID: String,
         senderID: String,
         receiverID: String?,
-        senderSigningPublicKey: String?
+        senderSigningPublicKey: String?,
+        attachmentRemoteURL: String?
     ) -> String {
         guard let currentUserID = TokenStorage.shared.userID else {
             return "🔒 Защищённое сообщение"
         }
 
         if senderID == currentUserID {
-            return GRUE2EESentMessageStore.shared.plaintext(
+            guard let plaintext = GRUE2EESentMessageStore.shared.plaintext(
                 for: envelope.clientMessageId
-            ) ?? "🔒 Защищённое сообщение"
+            ) else {
+                return "🔒 Защищённое сообщение"
+            }
+            return resolveVerifiedPayload(
+                plaintext,
+                attachmentRemoteURL: attachmentRemoteURL
+            )
         }
 
         guard receiverID == currentUserID,
@@ -289,9 +298,31 @@ struct ServerMessageDTO: Codable {
                 return "🔒 Повтор защищённого сообщения заблокирован"
             }
 
-            return plaintext
+            return resolveVerifiedPayload(
+                plaintext,
+                attachmentRemoteURL: attachmentRemoteURL
+            )
         } catch {
             return "🔒 Не удалось расшифровать сообщение"
         }
+    }
+
+    private static func resolveVerifiedPayload(
+        _ plaintext: String,
+        attachmentRemoteURL: String?
+    ) -> String {
+        guard GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext) else {
+            return plaintext
+        }
+
+        if let attachmentRemoteURL, !attachmentRemoteURL.isEmpty {
+            GRUE2EEMediaKeyStore.shared.register(
+                keyPayload: plaintext,
+                remoteURL: attachmentRemoteURL
+            )
+        }
+
+        // Never expose a decrypted media key as message text.
+        return ""
     }
 }
