@@ -9,6 +9,15 @@ struct GRUE2EEPublicIdentity: Codable, Equatable {
     var signingFingerprint: String {
         GRUE2EE.fingerprint(base64PublicKey: signingPublicKey)
     }
+
+    /// Trust must bind both long-lived public keys. Pinning only Ed25519 would
+    /// allow an X25519 key substitution to redirect future ciphertext.
+    var trustFingerprint: String {
+        GRUE2EE.identityFingerprint(
+            keyAgreementPublicKey: keyAgreementPublicKey,
+            signingPublicKey: signingPublicKey
+        )
+    }
 }
 
 struct GRUE2EEEnvelope: Codable, Equatable {
@@ -33,7 +42,8 @@ final class GRUE2EE {
     static let keyRotationVersion = "gru-e2ee-key-rotation-v1"
 
     private let keychainService = "sok.com.gru.e2ee.identity.v1"
-    private let trustKeychainService = "sok.com.gru.e2ee.trust.v1"
+    // v2 trust records bind X25519 + Ed25519 together.
+    private let trustKeychainService = "sok.com.gru.e2ee.trust.v2"
     private let agreementAccount = "x25519-private"
     private let signingAccount = "ed25519-private"
 
@@ -59,7 +69,8 @@ final class GRUE2EE {
         guard UUID(uuidString: clientMessageID) != nil else {
             throw GRUE2EEError.invalidClientMessageID
         }
-        guard let recipientAgreementData = Data(base64Encoded: receiverIdentity.keyAgreementPublicKey) else {
+        guard let recipientAgreementData = Data(base64Encoded: receiverIdentity.keyAgreementPublicKey),
+              recipientAgreementData.count == 32 else {
             throw GRUE2EEError.invalidPublicKey
         }
 
@@ -123,7 +134,9 @@ final class GRUE2EE {
 
         guard let signatureData = Data(base64Encoded: envelope.signature),
               let signingData = Data(base64Encoded: senderIdentity.signingPublicKey),
+              signingData.count == 32,
               let ephemeralData = Data(base64Encoded: envelope.senderEphemeralPublicKey),
+              ephemeralData.count == 32,
               let encryptedData = Data(base64Encoded: envelope.encryptedPayload)
         else {
             throw GRUE2EEError.invalidEnvelope
@@ -176,7 +189,10 @@ final class GRUE2EE {
     }
 
     func trustState(for userID: String, identity: GRUE2EEPublicIdentity) -> GRUE2EETrustState {
-        let current = identity.signingFingerprint
+        let current = identity.trustFingerprint
+        guard current != "invalid" else {
+            return .keyChanged(previous: "invalid", current: "invalid")
+        }
         guard let previous = loadTrustedFingerprint(for: userID) else {
             return .firstSeen
         }
@@ -186,8 +202,11 @@ final class GRUE2EE {
     }
 
     func trust(identity: GRUE2EEPublicIdentity, for userID: String) throws {
-        try storeTrustedFingerprint(identity.signingFingerprint, for: userID)
-        UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
+        let fingerprint = identity.trustFingerprint
+        guard fingerprint != "invalid" else {
+            throw GRUE2EEError.invalidFingerprint
+        }
+        try storeTrustedFingerprint(fingerprint, for: userID)
     }
 
     func clearTrust(for userID: String) {
@@ -197,12 +216,34 @@ final class GRUE2EE {
             kSecAttrAccount as String: trustAccount(userID)
         ]
         SecItemDelete(query as CFDictionary)
-        UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
     }
 
     static func fingerprint(base64PublicKey: String) -> String {
-        guard let data = Data(base64Encoded: base64PublicKey) else { return "invalid" }
+        guard let data = Data(base64Encoded: base64PublicKey), data.count == 32 else {
+            return "invalid"
+        }
         return SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    static func identityFingerprint(
+        keyAgreementPublicKey: String,
+        signingPublicKey: String
+    ) -> String {
+        guard let agreement = Data(base64Encoded: keyAgreementPublicKey),
+              agreement.count == 32,
+              let signing = Data(base64Encoded: signingPublicKey),
+              signing.count == 32 else {
+            return "invalid"
+        }
+
+        var canonical = Data("gru-e2ee-identity-v1|".utf8)
+        canonical.append(agreement)
+        canonical.append(Data("|".utf8))
+        canonical.append(signing)
+
+        return SHA256.hash(data: canonical)
             .map { String(format: "%02x", $0) }
             .joined()
     }
@@ -266,12 +307,6 @@ final class GRUE2EE {
            let value = String(data: data, encoding: .utf8) {
             return value
         }
-
-        if let legacy = UserDefaults.standard.string(forKey: legacyTrustKey(userID)) {
-            try? storeTrustedFingerprint(legacy, for: userID)
-            UserDefaults.standard.removeObject(forKey: legacyTrustKey(userID))
-            return legacy
-        }
         return nil
     }
 
@@ -302,10 +337,6 @@ final class GRUE2EE {
 
     private func trustAccount(_ userID: String) -> String {
         "peer-" + userID
-    }
-
-    private func legacyTrustKey(_ userID: String) -> String {
-        "gru.e2ee.trusted-signing-fingerprint.v1.\(userID)"
     }
 
     private func constantTimeEqual(_ lhs: String, _ rhs: String) -> Bool {
