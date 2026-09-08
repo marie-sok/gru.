@@ -1,33 +1,26 @@
 import Foundation
 
-/// Высокопроизводительное асинхронное локальное хранилище данных приложения.
-/// Все дисковые операции и кодирование JSON вынесены на фоновую очередь (non-blocking MainActor).
+/// Local cache for chats/messages.
+/// Sensitive payloads are encrypted before touching disk and additionally use
+/// iOS complete file protection. Existing plaintext v6/v7 cache remains
+/// readable only for migration and is encrypted on the next save.
 final class CacheStorage {
 
     static let shared = CacheStorage()
 
-    private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
+    private let protector = GRUDataProtection.shared
 
-    // Очередь для синхронизации доступа к дисковым файлам
     private let ioQueue = DispatchQueue(label: "sok.com.gru.cache.io", qos: .utility)
-
-    // Кэш в памяти для мгновенного доступа
     private var inMemoryChats: [Chat]?
     private let memoryLock = NSLock()
-
-    // Таймер дебаунса для частых сохранений
     private var pendingSaveWorkItem: DispatchWorkItem?
 
-    private init() {
-        decoder = JSONDecoder()
-        encoder = JSONEncoder()
-    }
+    private init() {}
 
-    // MARK: - Chats (Async Non-blocking)
+    // MARK: - Chats
 
-    /// Сохраняет список чатов асинхронно в фоновом потоке.
-    /// Не блокирует UI и MainActor при больших объемах данных.
     func saveChats(
         _ chats: [Chat],
         userID: String? = TokenStorage.shared.userID
@@ -38,29 +31,24 @@ final class CacheStorage {
 
         guard let targetURL = chatsURL(userID: userID) else { return }
 
-        // Дебаунс 250мс: если за короткое время пришло несколько событий,
-        // сохраняем на диск один раз итоговое состояние
         ioQueue.async { [weak self] in
-            guard let self = self else { return }
-
+            guard let self else { return }
             self.pendingSaveWorkItem?.cancel()
 
             let workItem = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
+                guard let self else { return }
                 do {
-                    let data = try self.encoder.encode(chats)
-                    try data.write(to: targetURL, options: [.atomic])
-
-                    // Сохраняем дату синхронизации
+                    try self.writeProtected(
+                        self.encoder.encode(chats),
+                        to: targetURL
+                    )
                     UserDefaults.standard.set(
                         Date(),
                         forKey: self.syncDateKey(userID: userID)
                     )
-
-                    // Асинхронно сохраняем сообщения каждого чата в изолированные файлы
                     self.savePerChatMessagesAsync(chats)
                 } catch {
-                    print("❌ Chat cache async save failed:", error.localizedDescription)
+                    print("❌ Chat cache protected save failed:", error.localizedDescription)
                 }
             }
 
@@ -69,7 +57,6 @@ final class CacheStorage {
         }
     }
 
-    /// Загружает список чатов. Если есть кэш в памяти — отдает мгновенно.
     func loadChats(
         userID: String? = TokenStorage.shared.userID
     ) -> [Chat] {
@@ -82,7 +69,6 @@ final class CacheStorage {
 
         guard let url = chatsURL(userID: userID) else { return [] }
 
-        // Если актуального файла нет, проверяем legacy v6
         let fileURLToRead: URL
         if FileManager.default.fileExists(atPath: url.path) {
             fileURLToRead = url
@@ -94,16 +80,21 @@ final class CacheStorage {
         }
 
         do {
-            let data = try Data(contentsOf: fileURLToRead)
+            let protectedOrLegacy = try Data(contentsOf: fileURLToRead)
+            let data = try protector.open(protectedOrLegacy)
             let loadedChats = try decoder.decode([Chat].self, from: data)
 
             memoryLock.lock()
             inMemoryChats = loadedChats
             memoryLock.unlock()
 
+            // Migrate any legacy plaintext cache immediately.
+            if !protectedOrLegacy.starts(with: Data("GRUENC1".utf8)) {
+                saveChats(loadedChats, userID: userID)
+            }
             return loadedChats
         } catch {
-            print("❌ Chat cache load failed:", error.localizedDescription)
+            print("❌ Chat cache protected load failed:", error.localizedDescription)
             return []
         }
     }
@@ -114,9 +105,8 @@ final class CacheStorage {
         UserDefaults.standard.object(forKey: syncDateKey(userID: userID)) as? Date
     }
 
-    // MARK: - Per-Chat Messages Storage
+    // MARK: - Per-chat messages
 
-    /// Сохраняет историю конкретного чата в отдельный файл
     func saveMessages(
         _ messages: [Message],
         for chatID: String
@@ -124,17 +114,15 @@ final class CacheStorage {
         guard let url = chatMessagesURL(chatID: chatID) else { return }
 
         ioQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
             do {
-                let data = try self.encoder.encode(messages)
-                try data.write(to: url, options: [.atomic])
+                try self.writeProtected(self.encoder.encode(messages), to: url)
             } catch {
-                print("❌ Failed to save per-chat messages for \(chatID):", error)
+                print("❌ Protected message cache save failed for \(chatID):", error.localizedDescription)
             }
         }
     }
 
-    /// Загружает сообщения конкретного чата из отдельного файла
     func loadMessages(
         for chatID: String
     ) -> [Message]? {
@@ -145,9 +133,15 @@ final class CacheStorage {
         }
 
         do {
-            let data = try Data(contentsOf: url)
-            return try decoder.decode([Message].self, from: data)
+            let stored = try Data(contentsOf: url)
+            let data = try protector.open(stored)
+            let messages = try decoder.decode([Message].self, from: data)
+            if !stored.starts(with: Data("GRUENC1".utf8)) {
+                saveMessages(messages, for: chatID)
+            }
+            return messages
         } catch {
+            print("❌ Protected message cache load failed:", error.localizedDescription)
             return nil
         }
     }
@@ -155,11 +149,10 @@ final class CacheStorage {
     private func savePerChatMessagesAsync(_ chats: [Chat]) {
         for chat in chats {
             let chatID = chat.serverID ?? chat.id.uuidString
-            if let url = chatMessagesURL(chatID: chatID) {
-                if let data = try? encoder.encode(chat.messages) {
-                    try? data.write(to: url, options: [.atomic])
-                }
-            }
+            guard let url = chatMessagesURL(chatID: chatID),
+                  let data = try? encoder.encode(chat.messages)
+            else { continue }
+            try? writeProtected(data, to: url)
         }
     }
 
@@ -167,12 +160,11 @@ final class CacheStorage {
 
     func saveUsers(_ users: [User]) {
         ioQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
             do {
-                let data = try self.encoder.encode(users)
-                try data.write(to: self.usersURL, options: [.atomic])
+                try self.writeProtected(self.encoder.encode(users), to: self.usersURL)
             } catch {
-                print("❌ User cache save failed:", error.localizedDescription)
+                print("❌ Protected user cache save failed:", error.localizedDescription)
             }
         }
     }
@@ -183,10 +175,15 @@ final class CacheStorage {
         }
 
         do {
-            let data = try Data(contentsOf: usersURL)
-            return try decoder.decode([User].self, from: data)
+            let stored = try Data(contentsOf: usersURL)
+            let data = try protector.open(stored)
+            let users = try decoder.decode([User].self, from: data)
+            if !stored.starts(with: Data("GRUENC1".utf8)) {
+                saveUsers(users)
+            }
+            return users
         } catch {
-            print("❌ User cache load failed:", error.localizedDescription)
+            print("❌ Protected user cache load failed:", error.localizedDescription)
             return []
         }
     }
@@ -203,21 +200,42 @@ final class CacheStorage {
         if let url = chatsURL(userID: userID) {
             try? FileManager.default.removeItem(at: url)
         }
+        if let legacyURL = legacyChatsURL(userID: userID) {
+            try? FileManager.default.removeItem(at: legacyURL)
+        }
 
+        removeFiles(withPrefix: "messages-", suffix: ".json")
         UserDefaults.standard.removeObject(forKey: syncDateKey(userID: userID))
     }
 
     func clear() {
         clearCurrentUser()
         try? FileManager.default.removeItem(at: usersURL)
-
-        // Удаляем legacy кэши
-        if let legacyURL = legacyChatsURL(userID: TokenStorage.shared.userID) {
-            try? FileManager.default.removeItem(at: legacyURL)
-        }
         try? FileManager.default.removeItem(
             at: documentsDirectory.appendingPathComponent("chats.json")
         )
+    }
+
+    // MARK: - Protected disk IO
+
+    private func writeProtected(_ plaintext: Data, to url: URL) throws {
+        let ciphertext = try protector.seal(plaintext)
+        try ciphertext.write(
+            to: url,
+            options: [.atomic, .completeFileProtection]
+        )
+    }
+
+    private func removeFiles(withPrefix prefix: String, suffix: String) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: documentsDirectory,
+            includingPropertiesForKeys: nil
+        ) else { return }
+
+        for file in files where file.lastPathComponent.hasPrefix(prefix)
+            && file.lastPathComponent.hasSuffix(suffix) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 }
 
