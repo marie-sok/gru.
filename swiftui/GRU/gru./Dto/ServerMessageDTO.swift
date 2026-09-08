@@ -20,6 +20,7 @@ struct ServerMessageDTO: Codable {
     let e2eeSignature: String?
     let senderKeyFingerprint: String?
     let senderSigningPublicKey: String?
+    let senderKeyAgreementPublicKey: String?
 
     let createdAt: Date
     let deliveredAt: Date?
@@ -35,7 +36,7 @@ struct ServerMessageDTO: Codable {
         case id, chatId, senderId, receiverId, text
         case e2eeClientMessageId, encryptedPayload, encryptionVersion
         case senderEphemeralPublicKey, e2eeSignature, senderKeyFingerprint
-        case senderSigningPublicKey
+        case senderSigningPublicKey, senderKeyAgreementPublicKey
         case createdAt, deliveredAt, readAt, deletedAt, isEdited, editedAt
         case reaction, replyTo, attachment
     }
@@ -56,6 +57,7 @@ struct ServerMessageDTO: Codable {
         let decodedSignature = try c.decodeIfPresent(String.self, forKey: .e2eeSignature)
         let decodedFingerprint = try c.decodeIfPresent(String.self, forKey: .senderKeyFingerprint)
         let decodedSigningKey = try c.decodeIfPresent(String.self, forKey: .senderSigningPublicKey)
+        let decodedAgreementKey = try c.decodeIfPresent(String.self, forKey: .senderKeyAgreementPublicKey)
         let decodedAttachment = try c.decodeIfPresent(Attachment.self, forKey: .attachment)
 
         id = decodedID
@@ -69,6 +71,7 @@ struct ServerMessageDTO: Codable {
         e2eeSignature = decodedSignature
         senderKeyFingerprint = decodedFingerprint
         senderSigningPublicKey = decodedSigningKey
+        senderKeyAgreementPublicKey = decodedAgreementKey
 
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         deliveredAt = try c.decodeIfPresent(Date.self, forKey: .deliveredAt)
@@ -102,6 +105,7 @@ struct ServerMessageDTO: Codable {
                 senderID: decodedSenderID,
                 receiverID: decodedReceiverID,
                 senderSigningPublicKey: decodedSigningKey,
+                senderKeyAgreementPublicKey: decodedAgreementKey,
                 attachmentRemoteURL: decodedAttachment?.remoteURL
             )
         } else {
@@ -123,6 +127,7 @@ struct ServerMessageDTO: Codable {
         try c.encodeIfPresent(e2eeSignature, forKey: .e2eeSignature)
         try c.encodeIfPresent(senderKeyFingerprint, forKey: .senderKeyFingerprint)
         try c.encodeIfPresent(senderSigningPublicKey, forKey: .senderSigningPublicKey)
+        try c.encodeIfPresent(senderKeyAgreementPublicKey, forKey: .senderKeyAgreementPublicKey)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encodeIfPresent(deliveredAt, forKey: .deliveredAt)
         try c.encodeIfPresent(readAt, forKey: .readAt)
@@ -173,6 +178,7 @@ struct ServerMessageDTO: Codable {
             e2eeSignature: e2eeSignature,
             senderKeyFingerprint: senderKeyFingerprint,
             senderSigningPublicKey: senderSigningPublicKey,
+            senderKeyAgreementPublicKey: senderKeyAgreementPublicKey,
             createdAt: createdAt,
             deliveredAt: deliveredAt,
             readAt: readAt,
@@ -198,6 +204,7 @@ struct ServerMessageDTO: Codable {
         e2eeSignature: String?,
         senderKeyFingerprint: String?,
         senderSigningPublicKey: String?,
+        senderKeyAgreementPublicKey: String?,
         createdAt: Date,
         deliveredAt: Date?,
         readAt: Date?,
@@ -220,6 +227,7 @@ struct ServerMessageDTO: Codable {
         self.e2eeSignature = e2eeSignature
         self.senderKeyFingerprint = senderKeyFingerprint
         self.senderSigningPublicKey = senderSigningPublicKey
+        self.senderKeyAgreementPublicKey = senderKeyAgreementPublicKey
         self.createdAt = createdAt
         self.deliveredAt = deliveredAt
         self.readAt = readAt
@@ -238,6 +246,7 @@ struct ServerMessageDTO: Codable {
         senderID: String,
         receiverID: String?,
         senderSigningPublicKey: String?,
+        senderKeyAgreementPublicKey: String?,
         attachmentRemoteURL: String?
     ) -> String {
         guard let currentUserID = TokenStorage.shared.userID else {
@@ -258,12 +267,14 @@ struct ServerMessageDTO: Codable {
 
         guard receiverID == currentUserID,
               let signingKey = senderSigningPublicKey,
-              !signingKey.isEmpty else {
+              !signingKey.isEmpty,
+              let agreementKey = senderKeyAgreementPublicKey,
+              !agreementKey.isEmpty else {
             return "🔒 Защищённое сообщение"
         }
 
         let senderIdentity = GRUE2EEPublicIdentity(
-            keyAgreementPublicKey: "",
+            keyAgreementPublicKey: agreementKey,
             signingPublicKey: signingKey
         )
         let trustState = GRUE2EE.shared.trustState(
@@ -322,7 +333,6 @@ struct ServerMessageDTO: Codable {
             )
         }
 
-        // Never expose a decrypted media key as message text.
         return ""
     }
 }
