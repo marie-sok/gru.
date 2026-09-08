@@ -24,6 +24,9 @@ public class Message {
     /** Plaintext for legacy/non-E2EE messages only. */
     private String text;
 
+    /** Client-generated UUID, signed into the E2EE envelope for replay/idempotency protection. */
+    private String e2eeClientMessageId;
+
     /** Opaque base64 ciphertext produced on the sender device. */
     private String encryptedPayload;
 
@@ -57,9 +60,5 @@ public class Message {
 
     private ReplyReference replyTo;
 
-    /**
-     * Per-account soft-hide state for "delete for me".
-     * Kept on the message so history filtering survives app restarts and reloads.
-     */
     private Set<String> hiddenForUserIds = new HashSet<>();
 }
