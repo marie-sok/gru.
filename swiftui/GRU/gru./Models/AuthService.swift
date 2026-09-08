@@ -1,4 +1,3 @@
-
 import Foundation
 
 final class AuthService {
@@ -34,6 +33,7 @@ final class AuthService {
             from: data
         )
 
+        await publishE2EEIdentityIfPossible(token: response.token)
         return response
     }
 
@@ -66,6 +66,20 @@ final class AuthService {
             from: data
         )
 
+        await publishE2EEIdentityIfPossible(token: response.token)
         return response
+    }
+
+    /// Authentication must remain usable even if an existing account has a
+    /// different pinned device identity. In that case E2EE sending fails closed
+    /// later and the signed key-rotation/multi-device flow can resolve it.
+    private func publishE2EEIdentityIfPossible(token: String) async {
+        do {
+            _ = try await E2EEAPIService.shared.publishIdentity(token: token)
+        } catch {
+            #if DEBUG
+            print("⚠️ E2EE identity publish deferred:", error.localizedDescription)
+            #endif
+        }
     }
 }
