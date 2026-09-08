@@ -33,7 +33,16 @@ final class MessageAPIService {
                     currentUserID: currentUserID,
                     token: token
                 )
-                result.append(message.replacingText(plaintext))
+                if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext),
+                   let remoteURL = message.attachment?.remoteURL {
+                    GRUE2EEMediaKeyStore.shared.register(
+                        keyPayload: plaintext,
+                        remoteURL: remoteURL
+                    )
+                    result.append(message.replacingText(""))
+                } else {
+                    result.append(message.replacingText(plaintext))
+                }
             } catch {
                 #if DEBUG
                 print("⚠️ E2EE history decrypt failed:", error.localizedDescription)
@@ -73,24 +82,17 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields = [
-            "chatId": chatID,
-            "width": String(width),
-            "height": String(height)
-        ]
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/photo",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .photo,
             fileName: fileName,
             mimeType: "image/jpeg",
-            fileData: data
+            width: width,
+            height: height,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: responseData)
     }
 
     func sendVideo(
@@ -104,23 +106,18 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields = ["chatId": chatID]
-        if let width, width > 0 { fields["width"] = String(width) }
-        if let height, height > 0 { fields["height"] = String(height) }
-        if let duration, duration > 0 { fields["duration"] = String(duration) }
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/video",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .video,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
+            width: width,
+            height: height,
+            duration: duration,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: responseData)
     }
 
     func sendVideoNote(
@@ -134,23 +131,18 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields = ["chatId": chatID]
-        if let width, width > 0 { fields["width"] = String(width) }
-        if let height, height > 0 { fields["height"] = String(height) }
-        if let duration, duration > 0 { fields["duration"] = String(duration) }
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/video-note",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .videoNote,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
+            width: width,
+            height: height,
+            duration: duration,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: responseData)
     }
 
     func sendDocument(
@@ -161,20 +153,15 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields = ["chatId": chatID]
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/document",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .document,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
+            replyToMessageID: replyToMessageID,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: responseData)
     }
 
     func sendAudio(
@@ -187,27 +174,17 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields = ["chatId": chatID]
-        if let duration, duration > 0 { fields["duration"] = String(duration) }
-        if let waveform, !waveform.isEmpty {
-            fields["waveform"] = waveform
-                .prefix(64)
-                .map { String(format: "%.4f", max(0.04, min(1.0, $0))) }
-                .joined(separator: ",")
-        }
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/audio",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .audio,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
+            duration: duration,
+            waveform: waveform,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
-        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: responseData)
     }
 
     func markDelivered(messageID: String, token: String) async throws -> ServerMessageDTO {
