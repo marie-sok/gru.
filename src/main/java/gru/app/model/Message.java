@@ -21,7 +21,23 @@ public class Message {
 
     private String receiverId;
 
+    /** Plaintext for legacy/non-E2EE messages only. */
     private String text;
+
+    /** Opaque base64 ciphertext produced on the sender device. */
+    private String encryptedPayload;
+
+    /** Protocol version, e.g. "gru-e2ee-v1". */
+    private String encryptionVersion;
+
+    /** Sender ephemeral X25519 public key, base64 encoded. */
+    private String senderEphemeralPublicKey;
+
+    /** Signature over the canonical encrypted envelope, base64 encoded. */
+    private String e2eeSignature;
+
+    /** SHA-256 fingerprint of the sender signing identity key. */
+    private String senderKeyFingerprint;
 
     private Instant createdAt;
 
