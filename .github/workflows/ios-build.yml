@@ -36,3 +36,29 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/GRUDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Build Release for physical iPhone architecture
+        run: |
+          xcodebuild \
+            -project swiftui/GRU/gru..xcodeproj \
+            -scheme gru \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/GRUReleaseDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify TestFlight production transport
+        run: |
+          INFO="$RUNNER_TEMP/GRUReleaseDerivedData/Build/Products/Release-iphoneos/gru.app/Info.plist"
+          test -f "$INFO"
+
+          HTTP="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionHTTPBaseURL' "$INFO")"
+          WSS="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionWebSocketURL' "$INFO")"
+
+          echo "HTTP=$HTTP"
+          echo "WSS=$WSS"
+
+          test "$HTTP" = "https://gru-jiqi.onrender.com"
+          test "$WSS" = "wss://gru-jiqi.onrender.com/ws"
