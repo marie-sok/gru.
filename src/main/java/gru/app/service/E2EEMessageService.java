@@ -73,7 +73,9 @@ public class E2EEMessageService {
         message.setChatId(chat.getId());
         message.setSenderId(senderId);
         message.setReceiverId(receiver.getId());
-        message.setText(null);
+        // Legacy clients require a non-null JSON string. The content itself is
+        // exclusively in encryptedPayload and remains opaque to the server.
+        message.setText("");
         message.setEncryptedPayload(request.getEncryptedPayload());
         message.setEncryptionVersion(request.getEncryptionVersion());
         message.setSenderEphemeralPublicKey(request.getSenderEphemeralPublicKey());
