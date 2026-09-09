@@ -9,6 +9,16 @@ private struct Copy {
     let ephemeralPublicKey: String
 }
 
+private struct IdentityBackup: Codable {
+    let agreementPrivateKey: String
+    let signingPrivateKey: String
+}
+
+private struct RestoredIdentity {
+    let agreement: Curve25519.KeyAgreement.PrivateKey
+    let signing: Curve25519.Signing.PrivateKey
+}
+
 private func fingerprint(_ signingPublicKey: Curve25519.Signing.PublicKey) -> String {
     SHA256.hash(data: signingPublicKey.rawRepresentation)
         .map { String(format: "%02x", $0) }
@@ -77,6 +87,62 @@ private func open(
     return value
 }
 
+/// Simulates the security-critical part of a reinstall/new-phone recovery:
+/// the server keeps only this encrypted identity bundle; the recovery key is
+/// separate, and the restored private keys must recreate the exact same public
+/// identity rather than generating a replacement identity.
+private func simulateReinstallRestore(
+    agreement: Curve25519.KeyAgreement.PrivateKey,
+    signing: Curve25519.Signing.PrivateKey
+) throws -> RestoredIdentity {
+    let recoveryKey = SymmetricKey(size: .bits256)
+    let backup = IdentityBackup(
+        agreementPrivateKey: agreement.rawRepresentation.base64EncodedString(),
+        signingPrivateKey: signing.rawRepresentation.base64EncodedString()
+    )
+    let plaintext = try JSONEncoder().encode(backup)
+    let encryptedBundle = try ChaChaPoly.seal(plaintext, using: recoveryKey).combined
+
+    // A wrong recovery key must fail closed.
+    do {
+        _ = try ChaChaPoly.open(
+            ChaChaPoly.SealedBox(combined: encryptedBundle),
+            using: SymmetricKey(size: .bits256)
+        )
+        fatalError("wrong recovery key decrypted the identity backup")
+    } catch {
+        // Expected authentication failure.
+    }
+
+    let recoveredData = try ChaChaPoly.open(
+        ChaChaPoly.SealedBox(combined: encryptedBundle),
+        using: recoveryKey
+    )
+    let recovered = try JSONDecoder().decode(IdentityBackup.self, from: recoveredData)
+
+    guard let agreementData = Data(base64Encoded: recovered.agreementPrivateKey),
+          let signingData = Data(base64Encoded: recovered.signingPrivateKey) else {
+        fatalError("invalid recovered identity encoding")
+    }
+
+    let restoredAgreement = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: agreementData)
+    let restoredSigning = try Curve25519.Signing.PrivateKey(rawRepresentation: signingData)
+
+    precondition(
+        restoredAgreement.publicKey.rawRepresentation == agreement.publicKey.rawRepresentation,
+        "reinstall restore changed the X25519 public identity"
+    )
+    precondition(
+        restoredSigning.publicKey.rawRepresentation == signing.publicKey.rawRepresentation,
+        "reinstall restore changed the Ed25519 public identity"
+    )
+
+    return RestoredIdentity(
+        agreement: restoredAgreement,
+        signing: restoredSigning
+    )
+}
+
 private func runDirection(
     senderID: String,
     receiverID: String,
@@ -141,9 +207,20 @@ private func runDirection(
     )
     precondition(recipientPlaintext == plaintext, "recipient could not decrypt v2 message")
 
+    // Simulate deleting the installation and restoring the same long-lived
+    // identity from an opaque encrypted recovery bundle.
+    let restoredSender = try simulateReinstallRestore(
+        agreement: senderAgreement,
+        signing: senderSigning
+    )
+    precondition(
+        restoredSender.signing.publicKey.isValidSignature(signature, for: canonical),
+        "restored signing identity does not verify historical envelope"
+    )
+
     let senderRecoveredPlaintext = try open(
         copy: recovery,
-        privateKey: senderAgreement,
+        privateKey: restoredSender.agreement,
         sharedInfo: context(
             role: "sender-recovery",
             senderID: senderID,
@@ -151,7 +228,10 @@ private func runDirection(
             clientID: clientID
         )
     )
-    precondition(senderRecoveredPlaintext == plaintext, "sender recovery copy could not decrypt")
+    precondition(
+        senderRecoveredPlaintext == plaintext,
+        "restored device could not decrypt historical outgoing message"
+    )
 
     let tamperedCanonical = Data([
         version,
@@ -166,7 +246,7 @@ private func runDirection(
         fp
     ].joined(separator: "|").utf8)
     precondition(
-        !senderSigning.publicKey.isValidSignature(signature, for: tamperedCanonical),
+        !restoredSender.signing.publicKey.isValidSignature(signature, for: tamperedCanonical),
         "tampered v2 envelope signature was accepted"
     )
 }
@@ -194,4 +274,4 @@ try runDirection(
     plaintext: "B → A encrypted text"
 )
 
-print("PASS: gru-e2ee-v2 two-client recipient + sender-recovery smoke")
+print("PASS: two-client v2 + reinstall identity continuity + sender-history recovery")
