@@ -28,5 +28,5 @@ jobs:
       - name: Run security regression tests
         run: >-
           mvn --batch-mode --no-transfer-progress
-          -Dtest=JwtChannelInterceptorTest,MediaControllerTest,E2EECryptoVerifierTest
+          -Dtest=JwtChannelInterceptorTest,MediaControllerTest,E2EERecoveryControllerTest,E2EECryptoVerifierTest
           test
