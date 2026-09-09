@@ -1,6 +1,5 @@
 package gru.app.websocket;
 
-import gru.app.websocket.JwtChannelInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -18,22 +17,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-
-        registry.enableSimpleBroker("/topic");
-
+        // /topic is only for chat-scoped broadcasts whose SUBSCRIBE frames are
+        // checked by JwtChannelInterceptor. Presence is private metadata and is
+        // delivered through per-user /queue destinations instead of a global topic.
+        registry.enableSimpleBroker("/topic", "/queue");
         registry.setApplicationDestinationPrefixes("/app");
+        registry.setUserDestinationPrefix("/user");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*");
     }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-
         registration.interceptors(jwtChannelInterceptor);
     }
 }
