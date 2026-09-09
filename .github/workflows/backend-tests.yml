@@ -12,6 +12,7 @@ on:
     paths:
       - "pom.xml"
       - "src/**"
+      - "Dockerfile"
       - ".github/workflows/backend-tests.yml"
 
 permissions:
@@ -21,12 +22,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      GRU_JWT_SECRET: gru-ci-only-secret-not-for-production-2026-09-security
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Generate ephemeral CI JWT secret
+        shell: bash
+        run: echo "GRU_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
@@ -37,3 +40,6 @@ jobs:
 
       - name: Compile and test backend
         run: mvn --batch-mode --no-transfer-progress clean test
+
+      - name: Build production Docker image
+        run: docker build --tag gru-security-ci .
