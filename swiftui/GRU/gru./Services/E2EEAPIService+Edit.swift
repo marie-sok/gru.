@@ -44,7 +44,7 @@ extension E2EEAPIService {
         }
 
         let clientMessageID = UUID().uuidString.lowercased()
-        let envelope = try GRUE2EE.shared.encrypt(
+        let envelope = try GRUE2EEV2.shared.encrypt(
             plaintext: plaintext,
             chatID: chatID,
             senderID: senderID,
@@ -65,6 +65,8 @@ extension E2EEAPIService {
             let encryptedPayload: String
             let encryptionVersion: String
             let senderEphemeralPublicKey: String
+            let senderRecoveryEncryptedPayload: String
+            let senderRecoveryEphemeralPublicKey: String
             let signature: String
             let senderKeyFingerprint: String
             let replyToMessageId: String?
@@ -77,6 +79,8 @@ extension E2EEAPIService {
                 encryptedPayload: envelope.encryptedPayload,
                 encryptionVersion: envelope.version,
                 senderEphemeralPublicKey: envelope.senderEphemeralPublicKey,
+                senderRecoveryEncryptedPayload: envelope.senderRecoveryEncryptedPayload,
+                senderRecoveryEphemeralPublicKey: envelope.senderRecoveryEphemeralPublicKey,
                 signature: envelope.signature,
                 senderKeyFingerprint: envelope.senderKeyFingerprint,
                 replyToMessageId: nil
