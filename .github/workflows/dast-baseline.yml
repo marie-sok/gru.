@@ -15,11 +15,35 @@ permissions:
 jobs:
   zap-baseline:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Wake production backend and wait for health
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="https://gru-jiqi.onrender.com"
+
+          for attempt in $(seq 1 36); do
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              --max-time 10 \
+              "$TARGET/health" >/dev/null; then
+              echo "GRU backend is awake for DAST"
+              exit 0
+            fi
+
+            echo "Waiting for Render backend (attempt $attempt/36)..."
+            sleep 5
+          done
+
+          echo "Backend did not become healthy in time" >&2
+          exit 1
 
       - name: OWASP ZAP baseline against public production surface
         uses: zaproxy/action-baseline@v0.15.0
@@ -28,4 +52,4 @@ jobs:
           allow_issue_writing: false
           fail_action: false
           artifact_name: "gru-zap-baseline"
-          cmd_options: "-a -m 1"
+          cmd_options: "-a -m 1 -T 5"
