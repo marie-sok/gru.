@@ -2,6 +2,7 @@ package gru.app.model;
 
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -9,6 +10,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Document(collection = "messages")
+@CompoundIndex(
+        name = "uniq_e2ee_sender_client_message",
+        def = "{'senderId': 1, 'e2eeClientMessageId': 1}",
+        unique = true,
+        partialFilter = "{'e2eeClientMessageId': {'$type': 'string'}}"
+)
 @Data
 public class Message {
 
@@ -21,7 +28,32 @@ public class Message {
 
     private String receiverId;
 
+    /** Plaintext for legacy/non-E2EE messages only. */
     private String text;
+
+    /** Client-generated UUID, signed into the E2EE envelope for replay/idempotency protection. */
+    private String e2eeClientMessageId;
+
+    /** Opaque base64 ciphertext produced on the sender device. */
+    private String encryptedPayload;
+
+    /** Protocol version, e.g. "gru-e2ee-v1". */
+    private String encryptionVersion;
+
+    /** Sender ephemeral X25519 public key, base64 encoded. */
+    private String senderEphemeralPublicKey;
+
+    /** Signature over the canonical encrypted envelope, base64 encoded. */
+    private String e2eeSignature;
+
+    /** SHA-256 fingerprint of the sender signing identity key. */
+    private String senderKeyFingerprint;
+
+    /** Public Ed25519 identity key used by clients to verify this envelope offline. */
+    private String senderSigningPublicKey;
+
+    /** Public X25519 identity key, pinned together with the signing key as one peer identity. */
+    private String senderKeyAgreementPublicKey;
 
     private Instant createdAt;
 
@@ -41,9 +73,5 @@ public class Message {
 
     private ReplyReference replyTo;
 
-    /**
-     * Per-account soft-hide state for "delete for me".
-     * Kept on the message so history filtering survives app restarts and reloads.
-     */
     private Set<String> hiddenForUserIds = new HashSet<>();
 }

@@ -454,6 +454,13 @@ final class APIClient {
             #endif
 
             if 200...299 ~= http.statusCode {
+                if let path = request.url?.path,
+                   path.hasPrefix("/media/") {
+                    return try GRUE2EEMediaKeyStore.shared.decryptIfRegistered(
+                        data,
+                        path: path
+                    )
+                }
                 return data
             }
 

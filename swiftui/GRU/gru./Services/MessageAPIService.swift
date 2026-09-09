@@ -1,43 +1,69 @@
 import Foundation
 
 final class MessageAPIService {
-
-    static let shared =
-        MessageAPIService()
-
+    static let shared = MessageAPIService()
     private init() {}
 
-    // MARK: ========================================
-    // MARK: GET MESSAGES
-    // MARK: ========================================
+    func getMessages(chatID: String, token: String) async throws -> [ServerMessageDTO] {
+        let data = try await APIClient.shared.request(
+            path: "/chats/\(chatID)/messages",
+            method: "GET",
+            token: token
+        )
+        let messages = try JSONCoding.decoder.decode([ServerMessageDTO].self, from: data)
+        guard let currentUserID = TokenStorage.shared.userID else { return messages }
 
-    func getMessages(
-        chatID: String,
-        token: String
-    ) async throws -> [ServerMessageDTO] {
+        var result: [ServerMessageDTO] = []
+        result.reserveCapacity(messages.count)
 
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/chats/\(chatID)/messages",
-                    method:
-                        "GET",
-                    token:
-                        token
+        for message in messages {
+            guard message.e2eeEnvelope != nil else {
+                result.append(message)
+                continue
+            }
+
+            if !message.text.isEmpty && !message.text.hasPrefix("🔒") {
+                result.append(message)
+                continue
+            }
+
+            do {
+                let plaintext = try await E2EEAPIService.shared.decrypt(
+                    message: message,
+                    currentUserID: currentUserID,
+                    token: token
                 )
 
-        return try
-            JSONCoding.decoder.decode(
-                [ServerMessageDTO].self,
-                from:
-                    data
-            )
-    }
+                if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext) {
+                    // A media key is cryptographic material, never user-visible
+                    // message text. Even a malformed server DTO without remoteURL
+                    // must fail closed instead of rendering/caching the raw key.
+                    if let remoteURL = message.attachment?.remoteURL,
+                       !remoteURL.isEmpty {
+                        GRUE2EEMediaKeyStore.shared.register(
+                            keyPayload: plaintext,
+                            remoteURL: remoteURL
+                        )
+                    } else {
+                        #if DEBUG
+                        print("⚠️ E2EE media envelope has no remoteURL; key suppressed")
+                        #endif
+                    }
 
-    // MARK: ========================================
-    // MARK: SEND MESSAGE
-    // MARK: ========================================
+                    result.append(message.replacingText(""))
+                } else {
+                    result.append(message.replacingText(plaintext))
+                }
+            } catch {
+                #if DEBUG
+                print("⚠️ E2EE history decrypt failed:", error.localizedDescription)
+                #endif
+                result.append(message.replacingText("🔒 Не удалось расшифровать сообщение"))
+            }
+        }
+
+        return result
+    }
 
     func sendMessage(
         chatID: String,
@@ -45,52 +71,18 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else {
+            throw MessageTransportError.emptyMessage
+        }
 
-        let cleanText =
-            text.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
-
-        let request =
-            SendMessageDTO(
-                chatId:
-                    chatID,
-                text:
-                    cleanText,
-                replyToMessageId:
-                    replyToMessageID
-            )
-
-        let body =
-            try JSONCoding.encoder.encode(
-                request
-            )
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages",
-                    method:
-                        "POST",
-                    token:
-                        token,
-                    body:
-                        body
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
+        return try await E2EEAPIService.shared.sendEncryptedText(
+            chatID: chatID,
+            plaintext: cleanText,
+            replyToMessageID: replyToMessageID,
+            token: token
+        )
     }
-
-    // MARK: ========================================
-    // MARK: SEND PHOTO
-    // MARK: ========================================
 
     func sendPhoto(
         chatID: String,
@@ -101,56 +93,18 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-
-        var fields: [String: String] = [
-            "chatId":
-                chatID,
-            "width":
-                String(width),
-            "height":
-                String(height)
-        ]
-
-        if let replyToMessageID,
-           !replyToMessageID.isEmpty {
-
-            fields[
-                "replyToMessageId"
-            ] =
-                replyToMessageID
-        }
-
-        let responseData =
-            try await
-                APIClient.shared
-                .uploadMultipart(
-                    path:
-                        "/messages/photo",
-                    token:
-                        token,
-                    fields:
-                        fields,
-                    fileFieldName:
-                        "file",
-                    fileName:
-                        fileName,
-                    mimeType:
-                        "image/jpeg",
-                    fileData:
-                        data
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    responseData
-            )
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .photo,
+            fileName: fileName,
+            mimeType: "image/jpeg",
+            width: width,
+            height: height,
+            replyToMessageID: replyToMessageID,
+            token: token
+        )
     }
-
-    // MARK: ========================================
-    // MARK: SEND VIDEO
-    // MARK: ========================================
 
     func sendVideo(
         chatID: String,
@@ -163,35 +117,19 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-
-        var fields: [String: String] = ["chatId": chatID]
-
-        if let width, width > 0 { fields["width"] = String(width) }
-        if let height, height > 0 { fields["height"] = String(height) }
-        if let duration, duration > 0 { fields["duration"] = String(duration) }
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/video",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .video,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
-        )
-
-        return try JSONCoding.decoder.decode(
-            ServerMessageDTO.self,
-            from: responseData
+            width: width,
+            height: height,
+            duration: duration,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
     }
-
-    // MARK: ========================================
-    // MARK: SEND VIDEO MESSAGE
-    // MARK: ========================================
 
     func sendVideoNote(
         chatID: String,
@@ -204,67 +142,19 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-
-        var fields: [String: String] = [
-            "chatId":
-                chatID
-        ]
-
-        if let width,
-           width > 0 {
-            fields["width"] =
-                String(width)
-        }
-
-        if let height,
-           height > 0 {
-            fields["height"] =
-                String(height)
-        }
-
-        if let duration,
-           duration > 0 {
-            fields["duration"] =
-                String(duration)
-        }
-
-        if let replyToMessageID,
-           !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] =
-                replyToMessageID
-        }
-
-        let responseData =
-            try await
-                APIClient.shared
-                .uploadMultipart(
-                    path:
-                        "/messages/video-note",
-                    token:
-                        token,
-                    fields:
-                        fields,
-                    fileFieldName:
-                        "file",
-                    fileName:
-                        fileName,
-                    mimeType:
-                        mimeType,
-                    fileData:
-                        data
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    responseData
-            )
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .videoNote,
+            fileName: fileName,
+            mimeType: mimeType,
+            width: width,
+            height: height,
+            duration: duration,
+            replyToMessageID: replyToMessageID,
+            token: token
+        )
     }
-
-    // MARK: ========================================
-    // MARK: SEND DOCUMENT
-    // MARK: ========================================
 
     func sendDocument(
         chatID: String,
@@ -274,31 +164,16 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-        var fields: [String: String] = ["chatId": chatID]
-
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/document",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .document,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
-        )
-
-        return try JSONCoding.decoder.decode(
-            ServerMessageDTO.self,
-            from: responseData
+            replyToMessageID: replyToMessageID,
+            token: token
         )
     }
-
-    // MARK: ========================================
-    // MARK: SEND VOICE AUDIO
-    // MARK: ========================================
 
     func sendAudio(
         chatID: String,
@@ -310,285 +185,128 @@ final class MessageAPIService {
         replyToMessageID: String? = nil,
         token: String
     ) async throws -> ServerMessageDTO {
-
-        var fields: [String: String] = [
-            "chatId": chatID
-        ]
-
-        if let duration, duration > 0 {
-            fields["duration"] = String(duration)
-        }
-
-        if let waveform, !waveform.isEmpty {
-            fields["waveform"] = waveform
-                .prefix(64)
-                .map { String(format: "%.4f", max(0.04, min(1.0, $0))) }
-                .joined(separator: ",")
-        }
-
-        if let replyToMessageID, !replyToMessageID.isEmpty {
-            fields["replyToMessageId"] = replyToMessageID
-        }
-
-        let responseData = try await APIClient.shared.uploadMultipart(
-            path: "/messages/audio",
-            token: token,
-            fields: fields,
-            fileFieldName: "file",
+        try await E2EEMediaService.shared.send(
+            chatID: chatID,
+            data: data,
+            type: .audio,
             fileName: fileName,
             mimeType: mimeType,
-            fileData: data
-        )
-
-        return try JSONCoding.decoder.decode(
-            ServerMessageDTO.self,
-            from: responseData
+            duration: duration,
+            waveform: waveform,
+            replyToMessageID: replyToMessageID,
+            token: token
         )
     }
 
-    // MARK: ========================================
-    // MARK: DELIVERED
-    // MARK: ========================================
-
-    func markDelivered(
-        messageID: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages/\(messageID)/delivered",
-                    method:
-                        "POST",
-                    token:
-                        token
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
+    func markDelivered(messageID: String, token: String) async throws -> ServerMessageDTO {
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)/delivered",
+            method: "POST",
+            token: token
+        )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
     }
 
-    // MARK: ========================================
-    // MARK: READ MESSAGE
-    // MARK: ========================================
-
-    func markRead(
-        messageID: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages/\(messageID)/read",
-                    method:
-                        "POST",
-                    token:
-                        token
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
+    func markRead(messageID: String, token: String) async throws -> ServerMessageDTO {
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)/read",
+            method: "POST",
+            token: token
+        )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
     }
 
-    // MARK: ========================================
-    // MARK: READ CHAT
-    // MARK: ========================================
-
-    func markChatRead(
-        chatID: String,
-        token: String
-    ) async throws -> [ServerMessageDTO] {
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/chats/\(chatID)/read",
-                    method:
-                        "POST",
-                    token:
-                        token
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                [ServerMessageDTO].self,
-                from:
-                    data
-            )
+    func markChatRead(chatID: String, token: String) async throws -> [ServerMessageDTO] {
+        let data = try await APIClient.shared.request(
+            path: "/chats/\(chatID)/read",
+            method: "POST",
+            token: token
+        )
+        return try JSONCoding.decoder.decode([ServerMessageDTO].self, from: data)
     }
-
-    // MARK: ========================================
-    // MARK: SET REACTION
-    // MARK: ========================================
 
     func setReaction(
         messageID: String,
         reaction: ReactionType,
         token: String
     ) async throws -> ServerMessageDTO {
-
-        let request =
-            SetReactionDTO(
-                reaction:
-                    reaction.rawValue
-            )
-
-        let body =
-            try JSONCoding.encoder.encode(
-                request
-            )
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages/\(messageID)/reaction",
-                    method:
-                        "POST",
-                    token:
-                        token,
-                    body:
-                        body
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
-    }
-
-    // MARK: ========================================
-    // MARK: REMOVE REACTION
-    // MARK: ========================================
-
-    func removeReaction(
-        messageID: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages/\(messageID)/reaction",
-                    method:
-                        "DELETE",
-                    token:
-                        token
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
-    }
-
-    // MARK: ========================================
-    // MARK: DELETE MESSAGE
-    // MARK: ========================================
-
-    func deleteMessage(
-        messageID: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
-        let data =
-            try await
-                APIClient.shared.request(
-                    path:
-                        "/messages/\(messageID)",
-                    method:
-                        "DELETE",
-                    token:
-                        token
-                )
-
-        return try
-            JSONCoding.decoder.decode(
-                ServerMessageDTO.self,
-                from:
-                    data
-            )
-    }
-
-    // MARK: ========================================
-    // MARK: EDIT MESSAGE
-    // MARK: ========================================
-
-    func editMessage(
-        messageID: String,
-        text: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
-        struct EditMessageRequest: Codable {
-            let text: String
-        }
-
         let body = try JSONCoding.encoder.encode(
-            EditMessageRequest(text: text)
+            SetReactionDTO(reaction: reaction.rawValue)
         )
-
         let data = try await APIClient.shared.request(
-            path: "/messages/\(messageID)",
-            method: "PATCH",
+            path: "/messages/\(messageID)/reaction",
+            method: "POST",
             token: token,
             body: body
         )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
+    }
 
-        return try JSONCoding.decoder.decode(
-            ServerMessageDTO.self,
-            from: data
+    func removeReaction(messageID: String, token: String) async throws -> ServerMessageDTO {
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)/reaction",
+            method: "DELETE",
+            token: token
+        )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
+    }
+
+    func deleteMessage(messageID: String, token: String) async throws -> ServerMessageDTO {
+        let data = try await APIClient.shared.request(
+            path: "/messages/\(messageID)",
+            method: "DELETE",
+            token: token
+        )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
+    }
+
+    func editMessage(messageID: String, text: String, token: String) async throws -> ServerMessageDTO {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else {
+            throw MessageTransportError.emptyMessage
+        }
+
+        let chatID = await MainActor.run { () -> String? in
+            ChatService.shared.chats.first(where: { chat in
+                chat.messages.contains(where: { $0.serverID == messageID })
+            })?.serverID
+        }
+        guard let chatID, !chatID.isEmpty else {
+            throw MessageTransportError.missingChatContext
+        }
+
+        return try await E2EEAPIService.shared.editEncryptedText(
+            messageID: messageID,
+            chatID: chatID,
+            plaintext: cleanText,
+            token: token
         )
     }
 
-    // MARK: ========================================
-    // MARK: DELETE MESSAGE FOR ME
-    // MARK: ========================================
-
-    /// Hides a server message only for the current account. The peer's copy
-    /// remains untouched; local storage still hides it immediately while the
-    /// request is in flight.
-    func deleteMessageForMe(
-        messageID: String,
-        token: String
-    ) async throws -> ServerMessageDTO {
-
+    func deleteMessageForMe(messageID: String, token: String) async throws -> ServerMessageDTO {
         let data = try await APIClient.shared.request(
             path: "/messages/\(messageID)/me",
             method: "DELETE",
             token: token
         )
-
-        return try JSONCoding.decoder.decode(
-            ServerMessageDTO.self,
-            from: data
-        )
+        return try JSONCoding.decoder.decode(ServerMessageDTO.self, from: data)
     }
 }
 
-// MARK: ========================================
-// MARK: SET REACTION DTO
-// MARK: ========================================
-
 private struct SetReactionDTO: Codable {
-
     let reaction: String
+}
+
+enum MessageTransportError: LocalizedError {
+    case emptyMessage
+    case missingChatContext
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyMessage:
+            return "Сообщение пустое."
+        case .missingChatContext:
+            return "Не удалось определить чат для защищённого сообщения."
+        }
+    }
 }

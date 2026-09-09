@@ -21,6 +21,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GRU_JWT_SECRET: gru-ci-only-secret-not-for-production-2026-09-security
 
     steps:
       - name: Checkout

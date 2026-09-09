@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 import UIKit
+import CryptoKit
 @testable import gru
 
 struct gru_Tests {
@@ -129,7 +130,85 @@ struct gru_Tests {
         #expect(retrievedData == testData)
     }
 
-    // MARK: - 5. User Model & Avatar Tests
+    // MARK: - 5. E2EE Media Key Lifecycle
+
+    @Test func testE2EEMediaKeyRegistrationDecryptAndClear() throws {
+        let store = GRUE2EEMediaKeyStore.shared
+        store.clear()
+
+        let rawKey = Data(repeating: 0x2A, count: 32)
+        let payload = E2EEMediaService.mediaKeyPrefix + rawKey.base64EncodedString()
+        let path = "/media/test-\(UUID().uuidString)"
+        let plaintext = Data("encrypted-media-roundtrip".utf8)
+        let encrypted = try ChaChaPoly.seal(
+            plaintext,
+            using: SymmetricKey(data: rawKey)
+        ).combined
+
+        store.register(
+            keyPayload: payload,
+            remoteURL: "https://example.invalid\(path)?token=ignored"
+        )
+
+        let decrypted = try store.decryptIfRegistered(
+            encrypted,
+            path: path
+        )
+        #expect(decrypted == plaintext)
+
+        store.clear()
+
+        let afterClear = try store.decryptIfRegistered(
+            encrypted,
+            path: path
+        )
+        #expect(afterClear == encrypted)
+    }
+
+    @Test func testE2EEMediaKeyRegistryEvictsOldEntries() throws {
+        let store = GRUE2EEMediaKeyStore.shared
+        store.clear()
+
+        let rawKey = Data(repeating: 0x11, count: 32)
+        let payload = E2EEMediaService.mediaKeyPrefix + rawKey.base64EncodedString()
+        let firstPath = "/media/first-\(UUID().uuidString)"
+        let plaintext = Data("first-entry".utf8)
+        let encrypted = try ChaChaPoly.seal(
+            plaintext,
+            using: SymmetricKey(data: rawKey)
+        ).combined
+
+        store.register(keyPayload: payload, remoteURL: firstPath)
+
+        for index in 0..<512 {
+            store.register(
+                keyPayload: payload,
+                remoteURL: "/media/fill-\(index)-\(UUID().uuidString)"
+            )
+        }
+
+        let firstAfterEviction = try store.decryptIfRegistered(
+            encrypted,
+            path: firstPath
+        )
+        #expect(firstAfterEviction == encrypted)
+
+        let newestPath = "/media/newest-\(UUID().uuidString)"
+        store.register(keyPayload: payload, remoteURL: newestPath)
+        let newestEncrypted = try ChaChaPoly.seal(
+            plaintext,
+            using: SymmetricKey(data: rawKey)
+        ).combined
+        let newestDecrypted = try store.decryptIfRegistered(
+            newestEncrypted,
+            path: newestPath
+        )
+        #expect(newestDecrypted == plaintext)
+
+        store.clear()
+    }
+
+    // MARK: - 6. User Model & Avatar Tests
 
     @Test func testUserModelWithAvatar() throws {
         let avatarData = Data([0x47, 0x52, 0x55])
@@ -189,7 +268,7 @@ struct gru_Tests {
         #expect(bot.username == "gru.bot")
     }
 
-    // MARK: - 6. NetworkMonitor Connection Types
+    // MARK: - 7. NetworkMonitor Connection Types
 
     @Test func testNetworkMonitorTypes() throws {
         #expect(NetworkMonitor.ConnectionType.wifi.rawValue == "Wi-Fi")

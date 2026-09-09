@@ -7,6 +7,7 @@ struct MainView: View {
     @State private var isAgentPresented = false
     @State private var showBotTestLab = false
     @State private var showConnectivityDiagnostics = false
+    @State private var showE2EESecurityCenter = false
     @StateObject private var connectivity = GRUConnectivityCenter.shared
 
     var body: some View {
@@ -69,6 +70,9 @@ struct MainView: View {
                     }
             }
         }
+        .sheet(isPresented: $showE2EESecurityCenter) {
+            GRUE2EESecurityCenterView()
+        }
         .onChange(of: selectedTab) { _, _ in
             if isChatPresented {
                 isChatPresented = false
@@ -117,7 +121,29 @@ struct MainView: View {
         if selectedTab == .contacts {
             ContactsView()
         } else if selectedTab == .settings {
-            GRUReleaseSettingsView()
+            ZStack(alignment: .bottomTrailing) {
+                GRUReleaseSettingsView()
+
+                Button {
+                    showE2EESecurityCenter = true
+                } label: {
+                    Label("Защита E2EE", systemImage: "checkmark.shield.fill")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(GRUColors.accent.opacity(0.55), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(GRUColors.accent)
+                .padding(.trailing, 16)
+                .padding(.bottom, 14)
+                .accessibilityLabel("Открыть центр проверки E2EE")
+            }
         } else {
             BetaChatListView(
                 onChatPresentationChanged: { isPresented in

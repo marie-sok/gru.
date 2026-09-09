@@ -851,7 +851,9 @@ final class WebSocketService {
                         "auto",
                     "Authorization":
                         "Bearer \(token)"
-                ]
+                ],
+                body:
+                    nil
             )
 
         activeTypingSubscriptions
@@ -1530,29 +1532,17 @@ final class WebSocketService {
                 message.id
             )
             print(
-                "💬",
-                message.text
+                "🔐 e2ee:",
+                message.e2eeEnvelope != nil
             )
             print(
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
 
-            guard let handlers =
-                    messageListeners[
-                        message.chatId
-                    ]?.values
-            else {
-
-                return
-            }
-
-            for handler
-            in handlers {
-
-                handler(
-                    message
-                )
-            }
+            dispatchChatMessage(
+                message,
+                destination: destination
+            )
 
         } catch {
 
@@ -1569,6 +1559,103 @@ final class WebSocketService {
             print(
                 body
             )
+        }
+    }
+
+    // MARK: - E2EE Realtime Delivery
+
+    private func dispatchChatMessage(
+        _ message: ServerMessageDTO,
+        destination: String
+    ) {
+        guard message.e2eeEnvelope != nil else {
+            deliverChatMessage(message)
+            return
+        }
+
+        guard let token,
+              !token.isEmpty,
+              let currentUserID = TokenStorage.shared.userID,
+              !currentUserID.isEmpty else {
+            deliverChatMessage(
+                message.replacingText("🔒 Не удалось расшифровать сообщение")
+            )
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let plaintext = try await E2EEAPIService.shared.decrypt(
+                    message: message,
+                    currentUserID: currentUserID,
+                    token: token
+                )
+
+                let resolved: ServerMessageDTO
+
+                if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext) {
+                    if let remoteURL = message.attachment?.remoteURL,
+                       !remoteURL.isEmpty {
+                        GRUE2EEMediaKeyStore.shared.register(
+                            keyPayload: plaintext,
+                            remoteURL: remoteURL
+                        )
+                    } else {
+                        #if DEBUG
+                        print("⚠️ E2EE realtime media envelope has no remoteURL; key suppressed")
+                        #endif
+                    }
+                    resolved = message.replacingText("")
+                } else {
+                    resolved = message.replacingText(plaintext)
+                }
+
+                self.deliverChatMessage(resolved)
+
+            } catch E2EEAPIError.replayedEnvelope {
+                // Reconnects and broker redelivery may legitimately replay an
+                // already accepted STOMP message. Do not replace a valid local
+                // bubble with a decryption error; simply drop the duplicate.
+                #if DEBUG
+                print("♻️ Dropped replayed E2EE realtime message:", message.id)
+                #endif
+                return
+
+            } catch {
+                #if DEBUG
+                print(
+                    "❌ E2EE realtime decrypt failed:",
+                    message.id,
+                    error.localizedDescription
+                )
+                #endif
+                self.deliverChatMessage(
+                    message.replacingText("🔒 Не удалось расшифровать сообщение")
+                )
+            }
+        }
+    }
+
+    private func deliverChatMessage(
+        _ message: ServerMessageDTO
+    ) {
+        guard let registeredHandlers =
+                messageListeners[
+                    message.chatId
+                ]
+        else {
+            return
+        }
+
+        // A listener may remove itself while handling the event (for example,
+        // when ChatView disappears). Iterate over an immutable snapshot so the
+        // dictionary cannot be mutated underneath the delivery loop.
+        let handlers = Array(registeredHandlers.values)
+
+        for handler in handlers {
+            handler(message)
         }
     }
 
@@ -1622,14 +1709,16 @@ final class WebSocketService {
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
 
-            guard let handlers =
+            guard let registeredHandlers =
                     typingListeners[
                         event.chatId
-                    ]?.values
+                    ]
             else {
 
                 return
             }
+
+            let handlers = Array(registeredHandlers.values)
 
             for handler
             in handlers {

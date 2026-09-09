@@ -49,6 +49,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             clean build
 
+      - name: Verify direct-chat E2EE transport is fail-closed
+        run: |
+          MESSAGE_API="swiftui/GRU/gru./Services/MessageAPIService.swift"
+          E2EE_API="swiftui/GRU/gru./Services/E2EEAPIService.swift"
+          MEDIA_API="swiftui/GRU/gru./Services/E2EEMediaService.swift"
+
+          grep -F 'E2EEAPIService.shared.sendEncryptedText' "$MESSAGE_API"
+          grep -F 'E2EEMediaService.shared.send' "$MESSAGE_API"
+          grep -F 'path: "/messages/e2ee"' "$E2EE_API"
+          grep -F 'path: "/messages/media-e2ee"' "$MEDIA_API"
+
+          # Normal direct-chat iOS sends must not regress to legacy plaintext routes.
+          ! grep -F 'path: "/messages/photo"' "$MESSAGE_API"
+          ! grep -F 'path: "/messages/video"' "$MESSAGE_API"
+          ! grep -F 'path: "/messages/video-note"' "$MESSAGE_API"
+          ! grep -F 'path: "/messages/document"' "$MESSAGE_API"
+          ! grep -F 'path: "/messages/audio"' "$MESSAGE_API"
+          ! grep -F 'path: "/messages",' "$MESSAGE_API"
+
       - name: Verify TestFlight production transport fail-safe
         run: |
           CONFIG="swiftui/GRU/gru./Services/APIClient.swift"

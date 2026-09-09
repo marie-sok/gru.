@@ -3085,34 +3085,73 @@ final class ChatViewModel {
       return
     }
 
-    let token = TokenStorage.shared.token ?? ""
     let serverID = target.serverID
-    cancelEditing()
+    let token = TokenStorage.shared.token ?? ""
 
-    // Optimistic update locally
-    if let index = chat.messages.firstIndex(where: { $0.id == target.id || ($0.serverID != nil && $0.serverID == serverID) }) {
-      chat.messages[index].text = updatedText
-      chat.messages[index].isEdited = true
-      chat.messages[index].editedAt = Date()
-      service.update(chat)
-    }
-
-    guard let serverID = serverID, !serverID.isEmpty, !token.isEmpty else {
+    if let serverID, !serverID.isEmpty, token.isEmpty {
+      actionError = "Не удалось изменить сообщение: сессия не найдена."
       return
     }
 
-    Task {
+    guard let index = chat.messages.firstIndex(where: {
+      $0.id == target.id || ($0.serverID != nil && $0.serverID == serverID)
+    }) else {
+      actionError = "Не удалось изменить сообщение: оно больше не найдено в чате."
+      cancelEditing()
+      return
+    }
+
+    let previousMessage = chat.messages[index]
+    let previousDraft = messageText
+
+    cancelEditing()
+
+    // Optimistic update locally. If the server rejects or the network fails,
+    // the exact previous Message is restored below.
+    chat.messages[index].text = updatedText
+    chat.messages[index].isEdited = true
+    chat.messages[index].editedAt = Date()
+    service.update(chat)
+    refreshSearch()
+
+    guard let serverID, !serverID.isEmpty else {
+      // A not-yet-synced local message has no remote state to update.
+      return
+    }
+
+    Task { [weak self] in
+      guard let self else { return }
+
       do {
         let serverDTO = try await MessageAPIService.shared.editMessage(
           messageID: serverID,
           text: updatedText,
           token: token
         )
-        if let index = chat.messages.firstIndex(where: { $0.id == target.id || $0.serverID == serverID }) {
-          chat.messages[index].applyServerState(serverDTO)
-          service.update(chat)
+
+        if let currentIndex = self.chat.messages.firstIndex(where: {
+          $0.id == target.id || $0.serverID == serverID
+        }) {
+          self.chat.messages[currentIndex].applyServerState(serverDTO)
+          self.service.update(self.chat)
+          self.refreshSearch()
         }
       } catch {
+        if let rollbackIndex = self.chat.messages.firstIndex(where: {
+          $0.id == target.id || $0.serverID == serverID
+        }) {
+          self.chat.messages[rollbackIndex] = previousMessage
+          self.service.update(self.chat)
+          self.refreshSearch()
+        }
+
+        // Preserve the attempted edit so the user can retry after dismissing
+        // the error instead of having to retype it from scratch.
+        self.editingMessage = previousMessage
+        self.messageText = previousDraft
+        self.actionError =
+          "Не удалось изменить сообщение. Изменение отменено: \(error.localizedDescription)"
+
         print("❌ Failed to edit message on server: \(error)")
       }
     }

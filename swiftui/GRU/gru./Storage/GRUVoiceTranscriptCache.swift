@@ -11,6 +11,7 @@ final class GRUVoiceTranscriptCache {
 
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let protector = GRUDataProtection.shared
 
     private init() {}
 
@@ -24,11 +25,17 @@ final class GRUVoiceTranscriptCache {
         }
 
         do {
-            let data = try Data(contentsOf: url)
-            return try decoder.decode(
+            let stored = try Data(contentsOf: url)
+            let data = try protector.open(stored)
+            let transcript = try decoder.decode(
                 GRUVoiceTranscript.self,
                 from: data
             )
+
+            if !stored.starts(with: Data("GRUENC1".utf8)) {
+                save(transcript, fingerprint: fingerprint)
+            }
+            return transcript
         } catch {
             return nil
         }
@@ -40,13 +47,17 @@ final class GRUVoiceTranscriptCache {
     ) {
         let url = fileURL(fingerprint: fingerprint)
 
-        queue.async { [encoder] in
+        queue.async { [encoder, protector] in
             do {
                 let data = try encoder.encode(transcript)
-                try data.write(to: url, options: .atomic)
+                let encrypted = try protector.seal(data)
+                try encrypted.write(
+                    to: url,
+                    options: [.atomic, .completeFileProtection]
+                )
             } catch {
                 print(
-                    "⚠️ Voice transcript cache save:",
+                    "⚠️ Voice transcript protected cache save:",
                     error.localizedDescription
                 )
             }
@@ -102,7 +113,7 @@ final class GRUVoiceTranscriptCache {
         )
 
         return directory.appendingPathComponent(
-            fingerprint + ".json"
+            fingerprint + ".bin"
         )
     }
 }
