@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @MainActor
 struct MainView: View {
@@ -12,8 +13,15 @@ struct MainView: View {
 
     var body: some View {
         ZStack {
+            // Keep one persistent animated backdrop alive while tabs change.
+            // Child tabs must not recreate their own wallpaper, otherwise the
+            // animation restarts and looks like a broken frame swap.
             GRUAppBackdrop()
+
             selectedContent
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
         }
         .overlay(alignment: .top) {
             if !isChatPresented && !isAgentPresented {
@@ -44,6 +52,7 @@ struct MainView: View {
             }
         }
         .onAppear {
+            dismissAnyKeyboard()
             connectivity.start()
         }
         .sheet(isPresented: $showBotTestLab) {
@@ -51,7 +60,7 @@ struct MainView: View {
                 GRUBetaTestChatView()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Готово") {
+                            Button(GRUL10n.text("Готово")) {
                                 showBotTestLab = false
                             }
                         }
@@ -63,7 +72,7 @@ struct MainView: View {
                 GRUConnectivityDiagnosticsView(center: connectivity)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Готово") {
+                            Button(GRUL10n.text("Готово")) {
                                 showConnectivityDiagnostics = false
                             }
                         }
@@ -74,6 +83,7 @@ struct MainView: View {
             GRUE2EESecurityCenterView()
         }
         .onChange(of: selectedTab) { _, _ in
+            dismissAnyKeyboard()
             if isChatPresented {
                 isChatPresented = false
             }
@@ -88,25 +98,19 @@ struct MainView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenChats)) { _ in
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selectedTab = .chats
-                isChatPresented = false
-                isAgentPresented = false
-            }
+            selectedTab = .chats
+            isChatPresented = false
+            isAgentPresented = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenContacts)) { _ in
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selectedTab = .contacts
-                isChatPresented = false
-                isAgentPresented = false
-            }
+            selectedTab = .contacts
+            isChatPresented = false
+            isAgentPresented = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenSettings)) { _ in
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selectedTab = .settings
-                isChatPresented = false
-                isAgentPresented = false
-            }
+            selectedTab = .settings
+            isChatPresented = false
+            isAgentPresented = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .gruBotOpenTestLab)) { _ in
             selectedTab = .chats
@@ -127,7 +131,7 @@ struct MainView: View {
                 Button {
                     showE2EESecurityCenter = true
                 } label: {
-                    Label("Защита E2EE", systemImage: "checkmark.shield.fill")
+                    Label(GRUL10n.text("Защита E2EE"), systemImage: "checkmark.shield.fill")
                         .font(.subheadline.weight(.bold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 11)
@@ -142,7 +146,7 @@ struct MainView: View {
                 .foregroundStyle(GRUColors.accent)
                 .padding(.trailing, 16)
                 .padding(.bottom, 14)
-                .accessibilityLabel("Открыть центр проверки E2EE")
+                .accessibilityLabel(GRUL10n.text("Открыть центр проверки E2EE"))
             }
         } else {
             BetaChatListView(
@@ -156,6 +160,15 @@ struct MainView: View {
                 }
             )
         }
+    }
+
+    private func dismissAnyKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }
 
