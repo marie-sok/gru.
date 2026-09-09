@@ -40,17 +40,13 @@ struct GRUTabBar: View {
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
             guard selectedTab != tab else { return }
-
-            // Tab changes are deliberately immediate. We previously animated
-            // the whole selected content tree, which looked like a broken
-            // frame/cross-fade when switching between Chats / People / Settings.
             selectedTab = tab
         } label: {
-            HStack(spacing: active ? 8 : 0) {
+            VStack(spacing: 2) {
                 ZStack {
                     Circle()
-                        .fill(active ? GRUColors.accent.opacity(0.16) : .clear)
-                        .frame(width: 38, height: 38)
+                        .fill(active ? GRUColors.accent.opacity(0.16) : Color.clear)
+                        .frame(width: 34, height: 34)
 
                     if usesEnvelope {
                         GRUEnvelope()
@@ -58,35 +54,27 @@ struct GRUTabBar: View {
                                 active ? GRUColors.accent : GRUColors.secondary,
                                 style: StrokeStyle(lineWidth: 2, lineJoin: .round)
                             )
-                            .frame(width: 22, height: 16)
+                            .frame(width: 21, height: 15)
                     } else {
                         Image(systemName: image)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(active ? GRUColors.accent : GRUColors.secondary)
                     }
                 }
 
-                if active {
-                    Text(GRUL10n.text(label))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
-                }
+                Text(GRUL10n.text(label))
+                    .font(.system(size: 9.5, weight: active ? .bold : .semibold, design: .rounded))
+                    .foregroundStyle(active ? GRUColors.text : GRUColors.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 48)
-            .background(
-                Capsule()
-                    .fill(active ? GRUColors.accent.opacity(0.09) : .clear)
-            )
-            .overlay {
-                if active {
-                    Capsule()
-                        .stroke(GRUColors.accent.opacity(0.22), lineWidth: 1)
-                }
-            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(GRUL10n.text(label))
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
 
