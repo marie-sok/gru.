@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,4 +22,12 @@ public class User {
     private String nickname;
 
     private Set<String> blockedUserIds = new HashSet<>();
+
+    /** Public X25519 identity key. Private material must never reach the server. */
+    private String e2eeKeyAgreementPublicKey;
+
+    /** Public Ed25519 signing key used to authenticate encrypted envelopes. */
+    private String e2eeSigningPublicKey;
+
+    private Instant e2eeKeyUpdatedAt;
 }
