@@ -255,7 +255,8 @@ struct ServerMessageDTO: Codable {
 
         if senderID == currentUserID {
             guard let plaintext = GRUE2EESentMessageStore.shared.plaintext(
-                for: envelope.clientMessageId
+                userID: currentUserID,
+                clientMessageID: envelope.clientMessageId
             ) else {
                 return "🔒 Защищённое сообщение"
             }
