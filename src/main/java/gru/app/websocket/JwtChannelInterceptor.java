@@ -44,7 +44,8 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         StompCommand command = accessor.getCommand();
 
         if (StompCommand.CONNECT.equals(command)) {
-            authenticate(accessor);
+            String userId = authenticatedUserFromBearer(accessor);
+            accessor.setUser(() -> userId);
             return message;
         }
 
@@ -63,7 +64,19 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
-    private void authenticate(StompHeaderAccessor accessor) {
+    private String requireAuthenticatedUser(StompHeaderAccessor accessor) {
+        Principal principal = accessor.getUser();
+        if (principal != null && principal.getName() != null && !principal.getName().isBlank()) {
+            return principal.getName();
+        }
+
+        // Some STOMP clients repeat Authorization on SUBSCRIBE/SEND. Validate
+        // the frame token directly instead of mutating message headers, which
+        // may already be immutable by this point in the channel pipeline.
+        return authenticatedUserFromBearer(accessor);
+    }
+
+    private String authenticatedUserFromBearer(StompHeaderAccessor accessor) {
         String token = bearerToken(accessor);
         if (!jwtService.isValid(token)) {
             throw new MessagingException("Invalid STOMP authorization token");
@@ -73,20 +86,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         if (userId == null || userId.isBlank()) {
             throw new MessagingException("Invalid STOMP principal");
         }
-
-        accessor.setUser(() -> userId);
-    }
-
-    private String requireAuthenticatedUser(StompHeaderAccessor accessor) {
-        Principal principal = accessor.getUser();
-        if (principal != null && principal.getName() != null && !principal.getName().isBlank()) {
-            return principal.getName();
-        }
-
-        // iOS currently repeats Authorization on SUBSCRIBE/SEND frames. This
-        // fallback keeps reconnects robust while still validating the token.
-        authenticate(accessor);
-        return accessor.getUser().getName();
+        return userId;
     }
 
     private String bearerToken(StompHeaderAccessor accessor) {
