@@ -5,1570 +5,518 @@ import Observation
 @Observable
 final class WebSocketService {
 
-    static let shared =
-        WebSocketService()
+    static let shared = WebSocketService()
 
-    // MARK: - Connection State
+    // MARK: - Public connection state
 
-    private(set) var isSocketOpened =
-        false
+    private(set) var isSocketOpened = false
+    private(set) var isConnected = false
+    private(set) var isReconnecting = false
+    private(set) var lastError: String?
 
-    private(set) var isConnected =
-        false
-
-    private(set) var isReconnecting =
-        false
-
-    private(set) var lastError:
-        String?
-
-    // MARK: - Configuration
+    // MARK: - Transport
 
     private var socketURLString: String {
         GRUServerConfiguration.webSocketURL
     }
 
-    // MARK: - Socket
+    private var socketTask: URLSessionWebSocketTask?
+    private var receiveTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var token: String?
+    private var shouldReconnect = true
+    private var reconnectAttempt = 0
 
-    private var socketTask:
-        URLSessionWebSocketTask?
+    // MARK: - Listeners
 
-    private var receiveTask:
-        Task<Void, Never>?
+    private var messageListeners: [
+        String: [UUID: (ServerMessageDTO) -> Void]
+    ] = [:]
 
-    private var reconnectTask:
-        Task<Void, Never>?
+    private var typingListeners: [
+        String: [UUID: (TypingEventDTO) -> Void]
+    ] = [:]
 
-    private var token:
-        String?
+    private var desiredMessageSubscriptions: Set<String> = []
+    private var desiredTypingSubscriptions: Set<String> = []
+    private var activeMessageSubscriptions: Set<String> = []
+    private var activeTypingSubscriptions: Set<String> = []
 
-    private var shouldReconnect =
-        true
-
-    private var reconnectAttempt =
-        0
-
-    // MARK: - Message Listeners
-
-    private var messageListeners:
-        [
-            String:
-            [
-                UUID:
-                (ServerMessageDTO) -> Void
-            ]
-        ] = [:]
-
-    // MARK: - Typing Listeners
-
-    private var typingListeners:
-        [
-            String:
-            [
-                UUID:
-                (TypingEventDTO) -> Void
-            ]
-        ] = [:]
-
-    // MARK: - Desired Subscriptions
-
-    private var desiredMessageSubscriptions:
-        Set<String> = []
-
-    private var desiredTypingSubscriptions:
-        Set<String> = []
-
-    /*
-     Presence глобальный.
-
-     Нам нужна только одна подписка
-     на всё приложение.
-     */
-
-    private var wantsPresenceSubscription =
-        true
-
-    // MARK: - Active Subscriptions
-
-    private var activeMessageSubscriptions:
-        Set<String> = []
-
-    private var activeTypingSubscriptions:
-        Set<String> = []
-
-    private var isPresenceSubscribed =
-        false
-
-    // MARK: - Init
+    // Presence is a single per-user subscription. It is deliberately not a
+    // global topic: online state is relationship metadata.
+    private var wantsPresenceSubscription = true
+    private var isPresenceSubscribed = false
 
     private init() {}
 
-    // MARK: - Connect
+    // MARK: - Connect / disconnect
 
-    func connect(
-        token: String
-    ) {
-
+    func connect(token: String) {
         guard !token.isEmpty else {
-
-            fail(
-                "JWT token is empty"
-            )
-
+            fail("JWT token is empty")
             return
         }
 
-        self.token =
-            token
-
-        shouldReconnect =
-            true
-
-        wantsPresenceSubscription =
-            true
+        self.token = token
+        shouldReconnect = true
+        wantsPresenceSubscription = true
 
         if isConnected {
-
-            print(
-                "ℹ️ WebSocket already connected"
-            )
-
             subscribeToDesiredTopics()
-
             return
         }
 
-        if socketTask != nil {
-
-            print(
-                "ℹ️ WebSocket connection already in progress"
-            )
-
+        guard socketTask == nil else {
             return
         }
 
-        reconnectTask?
-            .cancel()
-
-        reconnectTask =
-            nil
-
-        openSocket(
-            token:
-                token
-        )
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        openSocket(token: token)
     }
 
-    // MARK: - Open Socket
+    func disconnect() {
+        shouldReconnect = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        receiveTask?.cancel()
+        receiveTask = nil
 
-    private func openSocket(
-        token: String
-    ) {
-
-        guard let url =
-                URL(
-                    string:
-                        socketURLString
-                )
-        else {
-
-            fail(
-                "Invalid WebSocket URL"
+        if isConnected {
+            sendRaw(
+                makeFrame(command: "DISCONNECT"),
+                label: "DISCONNECT"
             )
+        }
 
+        socketTask?.cancel(with: .normalClosure, reason: nil)
+        socketTask = nil
+        resetConnectionState()
+        reconnectAttempt = 0
+
+        #if DEBUG
+        print("🔌 WebSocket disconnected")
+        #endif
+    }
+
+    func resetSession() {
+        disconnect()
+        token = nil
+        messageListeners.removeAll()
+        typingListeners.removeAll()
+        desiredMessageSubscriptions.removeAll()
+        desiredTypingSubscriptions.removeAll()
+        wantsPresenceSubscription = false
+        activeMessageSubscriptions.removeAll()
+        activeTypingSubscriptions.removeAll()
+        isPresenceSubscribed = false
+        lastError = nil
+
+        #if DEBUG
+        print("🧹 WebSocket session fully reset")
+        #endif
+    }
+
+    private func openSocket(token: String) {
+        guard let url = URL(string: socketURLString) else {
+            fail("Invalid WebSocket URL")
             return
         }
 
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
+        lastError = nil
+        activeMessageSubscriptions.removeAll()
+        activeTypingSubscriptions.removeAll()
+        isPresenceSubscribed = false
 
-        if reconnectAttempt == 0 {
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-            print(
-                "🔌 WebSocket connecting"
-            )
-
-        } else {
-
-            print(
-                "🔄 WebSocket reconnecting"
-            )
-        }
-
-        print(
-            "🌐",
-            socketURLString
-        )
-
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        lastError =
-            nil
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
-        let request =
-            URLRequest(
-                url:
-                    url,
-                timeoutInterval:
-                    15
-            )
-
-        let task =
-            URLSession.shared
-                .webSocketTask(
-                    with:
-                        request
-                )
-
-        socketTask =
-            task
-
-        isSocketOpened =
-            true
-
-        isConnected =
-            false
-
+        let task = URLSession.shared.webSocketTask(with: request)
+        socketTask = task
+        isSocketOpened = true
+        isConnected = false
         task.resume()
 
         startReceiving()
+        sendConnectFrame(token: token)
 
-        sendConnectFrame(
-            token:
-                token
-        )
+        #if DEBUG
+        print(reconnectAttempt == 0 ? "🔌 WebSocket connecting" : "🔄 WebSocket reconnecting")
+        print("🌐", socketURLString)
+        #endif
     }
 
-    // MARK: - Disconnect
-
-    func disconnect() {
-
-        shouldReconnect =
-            false
-
-        reconnectTask?
-            .cancel()
-
-        reconnectTask =
-            nil
-
-        receiveTask?
-            .cancel()
-
-        receiveTask =
-            nil
-
-        if isConnected {
-
-            let frame =
-                makeFrame(
-                    command:
-                        "DISCONNECT"
-                )
-
-            sendRaw(
-                frame,
-                label:
-                    "DISCONNECT"
-            )
-        }
-
-        socketTask?
-            .cancel(
-                with:
-                    .normalClosure,
-                reason:
-                    nil
-            )
-
-        socketTask =
-            nil
-
-        isSocketOpened =
-            false
-
-        isConnected =
-            false
-
-        isReconnecting =
-            false
-
-        reconnectAttempt =
-            0
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
-        print(
-            "🔌 WebSocket disconnected"
-        )
+    private func resetConnectionState() {
+        isSocketOpened = false
+        isConnected = false
+        isReconnecting = false
+        activeMessageSubscriptions.removeAll()
+        activeTypingSubscriptions.removeAll()
+        isPresenceSubscribed = false
     }
 
-    // MARK: - Full Session Reset
-
-    func resetSession() {
-
-        disconnect()
-
-        token =
-            nil
-
-        messageListeners
-            .removeAll()
-
-        typingListeners
-            .removeAll()
-
-        desiredMessageSubscriptions
-            .removeAll()
-
-        desiredTypingSubscriptions
-            .removeAll()
-
-        wantsPresenceSubscription =
-            false
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
-        lastError =
-            nil
-
-        print(
-            "🧹 WebSocket session fully reset"
-        )
-    }
-
-    // MARK: - Message Listener
+    // MARK: - Chat listeners
 
     @discardableResult
     func addListener(
         chatID: String,
-        handler:
-            @escaping
-            (ServerMessageDTO) -> Void
+        handler: @escaping (ServerMessageDTO) -> Void
     ) -> UUID {
-
-        let listenerID =
-            UUID()
-
-        var handlers =
-            messageListeners[
-                chatID
-            ] ?? [:]
-
-        handlers[
-            listenerID
-        ] =
-            handler
-
-        messageListeners[
-            chatID
-        ] =
-            handlers
-
-        desiredMessageSubscriptions
-            .insert(
-                chatID
-            )
-
-        print(
-            "➕ Message listener:",
-            chatID
-        )
+        let id = UUID()
+        var handlers = messageListeners[chatID] ?? [:]
+        handlers[id] = handler
+        messageListeners[chatID] = handlers
+        desiredMessageSubscriptions.insert(chatID)
 
         if isConnected {
-
-            subscribeMessages(
-                chatID:
-                    chatID
-            )
+            subscribeMessages(chatID: chatID)
         }
-
-        return listenerID
+        return id
     }
 
-    // MARK: - Remove Message Listener
+    func removeListener(chatID: String, listenerID: UUID) {
+        messageListeners[chatID]?[listenerID] = nil
+        guard messageListeners[chatID]?.isEmpty == true else { return }
 
-    func removeListener(
-        chatID: String,
-        listenerID: UUID
-    ) {
-
-        messageListeners[
-            chatID
-        ]?[
-            listenerID
-        ] =
-            nil
-
-        guard
-            messageListeners[
-                chatID
-            ]?.isEmpty == true
-        else {
-
-            return
-        }
-
-        messageListeners[
-            chatID
-        ] =
-            nil
-
-        desiredMessageSubscriptions
-            .remove(
-                chatID
-            )
-
-        unsubscribeMessages(
-            chatID:
-                chatID
-        )
+        messageListeners[chatID] = nil
+        desiredMessageSubscriptions.remove(chatID)
+        unsubscribeMessages(chatID: chatID)
     }
 
-    // MARK: - Typing Listener
+    // MARK: - Typing listeners
 
     @discardableResult
     func addTypingListener(
         chatID: String,
-        handler:
-            @escaping
-            (TypingEventDTO) -> Void
+        handler: @escaping (TypingEventDTO) -> Void
     ) -> UUID {
-
-        let listenerID =
-            UUID()
-
-        var handlers =
-            typingListeners[
-                chatID
-            ] ?? [:]
-
-        handlers[
-            listenerID
-        ] =
-            handler
-
-        typingListeners[
-            chatID
-        ] =
-            handlers
-
-        desiredTypingSubscriptions
-            .insert(
-                chatID
-            )
-
-        print(
-            "➕ Typing listener:",
-            chatID
-        )
+        let id = UUID()
+        var handlers = typingListeners[chatID] ?? [:]
+        handlers[id] = handler
+        typingListeners[chatID] = handlers
+        desiredTypingSubscriptions.insert(chatID)
 
         if isConnected {
-
-            subscribeTyping(
-                chatID:
-                    chatID
-            )
+            subscribeTyping(chatID: chatID)
         }
-
-        return listenerID
+        return id
     }
 
-    // MARK: - Remove Typing Listener
+    func removeTypingListener(chatID: String, listenerID: UUID) {
+        typingListeners[chatID]?[listenerID] = nil
+        guard typingListeners[chatID]?.isEmpty == true else { return }
 
-    func removeTypingListener(
-        chatID: String,
-        listenerID: UUID
-    ) {
-
-        typingListeners[
-            chatID
-        ]?[
-            listenerID
-        ] =
-            nil
-
-        guard
-            typingListeners[
-                chatID
-            ]?.isEmpty == true
-        else {
-
-            return
-        }
-
-        typingListeners[
-            chatID
-        ] =
-            nil
-
-        desiredTypingSubscriptions
-            .remove(
-                chatID
-            )
-
-        unsubscribeTyping(
-            chatID:
-                chatID
-        )
+        typingListeners[chatID] = nil
+        desiredTypingSubscriptions.remove(chatID)
+        unsubscribeTyping(chatID: chatID)
     }
 
-    // MARK: - Send Typing
+    func sendTyping(chatID: String, typing: Bool) {
+        guard isConnected else { return }
+        guard let token, !token.isEmpty else { return }
 
-    func sendTyping(
-        chatID: String,
-        typing: Bool
-    ) {
-
-        guard isConnected else {
-
-            print(
-                "⚠️ Typing skipped: WebSocket offline"
-            )
-
+        let payload = TypingSendDTO(chatId: chatID, typing: typing)
+        guard let data = try? JSONEncoder().encode(payload),
+              let body = String(data: data, encoding: .utf8) else {
             return
         }
 
-        guard let token,
-              !token.isEmpty
-        else {
-
-            print(
-                "❌ Typing skipped: JWT missing"
-            )
-
-            return
-        }
-
-        let payload =
-            TypingSendDTO(
-                chatId:
-                    chatID,
-                typing:
-                    typing
-            )
-
-        guard let data =
-                try? JSONEncoder()
-                    .encode(
-                        payload
-                    ),
-              let body =
-                String(
-                    data:
-                        data,
-                    encoding:
-                        .utf8
-                )
-        else {
-
-            print(
-                "❌ Typing encode error"
-            )
-
-            return
-        }
-
-        let frame =
+        sendRaw(
             makeFrame(
-                command:
-                    "SEND",
+                command: "SEND",
                 headers: [
-                    "destination":
-                        "/app/typing",
-                    "content-type":
-                        "application/json",
-                    "Authorization":
-                        "Bearer \(token)"
+                    "destination": "/app/typing",
+                    "content-type": "application/json",
+                    "Authorization": "Bearer \(token)"
                 ],
-                body:
-                    body
-            )
-
-        sendRaw(
-            frame,
-            label:
-                "TYPING \(typing)"
+                body: body
+            ),
+            label: "TYPING \(typing)"
         )
     }
 
-    // MARK: - CONNECT
+    // MARK: - STOMP connect / subscriptions
 
-    private func sendConnectFrame(
-        token: String
-    ) {
-
-        let frame =
+    private func sendConnectFrame(token: String) {
+        sendRaw(
             makeFrame(
-                command:
-                    "CONNECT",
+                command: "CONNECT",
                 headers: [
-                    "accept-version":
-                        "1.2",
-                    "host":
-                        GRUServerConfiguration.host,
-                    "heart-beat":
-                        "0,0",
-                    "Authorization":
-                        "Bearer \(token)"
+                    "accept-version": "1.2",
+                    "host": GRUServerConfiguration.host,
+                    "heart-beat": "0,0",
+                    "Authorization": "Bearer \(token)"
                 ]
-            )
-
-        print(
-            "📤 STOMP CONNECT"
-        )
-
-        sendRaw(
-            frame,
-            label:
-                "CONNECT"
+            ),
+            label: "CONNECT"
         )
     }
-
-    // MARK: - Restore All Subscriptions
 
     private func subscribeToDesiredTopics() {
-
-        // Presence
-
         if wantsPresenceSubscription {
-
             subscribePresence()
         }
 
-        // Messages
-
-        for chatID
-        in desiredMessageSubscriptions {
-
-            subscribeMessages(
-                chatID:
-                    chatID
-            )
+        for chatID in desiredMessageSubscriptions {
+            subscribeMessages(chatID: chatID)
         }
 
-        // Typing
-
-        for chatID
-        in desiredTypingSubscriptions {
-
-            subscribeTyping(
-                chatID:
-                    chatID
-            )
+        for chatID in desiredTypingSubscriptions {
+            subscribeTyping(chatID: chatID)
         }
     }
-
-    // MARK: - Subscribe Presence
 
     private func subscribePresence() {
+        guard isConnected, !isPresenceSubscribed else { return }
+        guard let token, !token.isEmpty else { return }
 
-        guard isConnected else {
-
-            return
-        }
-
-        guard
-            !isPresenceSubscribed
-        else {
-
-            return
-        }
-
-        guard let token,
-              !token.isEmpty
-        else {
-
-            return
-        }
-
-        let destination =
-            "/topic/presence"
-
-        let frame =
-            makeFrame(
-                command:
-                    "SUBSCRIBE",
-                headers: [
-                    "id":
-                        "presence-global",
-                    "destination":
-                        destination,
-                    "ack":
-                        "auto",
-                    "Authorization":
-                        "Bearer \(token)"
-                ]
-            )
-
-        isPresenceSubscribed =
-            true
-
-        sendRaw(
-            frame,
-            label:
-                "SUBSCRIBE \(destination)"
+        let destination = "/user/queue/presence"
+        let frame = makeFrame(
+            command: "SUBSCRIBE",
+            headers: [
+                "id": "presence-private",
+                "destination": destination,
+                "ack": "auto",
+                "Authorization": "Bearer \(token)"
+            ]
         )
 
-        print(
-            "🟢 PRESENCE SUBSCRIBE:",
-            destination
+        isPresenceSubscribed = true
+        sendRaw(frame, label: "SUBSCRIBE \(destination)")
+
+        #if DEBUG
+        print("🟢 PRIVATE PRESENCE SUBSCRIBE:", destination)
+        #endif
+    }
+
+    private func subscribeMessages(chatID: String) {
+        guard isConnected,
+              !activeMessageSubscriptions.contains(chatID),
+              let token,
+              !token.isEmpty else {
+            return
+        }
+
+        let destination = "/topic/chat/\(chatID)"
+        let frame = makeFrame(
+            command: "SUBSCRIBE",
+            headers: [
+                "id": "message-\(chatID)",
+                "destination": destination,
+                "ack": "auto",
+                "Authorization": "Bearer \(token)"
+            ]
+        )
+
+        activeMessageSubscriptions.insert(chatID)
+        sendRaw(frame, label: "SUBSCRIBE \(destination)")
+    }
+
+    private func subscribeTyping(chatID: String) {
+        guard isConnected,
+              !activeTypingSubscriptions.contains(chatID),
+              let token,
+              !token.isEmpty else {
+            return
+        }
+
+        let destination = "/topic/chat/\(chatID)/typing"
+        let frame = makeFrame(
+            command: "SUBSCRIBE",
+            headers: [
+                "id": "typing-\(chatID)",
+                "destination": destination,
+                "ack": "auto",
+                "Authorization": "Bearer \(token)"
+            ]
+        )
+
+        activeTypingSubscriptions.insert(chatID)
+        sendRaw(frame, label: "SUBSCRIBE \(destination)")
+    }
+
+    private func unsubscribeMessages(chatID: String) {
+        guard activeMessageSubscriptions.contains(chatID) else { return }
+        activeMessageSubscriptions.remove(chatID)
+        sendRaw(
+            makeFrame(
+                command: "UNSUBSCRIBE",
+                headers: ["id": "message-\(chatID)"]
+            ),
+            label: "UNSUBSCRIBE message \(chatID)"
         )
     }
 
-    // MARK: - Subscribe Messages
-
-    private func subscribeMessages(
-        chatID: String
-    ) {
-
-        guard isConnected else {
-
-            return
-        }
-
-        guard let token,
-              !token.isEmpty
-        else {
-
-            return
-        }
-
-        guard
-            !activeMessageSubscriptions
-                .contains(
-                    chatID
-                )
-        else {
-
-            return
-        }
-
-        let destination =
-            "/topic/chat/\(chatID)"
-
-        let frame =
-            makeFrame(
-                command:
-                    "SUBSCRIBE",
-                headers: [
-                    "id":
-                        "message-\(chatID)",
-                    "destination":
-                        destination,
-                    "ack":
-                        "auto",
-                    "Authorization":
-                        "Bearer \(token)"
-                ]
-            )
-
-        activeMessageSubscriptions
-            .insert(
-                chatID
-            )
-
+    private func unsubscribeTyping(chatID: String) {
+        guard activeTypingSubscriptions.contains(chatID) else { return }
+        activeTypingSubscriptions.remove(chatID)
         sendRaw(
-            frame,
-            label:
-                "SUBSCRIBE \(destination)"
-        )
-
-        print(
-            "📡 MESSAGE SUBSCRIBE:",
-            destination
+            makeFrame(
+                command: "UNSUBSCRIBE",
+                headers: ["id": "typing-\(chatID)"]
+            ),
+            label: "UNSUBSCRIBE typing \(chatID)"
         )
     }
 
-    // MARK: - Subscribe Typing
-
-    private func subscribeTyping(
-        chatID: String
-    ) {
-
-        guard isConnected else {
-
-            return
-        }
-
-        guard let token,
-              !token.isEmpty
-        else {
-
-            return
-        }
-
-        guard
-            !activeTypingSubscriptions
-                .contains(
-                    chatID
-                )
-        else {
-
-            return
-        }
-
-        let destination =
-            "/topic/chat/\(chatID)/typing"
-
-        let frame =
-            makeFrame(
-                command:
-                    "SUBSCRIBE",
-                headers: [
-                    "id":
-                        "typing-\(chatID)",
-                    "destination":
-                        destination,
-                    "ack":
-                        "auto",
-                    "Authorization":
-                        "Bearer \(token)"
-                ],
-                body:
-                    nil
-            )
-
-        activeTypingSubscriptions
-            .insert(
-                chatID
-            )
-
-        sendRaw(
-            frame,
-            label:
-                "SUBSCRIBE \(destination)"
-        )
-
-        print(
-            "⌨️ TYPING SUBSCRIBE:",
-            destination
-        )
-    }
-
-    // MARK: - Unsubscribe Messages
-
-    private func unsubscribeMessages(
-        chatID: String
-    ) {
-
-        guard
-            activeMessageSubscriptions
-                .contains(
-                    chatID
-                )
-        else {
-
-            return
-        }
-
-        let frame =
-            makeFrame(
-                command:
-                    "UNSUBSCRIBE",
-                headers: [
-                    "id":
-                        "message-\(chatID)"
-                ]
-            )
-
-        activeMessageSubscriptions
-            .remove(
-                chatID
-            )
-
-        sendRaw(
-            frame,
-            label:
-                "UNSUBSCRIBE message \(chatID)"
-        )
-    }
-
-    // MARK: - Unsubscribe Typing
-
-    private func unsubscribeTyping(
-        chatID: String
-    ) {
-
-        guard
-            activeTypingSubscriptions
-                .contains(
-                    chatID
-                )
-        else {
-
-            return
-        }
-
-        let frame =
-            makeFrame(
-                command:
-                    "UNSUBSCRIBE",
-                headers: [
-                    "id":
-                        "typing-\(chatID)"
-                ]
-            )
-
-        activeTypingSubscriptions
-            .remove(
-                chatID
-            )
-
-        sendRaw(
-            frame,
-            label:
-                "UNSUBSCRIBE typing \(chatID)"
-        )
-    }
-
-    // MARK: - Receive
+    // MARK: - Receive loop
 
     private func startReceiving() {
+        receiveTask?.cancel()
+        receiveTask = Task { [weak self] in
+            guard let self else { return }
 
-        receiveTask?
-            .cancel()
-
-        receiveTask =
-            Task {
-                [weak self] in
-
-                guard let self else {
-
-                    return
-                }
-
-                print(
-                    "👂 WebSocket receive loop started"
-                )
-
-                while !Task.isCancelled {
-
-                    guard let socket =
-                            self.socketTask
-                    else {
-
-                        return
-                    }
-
-                    do {
-
-                        let message =
-                            try await socket
-                                .receive()
-
-                        switch message {
-
-                        case .string(
-                            let text
-                        ):
-
-                            self.processIncoming(
-                                text
-                            )
-
-                        case .data(
-                            let data
-                        ):
-
-                            guard let text =
-                                    String(
-                                        data:
-                                            data,
-                                        encoding:
-                                            .utf8
-                                    )
-                            else {
-
-                                continue
-                            }
-
-                            self.processIncoming(
-                                text
-                            )
-
-                        @unknown default:
-
-                            break
-                        }
-
-                    } catch {
-
-                        if Task.isCancelled {
-
-                            return
-                        }
-
-                        self.handleSocketFailure(
-                            error
-                        )
-
-                        return
-                    }
-                }
-            }
-    }
-
-    // MARK: - Socket Failure
-
-    private func handleSocketFailure(
-        _ error: Error
-    ) {
-
-        guard
-            socketTask != nil ||
-            isConnected ||
-            isSocketOpened
-        else {
-
-            return
-        }
-
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "❌ WebSocket connection lost"
-        )
-        print(
-            error.localizedDescription
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        lastError =
-            error.localizedDescription
-
-        isSocketOpened =
-            false
-
-        isConnected =
-            false
-
-        receiveTask?
-            .cancel()
-
-        receiveTask =
-            nil
-
-        socketTask?
-            .cancel()
-
-        socketTask =
-            nil
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
-        scheduleReconnect()
-    }
-
-    // MARK: - Reconnect
-
-    private func scheduleReconnect() {
-
-        guard
-            shouldReconnect,
-            let token,
-            !token.isEmpty
-        else {
-
-            return
-        }
-
-        guard
-            reconnectTask == nil
-        else {
-
-            return
-        }
-
-        reconnectAttempt +=
-            1
-
-        let delay: UInt64
-
-        switch reconnectAttempt {
-
-        case 1:
-
-            delay = 1
-
-        case 2:
-
-            delay = 2
-
-        case 3:
-
-            delay = 4
-
-        default:
-
-            delay = 8
-        }
-
-        isReconnecting =
-            true
-
-        print(
-            "🔄 WebSocket reconnect in \(delay)s"
-        )
-
-        reconnectTask =
-            Task {
-                [weak self] in
+            while !Task.isCancelled {
+                guard let socket = self.socketTask else { return }
 
                 do {
-
-                    try await Task.sleep(
-                        nanoseconds:
-                            delay *
-                            1_000_000_000
-                    )
-
+                    let message = try await socket.receive()
+                    switch message {
+                    case .string(let text):
+                        self.processIncoming(text)
+                    case .data(let data):
+                        guard let text = String(data: data, encoding: .utf8) else { continue }
+                        self.processIncoming(text)
+                    @unknown default:
+                        break
+                    }
                 } catch {
-
+                    guard !Task.isCancelled else { return }
+                    self.handleSocketFailure(error)
                     return
                 }
-
-                guard let self else {
-
-                    return
-                }
-
-                self.reconnectTask =
-                    nil
-
-                guard
-                    self.shouldReconnect,
-                    self.socketTask == nil
-                else {
-
-                    return
-                }
-
-                self.openSocket(
-                    token:
-                        token
-                )
             }
+        }
     }
 
-    // MARK: - Process Incoming
-
-    private func processIncoming(
-        _ rawPayload: String
-    ) {
-
-        // STOMP heartbeat
-
-        if
-            rawPayload == "\n" ||
-            rawPayload == "\r\n"
-        {
-
+    private func processIncoming(_ rawPayload: String) {
+        if rawPayload == "\n" || rawPayload == "\r\n" {
             return
         }
 
-        let frames =
-            rawPayload.components(
-                separatedBy:
-                    "\u{0000}"
-            )
-
-        for rawFrame
-        in frames {
-
-            let frame =
-                rawFrame
-                    .trimmingCharacters(
-                        in:
-                            .newlines
-                    )
-
-            guard
-                !frame.isEmpty
-            else {
-
-                continue
-            }
-
-            processSTOMPFrame(
-                frame
-            )
+        for rawFrame in rawPayload.components(separatedBy: "\u{0000}") {
+            let frame = rawFrame.trimmingCharacters(in: .newlines)
+            guard !frame.isEmpty else { continue }
+            processSTOMPFrame(frame)
         }
     }
 
-    // MARK: - Process STOMP
-
-    private func processSTOMPFrame(
-        _ frame: String
-    ) {
-
-        let command =
-            frame
-                .components(
-                    separatedBy:
-                        "\n"
-                )
-                .first?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-            ?? ""
+    private func processSTOMPFrame(_ frame: String) {
+        let normalized = frame.replacingOccurrences(of: "\r\n", with: "\n")
+        let command = normalized
+            .components(separatedBy: "\n")
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         switch command {
-
         case "CONNECTED":
-
             handleConnected()
-
         case "MESSAGE":
-
-            handleMessageFrame(
-                frame
-            )
-
+            handleMessageFrame(normalized)
         case "ERROR":
-
-            handleSTOMPError(
-                frame
-            )
-
+            handleSTOMPError(normalized)
         case "RECEIPT":
-
-            print(
-                "✅ STOMP RECEIPT"
-            )
-
+            break
         default:
-
+            #if DEBUG
             if !command.isEmpty {
-
-                print(
-                    "⚠️ Unknown STOMP frame:",
-                    command
-                )
+                print("⚠️ Unknown STOMP frame:", command)
             }
+            #endif
         }
     }
 
-    // MARK: - Connected
-
     private func handleConnected() {
-
-        reconnectTask?
-            .cancel()
-
-        reconnectTask =
-            nil
-
-        reconnectAttempt =
-            0
-
-        isReconnecting =
-            false
-
-        isConnected =
-            true
-
-        isSocketOpened =
-            true
-
-        lastError =
-            nil
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "✅ WebSocket STOMP connected"
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
+        isReconnecting = false
+        isConnected = true
+        isSocketOpened = true
+        lastError = nil
+        activeMessageSubscriptions.removeAll()
+        activeTypingSubscriptions.removeAll()
+        isPresenceSubscribed = false
 
         subscribeToDesiredTopics()
 
-        /*
-         После STOMP CONNECTED пользователь
-         уже зарегистрирован backend как online.
-
-         Обновляем snapshot, чтобы клиент
-         получил актуальный список всех online.
-         */
-
+        // REST gives the initial authorized snapshot; the private STOMP queue
+        // carries only subsequent changes from users the backend says we may see.
         Task {
-
-            await ChatService.shared
-                .loadPresence()
+            await ChatService.shared.loadPresence()
         }
     }
 
-    // MARK: - MESSAGE Dispatcher
+    // MARK: - MESSAGE dispatch
 
-    private func handleMessageFrame(
-        _ frame: String
-    ) {
+    private func handleMessageFrame(_ frame: String) {
+        let parsed = parseSTOMPFrame(frame)
+        guard let destination = parsed.headers["destination"] else { return }
 
-        let parsed =
-            parseSTOMPFrame(
-                frame
-            )
-
-        guard let destination =
-                parsed.headers[
-                    "destination"
-                ]
-        else {
-
-            print(
-                "⚠️ STOMP MESSAGE without destination"
-            )
-
-            return
-        }
-
-        // MARK: Presence
-
-        if destination ==
-            "/topic/presence" {
-
+        if destination == "/user/queue/presence"
+            || destination.hasSuffix("/queue/presence") {
             handlePresenceMessage(
-                destination:
-                    destination,
-                body:
-                    parsed.body
+                destination: destination,
+                body: parsed.body
             )
-
             return
         }
 
-        // MARK: Typing
-
-        if destination.hasSuffix(
-            "/typing"
-        ) {
-
+        if destination.hasSuffix("/typing") {
             handleTypingMessage(
-                destination:
-                    destination,
-                body:
-                    parsed.body
+                destination: destination,
+                body: parsed.body
             )
-
             return
         }
-
-        // MARK: Chat Message
 
         handleChatMessage(
-            destination:
-                destination,
-            body:
-                parsed.body
+            destination: destination,
+            body: parsed.body
         )
     }
 
-    // MARK: - Presence Message
-
-    private func handlePresenceMessage(
-        destination: String,
-        body: String
-    ) {
-
-        guard let data =
-                body.data(
-                    using:
-                        .utf8
-                )
-        else {
-
-            return
-        }
+    private func handlePresenceMessage(destination: String, body: String) {
+        guard let data = body.data(using: .utf8) else { return }
 
         do {
+            let event = try JSONCoding.decoder.decode(
+                PresenceEventDTO.self,
+                from: data
+            )
+            ChatService.shared.applyPresenceEvent(event)
 
-            let event =
-                try JSONCoding.decoder
-                    .decode(
-                        PresenceEventDTO.self,
-                        from:
-                            data
-                    )
-
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            print(
-                "🟢 REALTIME PRESENCE"
-            )
-            print(
-                "📡",
-                destination
-            )
-            print(
-                "👤",
-                event.userId
-            )
-            print(
-                "🌐 online:",
-                event.online
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
-            ChatService.shared
-                .applyPresenceEvent(
-                    event
-                )
-
+            #if DEBUG
+            print("🟢 PRIVATE PRESENCE:", event.userId, event.online)
+            #endif
         } catch {
-
-            print("")
-            print(
-                "❌ Presence decode error"
-            )
-            print(
-                error
-            )
-            print(
-                "📥 BODY:"
-            )
-            print(
-                body
-            )
+            #if DEBUG
+            print("❌ Presence decode error:", error.localizedDescription)
+            #endif
         }
     }
 
-    // MARK: - Chat Message
-
-    private func handleChatMessage(
-        destination: String,
-        body: String
-    ) {
-
-        guard let data =
-                body.data(
-                    using:
-                        .utf8
-                )
-        else {
-
-            return
-        }
+    private func handleChatMessage(destination: String, body: String) {
+        guard let data = body.data(using: .utf8) else { return }
 
         do {
-
-            let message =
-                try JSONCoding.decoder
-                    .decode(
-                        ServerMessageDTO.self,
-                        from:
-                            data
-                    )
-
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            let message = try JSONCoding.decoder.decode(
+                ServerMessageDTO.self,
+                from: data
             )
-            print(
-                "💬 REALTIME MESSAGE"
-            )
-            print(
-                "📡",
-                destination
-            )
-            print(
-                "🆔",
-                message.id
-            )
-            print(
-                "🔐 e2ee:",
-                message.e2eeEnvelope != nil
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
-            dispatchChatMessage(
-                message,
-                destination: destination
-            )
-
+            dispatchChatMessage(message, destination: destination)
         } catch {
-
-            print("")
-            print(
-                "❌ WebSocket message decode error"
-            )
-            print(
-                error
-            )
-            print(
-                "📥 BODY:"
-            )
-            print(
-                body
-            )
+            #if DEBUG
+            print("❌ WebSocket message decode error:", error.localizedDescription)
+            #endif
         }
     }
-
-    // MARK: - E2EE Realtime Delivery
 
     private func dispatchChatMessage(
         _ message: ServerMessageDTO,
         destination: String
     ) {
-        guard message.e2eeEnvelope != nil else {
+        guard message.e2eeEnvelope != nil || message.e2eeEnvelopeV2 != nil else {
             deliverChatMessage(message)
             return
         }
@@ -1594,7 +542,6 @@ final class WebSocketService {
                 )
 
                 let resolved: ServerMessageDTO
-
                 if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext) {
                     if let remoteURL = message.attachment?.remoteURL,
                        !remoteURL.isEmpty {
@@ -1602,10 +549,6 @@ final class WebSocketService {
                             keyPayload: plaintext,
                             remoteURL: remoteURL
                         )
-                    } else {
-                        #if DEBUG
-                        print("⚠️ E2EE realtime media envelope has no remoteURL; key suppressed")
-                        #endif
                     }
                     resolved = message.replacingText("")
                 } else {
@@ -1613,16 +556,9 @@ final class WebSocketService {
                 }
 
                 self.deliverChatMessage(resolved)
-
             } catch E2EEAPIError.replayedEnvelope {
-                // Reconnects and broker redelivery may legitimately replay an
-                // already accepted STOMP message. Do not replace a valid local
-                // bubble with a decryption error; simply drop the duplicate.
-                #if DEBUG
-                print("♻️ Dropped replayed E2EE realtime message:", message.id)
-                #endif
+                // Reconnect/broker redelivery of an already accepted exact pair.
                 return
-
             } catch {
                 #if DEBUG
                 print(
@@ -1638,501 +574,216 @@ final class WebSocketService {
         }
     }
 
-    private func deliverChatMessage(
-        _ message: ServerMessageDTO
-    ) {
-        guard let registeredHandlers =
-                messageListeners[
-                    message.chatId
-                ]
-        else {
+    private func deliverChatMessage(_ message: ServerMessageDTO) {
+        guard let registeredHandlers = messageListeners[message.chatId] else {
             return
         }
 
-        // A listener may remove itself while handling the event (for example,
-        // when ChatView disappears). Iterate over an immutable snapshot so the
-        // dictionary cannot be mutated underneath the delivery loop.
-        let handlers = Array(registeredHandlers.values)
-
-        for handler in handlers {
+        for handler in Array(registeredHandlers.values) {
             handler(message)
         }
     }
 
-    // MARK: - Typing Message
-
-    private func handleTypingMessage(
-        destination: String,
-        body: String
-    ) {
-
-        guard let data =
-                body.data(
-                    using:
-                        .utf8
-                )
-        else {
-
-            return
-        }
+    private func handleTypingMessage(destination: String, body: String) {
+        guard let data = body.data(using: .utf8) else { return }
 
         do {
-
-            let event =
-                try JSONCoding.decoder
-                    .decode(
-                        TypingEventDTO.self,
-                        from:
-                            data
-                    )
-
-            print("")
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            let event = try JSONCoding.decoder.decode(
+                TypingEventDTO.self,
+                from: data
             )
-            print(
-                "⌨️ REALTIME TYPING"
-            )
-            print(
-                "📡",
-                destination
-            )
-            print(
-                "👤",
-                event.userId
-            )
-            print(
-                "⌨️ typing:",
-                event.typing
-            )
-            print(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
-            guard let registeredHandlers =
-                    typingListeners[
-                        event.chatId
-                    ]
-            else {
-
+            guard let registeredHandlers = typingListeners[event.chatId] else {
                 return
             }
-
-            let handlers = Array(registeredHandlers.values)
-
-            for handler
-            in handlers {
-
-                handler(
-                    event
-                )
+            for handler in Array(registeredHandlers.values) {
+                handler(event)
             }
-
         } catch {
-
-            print("")
-            print(
-                "❌ Typing decode error"
-            )
-            print(
-                error
-            )
-            print(
-                "📥 BODY:"
-            )
-            print(
-                body
-            )
+            #if DEBUG
+            print("❌ Typing decode error:", error.localizedDescription)
+            #endif
         }
     }
 
-    // MARK: - STOMP Error
+    // MARK: - Failures / reconnect
 
-    private func handleSTOMPError(
-        _ frame: String
-    ) {
+    private func handleSocketFailure(_ error: Error) {
+        guard socketTask != nil || isConnected || isSocketOpened else { return }
 
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "❌ STOMP ERROR"
-        )
-        print(
-            sanitize(
-                frame
-            )
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
+        lastError = error.localizedDescription
+        receiveTask?.cancel()
+        receiveTask = nil
+        socketTask?.cancel()
+        socketTask = nil
+        resetConnectionState()
+        scheduleReconnect()
+    }
 
-        lastError =
-            frame
+    private func handleSTOMPError(_ frame: String) {
+        #if DEBUG
+        print("❌ STOMP ERROR")
+        print(sanitize(frame))
+        #endif
 
-        isConnected =
-            false
-
-        isSocketOpened =
-            false
-
-        receiveTask?
-            .cancel()
-
-        receiveTask =
-            nil
-
-        socketTask?
-            .cancel()
-
-        socketTask =
-            nil
-
-        activeMessageSubscriptions
-            .removeAll()
-
-        activeTypingSubscriptions
-            .removeAll()
-
-        isPresenceSubscribed =
-            false
-
+        lastError = sanitize(frame)
+        receiveTask?.cancel()
+        receiveTask = nil
+        socketTask?.cancel()
+        socketTask = nil
+        resetConnectionState()
         validateSessionBeforeReconnect()
     }
 
-    // MARK: - Session Probe After STOMP ERROR
-
     private func validateSessionBeforeReconnect() {
-
-        guard
-            shouldReconnect,
-            let token,
-            !token.isEmpty
-        else {
-
+        guard shouldReconnect,
+              let token,
+              !token.isEmpty else {
             return
         }
 
-        let tokenBeingValidated =
-            token
+        let tokenBeingValidated = token
 
-        print(
-            "🔐 Validating session before STOMP reconnect"
-        )
-
-        Task {
-            [weak self] in
-
-            guard let self else {
-                return
-            }
+        Task { [weak self] in
+            guard let self else { return }
 
             do {
-
-                _ =
-                    try await
-                        ChatAPIService.shared
-                        .getChats(
-                            token:
-                                tokenBeingValidated
-                        )
-
-                guard
-                    self.shouldReconnect,
-                    self.token ==
-                        tokenBeingValidated
-                else {
-
-                    return
-                }
-
-                print(
-                    "✅ Session valid — STOMP reconnect allowed"
+                _ = try await ChatAPIService.shared.getChats(
+                    token: tokenBeingValidated
                 )
 
+                guard self.shouldReconnect,
+                      self.token == tokenBeingValidated else {
+                    return
+                }
                 self.scheduleReconnect()
-
             } catch {
-
-                /*
-                 APIClient clears the session
-                 when /chats returns 401 or the
-                 Spring auth 403 "Access Denied".
-                 */
-                guard
-                    self.shouldReconnect,
-                    self.token ==
-                        tokenBeingValidated,
-                    TokenStorage.shared.token != nil
-                else {
-
-                    print(
-                        "🔐 STOMP reconnect stopped: session invalid"
-                    )
-
+                guard self.shouldReconnect,
+                      self.token == tokenBeingValidated,
+                      TokenStorage.shared.token != nil else {
                     return
                 }
-
-                /*
-                 A temporary network/server error
-                 must not destroy a valid session.
-                 Keep ordinary reconnect enabled.
-                 */
-                print(
-                    "⚠️ Session probe inconclusive:",
-                    error.localizedDescription
-                )
-
                 self.scheduleReconnect()
             }
         }
     }
 
-    // MARK: - Send Raw
-
-    private func sendRaw(
-        _ frame: String,
-        label: String
-    ) {
-
-        guard let socket =
-                socketTask
-        else {
-
-            print(
-                "❌ \(label) not sent: socket is nil"
-            )
-
+    private func scheduleReconnect() {
+        guard shouldReconnect,
+              let token,
+              !token.isEmpty,
+              reconnectTask == nil else {
             return
         }
 
-        Task {
-            [weak self] in
+        reconnectAttempt += 1
+        let delay: UInt64
+        switch reconnectAttempt {
+        case 1: delay = 1
+        case 2: delay = 2
+        case 3: delay = 4
+        default: delay = 8
+        }
 
-            guard let self else {
+        isReconnecting = true
 
+        reconnectTask = Task { [weak self] in
+            do {
+                try await Task.sleep(
+                    nanoseconds: delay * 1_000_000_000
+                )
+            } catch {
                 return
             }
 
-            do {
+            guard let self else { return }
+            self.reconnectTask = nil
 
-                try await socket.send(
-                    .string(
-                        frame
-                    )
-                )
-
-                print(
-                    "✅ STOMP \(label) sent"
-                )
-
-            } catch {
-
-                print(
-                    "❌ STOMP \(label) send error:",
-                    error.localizedDescription
-                )
-
-                self.handleSocketFailure(
-                    error
-                )
+            guard self.shouldReconnect,
+                  self.socketTask == nil,
+                  self.token == token else {
+                return
             }
+
+            self.openSocket(token: token)
         }
     }
 
-    // MARK: - STOMP Frame Builder
+    // MARK: - Frame IO
+
+    private func sendRaw(_ frame: String, label: String) {
+        guard let socket = socketTask else { return }
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await socket.send(.string(frame))
+                #if DEBUG
+                print("✅ STOMP \(label) sent")
+                #endif
+            } catch {
+                self.handleSocketFailure(error)
+            }
+        }
+    }
 
     private func makeFrame(
         command: String,
-        headers:
-            [String: String] = [:],
+        headers: [String: String] = [:],
         body: String? = nil
     ) -> String {
-
-        var frame =
-            command + "\n"
-
-        for key
-        in headers.keys.sorted() {
-
-            guard let value =
-                    headers[
-                        key
-                    ]
-            else {
-
-                continue
-            }
-
-            frame +=
-                "\(key):\(value)\n"
+        var frame = command + "\n"
+        for key in headers.keys.sorted() {
+            guard let value = headers[key] else { continue }
+            frame += "\(key):\(value)\n"
         }
-
-        frame +=
-            "\n"
-
+        frame += "\n"
         if let body {
-
-            frame +=
-                body
+            frame += body
         }
-
-        frame +=
-            "\u{0000}"
-
+        frame += "\u{0000}"
         return frame
     }
 
-    // MARK: - STOMP Parser
-
     private func parseSTOMPFrame(
         _ frame: String
-    ) -> (
-        command: String,
-        headers: [String: String],
-        body: String
-    ) {
-
-        guard let separator =
-                frame.range(
-                    of:
-                        "\n\n"
-                )
-        else {
-
-            return (
-                frame,
-                [:],
-                ""
-            )
+    ) -> (command: String, headers: [String: String], body: String) {
+        let normalized = frame.replacingOccurrences(of: "\r\n", with: "\n")
+        guard let separator = normalized.range(of: "\n\n") else {
+            return (normalized, [:], "")
         }
 
-        let headerPart =
-            String(
-                frame[
-                    ..<separator.lowerBound
-                ]
-            )
+        let headerPart = String(normalized[..<separator.lowerBound])
+        let body = String(normalized[separator.upperBound...])
+        var lines = headerPart.components(separatedBy: "\n")
+        let command = lines.isEmpty ? "" : lines.removeFirst()
+        var headers: [String: String] = [:]
 
-        let body =
-            String(
-                frame[
-                    separator.upperBound...
-                ]
-            )
-
-        var lines =
-            headerPart.components(
-                separatedBy:
-                    "\n"
-            )
-
-        let command =
-            lines.isEmpty
-            ? ""
-            : lines.removeFirst()
-
-        var headers:
-            [String: String] = [:]
-
-        for line
-        in lines {
-
-            guard let colon =
-                    line.firstIndex(
-                        of:
-                            ":"
-                    )
-            else {
-
-                continue
-            }
-
-            let key =
-                String(
-                    line[
-                        ..<colon
-                    ]
-                )
-
-            let valueStart =
-                line.index(
-                    after:
-                        colon
-                )
-
-            let value =
-                String(
-                    line[
-                        valueStart...
-                    ]
-                )
-
-            headers[
-                key
-            ] =
-                value
+        for line in lines {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let key = String(line[..<colon])
+            let valueStart = line.index(after: colon)
+            headers[key] = String(line[valueStart...])
         }
 
-        return (
-            command,
-            headers,
-            body
-        )
+        return (command, headers, body)
     }
 
-    // MARK: - Sanitize
-
-    private func sanitize(
-        _ text: String
-    ) -> String {
-
-        text.replacingOccurrences(
-            of:
-                "\u{0000}",
-            with:
-                ""
-        )
+    private func sanitize(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{0000}", with: "")
     }
 
-    // MARK: - Fail
+    private func fail(_ message: String) {
+        lastError = message
+        isConnected = false
+        isSocketOpened = false
 
-    private func fail(
-        _ message: String
-    ) {
-
-        lastError =
-            message
-
-        isConnected =
-            false
-
-        isSocketOpened =
-            false
-
-        print("")
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        print(
-            "❌ WebSocket:",
-            message
-        )
-        print(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
+        #if DEBUG
+        print("❌ WebSocket:", message)
+        #endif
     }
 }
 
-// MARK: - Typing Send DTO
-
-private struct TypingSendDTO:
-    Codable {
-
-    let chatId:
-        String
-
-    let typing:
-        Bool
+private struct TypingSendDTO: Codable {
+    let chatId: String
+    let typing: Bool
 }
