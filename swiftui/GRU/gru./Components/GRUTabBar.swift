@@ -39,9 +39,12 @@ struct GRUTabBar: View {
 
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                selectedTab = tab
-            }
+            guard selectedTab != tab else { return }
+
+            // Tab changes are deliberately immediate. We previously animated
+            // the whole selected content tree, which looked like a broken
+            // frame/cross-fade when switching between Chats / People / Settings.
+            selectedTab = tab
         } label: {
             HStack(spacing: active ? 8 : 0) {
                 ZStack {
@@ -67,7 +70,6 @@ struct GRUTabBar: View {
                     Text(GRUL10n.text(label))
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
                 }
             }
             .frame(maxWidth: .infinity)
