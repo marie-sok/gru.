@@ -1,6 +1,7 @@
 package gru.app.config;
 
 import gru.app.security.JwtFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +45,12 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // Preserve the original controller status (404/409/422/etc.)
+                        // when Spring Boot performs its internal ERROR dispatch.
+                        // Without this, the secondary /error dispatch can be denied
+                        // as anonymous and incorrectly mask the real response as 403.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 
                         .requestMatchers(
                                 "/",
