@@ -1,0 +1,52 @@
+name: DAST baseline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TARGET_URL: https://gru-jiqi.onrender.com
+
+    steps:
+      - name: Wake and verify target
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --retry 12 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            "$TARGET_URL/actuator/health"
+
+      - name: Run OWASP ZAP passive baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/zap-report"
+          chmod 777 "$GITHUB_WORKSPACE/zap-report"
+          docker pull ghcr.io/zaproxy/zaproxy:stable
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/zap-report:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t "$TARGET_URL" \
+            -r report.html \
+            -J report.json \
+            -I
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gru-zap-baseline
+          path: zap-report/
+          if-no-files-found: warn
+          retention-days: 14
