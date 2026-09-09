@@ -1,0 +1,1 @@
+Do not merge/deploy this branch until the recovery flow is integrated into iOS, sender-history recovery protocol v2 exists, CI is green, and the physical two-device TestFlight gate passes.
