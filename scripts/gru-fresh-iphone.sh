@@ -18,6 +18,16 @@ print_section() {
   echo "========== $1 =========="
 }
 
+xcode_version_for_developer_dir() {
+  local developer_dir="$1"
+  DEVELOPER_DIR="$developer_dir" xcodebuild -version 2>/dev/null | awk 'NR==1 { print $2 }'
+}
+
+sdk_version_for_developer_dir() {
+  local developer_dir="$1"
+  DEVELOPER_DIR="$developer_dir" xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true
+}
+
 print_section "GRU FRESH PHYSICAL IPHONE"
 echo "ROOT: $ROOT"
 
@@ -92,12 +102,119 @@ done
 
 echo "✅ Stale GRU clones removed from active workspace"
 
-print_section "CLEAR XCODE CACHE"
+print_section "FIND PHYSICAL IPHONE"
+DEVICE_LINE="$(xcrun xctrace list devices 2>/dev/null | awk '
+  /^== Devices ==/ { in_devices=1; next }
+  /^== Simulators ==/ { in_devices=0 }
+  in_devices && /iPhone/ { print; exit }
+')"
+
+DEVICE_ID="$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{20,})\)$/\1/')"
+if [[ -z "$DEVICE_LINE" || "$DEVICE_ID" == "$DEVICE_LINE" || -z "$DEVICE_ID" ]]; then
+  echo "❌ No connected physical iPhone detected"
+  echo "Connect/unlock the iPhone, trust this Mac, enable Developer Mode and rerun."
+  exit 1
+fi
+
+echo "✅ $DEVICE_LINE"
+echo "DEVICE_ID: $DEVICE_ID"
+
+# xctrace device lines end with: ... (OS_VERSION) (DEVICE_ID)
+DEVICE_OS="$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9]+([.][0-9]+)*)\)[[:space:]]+\([0-9A-Fa-f-]{20,}\)$/\1/')"
+if [[ "$DEVICE_OS" == "$DEVICE_LINE" || -z "$DEVICE_OS" ]]; then
+  # CoreDevice fallback. Keep parsing intentionally conservative.
+  DEVICE_OS="$(xcrun devicectl device info details --device "$DEVICE_ID" 2>/dev/null | awk -F: '/operatingSystemVersion|OS Version/ { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit }' || true)"
+fi
+DEVICE_MAJOR="${DEVICE_OS%%.*}"
+
+print_section "SELECT XCODE MATCHING DEVICE OS"
+ACTIVE_DEVELOPER="$(xcode-select -p 2>/dev/null || true)"
+if [[ -z "$ACTIVE_DEVELOPER" || ! -d "$ACTIVE_DEVELOPER" ]]; then
+  echo "❌ No active Xcode developer directory"
+  exit 1
+fi
+
+SELECTED_DEVELOPER="$ACTIVE_DEVELOPER"
+ACTIVE_XCODE_VERSION="$(xcode_version_for_developer_dir "$ACTIVE_DEVELOPER")"
+ACTIVE_SDK_VERSION="$(sdk_version_for_developer_dir "$ACTIVE_DEVELOPER")"
+ACTIVE_SDK_MAJOR="${ACTIVE_SDK_VERSION%%.*}"
+
+echo "Device iOS: ${DEVICE_OS:-unknown}"
+echo "Active Xcode: ${ACTIVE_XCODE_VERSION:-unknown}"
+echo "Active iPhoneOS SDK: ${ACTIVE_SDK_VERSION:-unknown}"
+echo "Active developer dir: $ACTIVE_DEVELOPER"
+
+if [[ "$DEVICE_MAJOR" == <-> ]] && [[ "$ACTIVE_SDK_MAJOR" == <-> ]] && (( DEVICE_MAJOR > ACTIVE_SDK_MAJOR )); then
+  echo "⚠️ Active Xcode SDK is older than the iPhone OS. Looking for a matching Xcode..."
+
+  setopt NULL_GLOB
+  XCODE_APPS=(/Applications/Xcode*.app(N/))
+  unsetopt NULL_GLOB
+
+  BEST_DEVELOPER=""
+  BEST_SDK_MAJOR=0
+  BEST_SDK_VERSION=""
+  BEST_XCODE_VERSION=""
+
+  for app in "${XCODE_APPS[@]:-}"; do
+    developer="$app/Contents/Developer"
+    [[ -d "$developer" ]] || continue
+
+    candidate_sdk="$(sdk_version_for_developer_dir "$developer")"
+    candidate_major="${candidate_sdk%%.*}"
+    [[ "$candidate_major" == <-> ]] || continue
+
+    if (( candidate_major >= DEVICE_MAJOR && candidate_major >= BEST_SDK_MAJOR )); then
+      BEST_DEVELOPER="$developer"
+      BEST_SDK_MAJOR="$candidate_major"
+      BEST_SDK_VERSION="$candidate_sdk"
+      BEST_XCODE_VERSION="$(xcode_version_for_developer_dir "$developer")"
+    fi
+  done
+
+  if [[ -z "$BEST_DEVELOPER" ]]; then
+    echo ""
+    echo "❌ XCODE / DEVICE VERSION MISMATCH"
+    echo "iPhone: iOS ${DEVICE_OS:-$DEVICE_MAJOR}"
+    echo "Current Xcode: ${ACTIVE_XCODE_VERSION:-unknown} (iPhoneOS SDK ${ACTIVE_SDK_VERSION:-unknown})"
+    echo ""
+    echo "This iPhone needs an Xcode that contains an iOS $DEVICE_MAJOR SDK."
+    echo "For iOS 27 install Xcode 27 beta (or newer), then rerun this script."
+    echo "Do not delete the GRU app from the iPhone."
+    exit 27
+  fi
+
+  SELECTED_DEVELOPER="$BEST_DEVELOPER"
+  echo "✅ Matching Xcode found: $BEST_XCODE_VERSION (iPhoneOS SDK $BEST_SDK_VERSION)"
+  echo "✅ $SELECTED_DEVELOPER"
+fi
+
+export DEVELOPER_DIR="$SELECTED_DEVELOPER"
+SELECTED_XCODE_VERSION="$(xcodebuild -version | awk 'NR==1 { print $2 }')"
+SELECTED_SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+echo "✅ Using Xcode $SELECTED_XCODE_VERSION / iPhoneOS SDK $SELECTED_SDK_VERSION"
+
+if [[ "$DEVICE_MAJOR" == <-> ]]; then
+  SELECTED_SDK_MAJOR="${SELECTED_SDK_VERSION%%.*}"
+  if [[ "$SELECTED_SDK_MAJOR" == <-> ]] && (( DEVICE_MAJOR > SELECTED_SDK_MAJOR )); then
+    echo "❌ Refusing to build: selected Xcode still cannot support iOS $DEVICE_MAJOR"
+    exit 27
+  fi
+fi
+
+print_section "CLEAR XCODE + DEVICE SYMBOL CACHE"
 killall Xcode 2>/dev/null || true
 rm -rf "$HOME/Library/Developer/Xcode/DerivedData/gru-"* 2>/dev/null || true
 rm -rf "$HOME/Library/Developer/Xcode/DerivedData/GRU-"* 2>/dev/null || true
 rm -rf "$DERIVED"
-echo "✅ Xcode/DerivedData cache cleared"
+
+# A failed dyld_shared_cache extraction can leave a partial device-symbol cache.
+# Remove only this device OS generation, never the whole Developer directory.
+if [[ -n "${DEVICE_OS:-}" ]]; then
+  rm -rf "$HOME/Library/Developer/Xcode/iOS DeviceSupport/${DEVICE_OS}"* 2>/dev/null || true
+fi
+
+echo "✅ Xcode/DerivedData and matching device-symbol cache cleared"
 
 print_section "PATCH CURRENT MAC LAN IP"
 MAC_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
@@ -133,23 +250,6 @@ fi
 
 echo "✅ Backend + Mongo ready"
 
-print_section "FIND PHYSICAL IPHONE"
-DEVICE_LINE="$(xcrun xctrace list devices 2>/dev/null | awk '
-  /^== Devices ==/ { in_devices=1; next }
-  /^== Simulators ==/ { in_devices=0 }
-  in_devices && /iPhone/ { print; exit }
-')"
-
-DEVICE_ID="$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{20,})\)$/\1/')"
-if [[ -z "$DEVICE_LINE" || "$DEVICE_ID" == "$DEVICE_LINE" || -z "$DEVICE_ID" ]]; then
-  echo "❌ No connected physical iPhone detected"
-  echo "Connect/unlock the iPhone, trust this Mac, enable Developer Mode and rerun."
-  exit 1
-fi
-
-echo "✅ $DEVICE_LINE"
-echo "DEVICE_ID: $DEVICE_ID"
-
 print_section "CLEAN BUILD FROM EXACT CHECKOUT"
 cd "$ROOT"
 SOURCE_SHORT="$(git rev-parse --short HEAD)"
@@ -179,6 +279,8 @@ print_section "VERIFY BUILT BINARY"
 /usr/libexec/PlistBuddy -c 'Print :GRUBuildStamp' "$APP/Info.plist" 2>/dev/null || echo "Build stamp: $BUILD_STAMP"
 
 echo "SOURCE: $SOURCE_SHORT"
+echo "XCODE: $SELECTED_XCODE_VERSION"
+echo "SDK: $SELECTED_SDK_VERSION"
 echo "APP: $APP"
 
 print_section "FORCE INSTALL TO IPHONE"
@@ -192,6 +294,7 @@ print_section "DONE"
 echo "✅ Installed physical-device build: gru. P0 FRESH"
 echo "✅ Source: $SOURCE_SHORT"
 echo "✅ Build: $BUILD_NUMBER"
+echo "✅ Xcode: $SELECTED_XCODE_VERSION / iPhoneOS SDK $SELECTED_SDK_VERSION"
 echo "✅ Stamp: $BUILD_STAMP"
 echo ""
 echo "The iPhone icon must now say 'gru. P0 FRESH'. If it still says only 'gru.', the fresh install did not replace the old binary."
