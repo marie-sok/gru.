@@ -132,10 +132,12 @@ final class E2EEAPIService {
         )
 
         // Persist our own readable copy before the request. The server receives
-        // only ciphertext; this protected local copy lets the sender reconstruct
-        // its own bubbles after a relaunch on this device.
+        // only ciphertext. The copy is scoped to the authenticated principal so
+        // switching accounts on one iPhone can never resolve another account's
+        // local recovery plaintext by clientMessageId.
         try GRUE2EESentMessageStore.shared.save(
             plaintext: plaintext,
+            userID: senderID,
             clientMessageID: envelope.clientMessageId
         )
 
@@ -183,7 +185,8 @@ final class E2EEAPIService {
 
         if message.senderId == currentUserID,
            let own = GRUE2EESentMessageStore.shared.plaintext(
-                for: envelope.clientMessageId
+                userID: currentUserID,
+                clientMessageID: envelope.clientMessageId
            ) {
             return own
         }
@@ -262,17 +265,35 @@ final class GRUE2EESentMessageStore {
     }
 
     private let queue = DispatchQueue(label: "sok.com.gru.e2ee.sent-copy")
-    private let fileName = "gru-e2ee-sent-copy-v1.bin"
+    private let fileName = "gru-e2ee-sent-copy-v2.bin"
+    private let legacyFileName = "gru-e2ee-sent-copy-v1.bin"
     private let maxEntries = 5_000
     private var state: State
 
     private init() {
         state = Self.loadState(fileName: fileName) ?? State(entries: [:])
+
+        // v1 had no account namespace. It cannot be migrated safely because an
+        // entry does not record which authenticated principal created it.
+        // Remove it rather than ever guessing ownership on a shared iPhone.
+        try? FileManager.default.removeItem(
+            at: Self.fileURL(fileName: legacyFileName)
+        )
     }
 
-    func save(plaintext: String, clientMessageID: String) throws {
+    func save(
+        plaintext: String,
+        userID: String,
+        clientMessageID: String
+    ) throws {
+        let cleanUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanClientID = clientMessageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanUserID.isEmpty, !cleanClientID.isEmpty else {
+            throw E2EEAPIError.missingCurrentUser
+        }
+
         try queue.sync {
-            state.entries[clientMessageID] = Entry(
+            state.entries[entryKey(userID: cleanUserID, clientMessageID: cleanClientID)] = Entry(
                 plaintext: plaintext,
                 createdAt: Date()
             )
@@ -281,9 +302,16 @@ final class GRUE2EESentMessageStore {
         }
     }
 
-    func plaintext(for clientMessageID: String) -> String? {
-        queue.sync {
-            state.entries[clientMessageID]?.plaintext
+    func plaintext(
+        userID: String,
+        clientMessageID: String
+    ) -> String? {
+        let cleanUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanClientID = clientMessageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanUserID.isEmpty, !cleanClientID.isEmpty else { return nil }
+
+        return queue.sync {
+            state.entries[entryKey(userID: cleanUserID, clientMessageID: cleanClientID)]?.plaintext
         }
     }
 
@@ -292,6 +320,10 @@ final class GRUE2EESentMessageStore {
             state = State(entries: [:])
             try? FileManager.default.removeItem(at: Self.fileURL(fileName: fileName))
         }
+    }
+
+    private func entryKey(userID: String, clientMessageID: String) -> String {
+        userID + "|" + clientMessageID
     }
 
     private func pruneIfNeeded() {
