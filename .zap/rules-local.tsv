@@ -1,0 +1,3 @@
+10035	IGNORE	(Local CI serves plain HTTP; Render terminates HTTPS/HSTS in production and production ZAP verifies HSTS.)
+10049	IGNORE	(GRU API responses intentionally use non-storable/no-cache semantics; this is not a vulnerability.)
+90005	IGNORE	(Sec-Fetch-Dest is a browser request header; ZAP's synthetic requests do not supply it.)
