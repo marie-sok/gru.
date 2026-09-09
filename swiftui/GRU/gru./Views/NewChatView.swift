@@ -1,114 +1,62 @@
-
 import SwiftUI
 
 @MainActor
 struct NewChatView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable private var service = ChatService.shared
 
-    // MARK: - Environment
+    @State private var searchText = ""
+    @State private var results: [UserSearchDTO] = []
+    @State private var isSearching = false
+    @State private var creatingUserID: String?
+    @State private var errorMessage: String?
 
-    @Environment(\.dismiss)
-    private var dismiss
-
-    // MARK: - Service
-
-    @Bindable
-    private var service = ChatService.shared
-
-    // MARK: - Search
-
-    @State
-    private var searchText = ""
-
-    @State
-    private var results: [UserSearchDTO] = []
-
-    @State
-    private var isSearching = false
-
-    // MARK: - Create Chat
-
-    @State
-    private var creatingUserID: String?
-
-    // MARK: - Error
-
-    @State
-    private var errorMessage: String?
-
-    // MARK: - Focus
-
-    @FocusState
-    private var searchIsFocused: Bool
-
-    // MARK: - Body
+    @FocusState private var searchIsFocused: Bool
 
     var body: some View {
-
         NavigationStack {
-
             ZStack {
-
                 GRUAppBackdrop()
 
                 VStack(spacing: 0) {
-
                     searchField
-
                     content
                 }
             }
-            .navigationTitle("Новый чат")
+            .navigationTitle(GRUL10n.text("Новый чат"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-
-                ToolbarItem(
-                    placement: .topBarLeading
-                ) {
-
-                    Button("Отмена") {
-
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(GRUL10n.text("Отмена")) {
+                        searchIsFocused = false
                         dismiss()
                     }
                 }
             }
         }
         .task(id: searchText) {
-
             await searchUsers()
         }
         .onAppear {
-
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + 0.25
-            ) {
-
-                searchIsFocused = true
-            }
+            // Deliberately do not focus the search field here. Opening New Chat
+            // must never summon the keyboard until the user taps the field.
+            searchIsFocused = false
+        }
+        .onDisappear {
+            searchIsFocused = false
         }
     }
 }
 
-// MARK: - Search Field
-
 private extension NewChatView {
-
     var searchField: some View {
-
         HStack(spacing: 11) {
-
-            Image(
-                systemName: "magnifyingglass"
-            )
-            .font(
-                .system(
-                    size: 16,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(.secondary)
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
 
             TextField(
-                "Найти по nickname",
+                GRUL10n.text("Найти по nickname"),
                 text: $searchText
             )
             .focused($searchIsFocused)
@@ -119,127 +67,58 @@ private extension NewChatView {
             .submitLabel(.search)
 
             if isSearching {
-
                 ProgressView()
                     .controlSize(.small)
-
             } else if !searchText.isEmpty {
-
                 Button {
-
                     searchText = ""
                     results = []
                     errorMessage = nil
-
                 } label: {
-
-                    Image(
-                        systemName: "xmark.circle.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 17
-                        )
-                    )
-                    .foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(GRUL10n.text("Очистить поиск"))
             }
         }
-        .padding(
-            .horizontal,
-            16
-        )
-        .frame(
-            minHeight: 50
-        )
-        .background(
-            GRUColors.card
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-        )
-        .padding(
-            .horizontal,
-            18
-        )
-        .padding(
-            .top,
-            14
-        )
-        .padding(
-            .bottom,
-            8
-        )
+        .padding(.horizontal, 16)
+        .frame(minHeight: 50)
+        .background(GRUColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
     }
-}
-
-// MARK: - Content
-
-private extension NewChatView {
 
     @ViewBuilder
     var content: some View {
-
-        let query =
-            searchText
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if query.isEmpty {
-
             startView
-
         } else if query.count < 2 {
-
             hintView
-
         } else if let errorMessage {
-
-            errorView(
-                errorMessage
-            )
-
-        } else if isSearching &&
-                    results.isEmpty {
-
+            errorView(errorMessage)
+        } else if isSearching && results.isEmpty {
             searchingView
-
         } else if results.isEmpty {
-
             noResultsView
-
         } else {
-
             resultsList
         }
     }
-}
-
-// MARK: - Start
-
-private extension NewChatView {
 
     var startView: some View {
-
         VStack(spacing: 14) {
-
             Spacer()
 
             ZStack {
-
                 Circle()
-                    .fill(
-                        GRUColors.card
-                    )
-                    .frame(
-                        width: 74,
-                        height: 74
-                    )
+                    .fill(GRUColors.card)
+                    .frame(width: 74, height: 74)
 
                 GRUEnvelope()
                     .stroke(
@@ -250,584 +129,228 @@ private extension NewChatView {
                             lineJoin: .round
                         )
                     )
-                    .frame(
-                        width: 32,
-                        height: 23
-                    )
+                    .frame(width: 32, height: 23)
             }
 
-            Text(
-                "Найди человека"
-            )
-            .font(
-                .system(
-                    size: 20,
-                    weight: .semibold,
-                    design: .rounded
-                )
-            )
+            Text(GRUL10n.text("Найди человека"))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
 
-            Text(
-                "Начни вводить nickname"
-            )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .regular,
-                    design: .rounded
-                )
-            )
-            .foregroundStyle(.secondary)
+            Text(GRUL10n.text("Начни вводить nickname"))
+                .font(.system(size: 14, weight: .regular, design: .rounded))
+                .foregroundStyle(.secondary)
 
             Spacer()
         }
-        .padding(
-            .bottom,
-            70
-        )
+        .padding(.bottom, 70)
     }
-}
-
-// MARK: - Hint
-
-private extension NewChatView {
 
     var hintView: some View {
-
         VStack(spacing: 8) {
+            Text(GRUL10n.text("Продолжай ввод"))
+                .font(.system(size: 16, weight: .medium, design: .rounded))
 
-            Text(
-                "Продолжай ввод"
-            )
-            .font(
-                .system(
-                    size: 16,
-                    weight: .medium,
-                    design: .rounded
-                )
-            )
-
-            Text(
-                "Нужно минимум 2 символа"
-            )
-            .font(
-                .system(
-                    size: 13,
-                    design: .rounded
-                )
-            )
-            .foregroundStyle(.secondary)
+            Text(GRUL10n.text("Нужно минимум 2 символа"))
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(.secondary)
         }
-        .frame(
-            maxWidth: .infinity
-        )
-        .padding(
-            .top,
-            42
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 42)
     }
-}
-
-// MARK: - Searching
-
-private extension NewChatView {
 
     var searchingView: some View {
-
         VStack(spacing: 12) {
-
             ProgressView()
 
-            Text(
-                "Ищем…"
-            )
-            .font(
-                .system(
-                    size: 14,
-                    design: .rounded
-                )
-            )
-            .foregroundStyle(.secondary)
+            Text(GRUL10n.text("Ищем…"))
+                .font(.system(size: 14, design: .rounded))
+                .foregroundStyle(.secondary)
         }
-        .frame(
-            maxWidth: .infinity
-        )
-        .padding(
-            .top,
-            42
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 42)
     }
-}
-
-// MARK: - No Results
-
-private extension NewChatView {
 
     var noResultsView: some View {
-
         VStack(spacing: 10) {
+            Image(systemName: "person.crop.circle.badge.questionmark")
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(.secondary)
 
-            Image(
-                systemName: "person.crop.circle.badge.questionmark"
-            )
-            .font(
-                .system(
-                    size: 30,
-                    weight: .light
-                )
-            )
-            .foregroundStyle(.secondary)
+            Text(GRUL10n.text("Никого не нашли"))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
 
-            Text(
-                "Никого не нашли"
-            )
-            .font(
-                .system(
-                    size: 17,
-                    weight: .semibold,
-                    design: .rounded
-                )
-            )
-
-            Text(
-                "Проверь nickname"
-            )
-            .font(
-                .system(
-                    size: 13,
-                    design: .rounded
-                )
-            )
-            .foregroundStyle(.secondary)
+            Text(GRUL10n.text("Проверь nickname"))
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(.secondary)
         }
-        .frame(
-            maxWidth: .infinity
-        )
-        .padding(
-            .top,
-            42
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 42)
     }
-}
 
-// MARK: - Error
-
-private extension NewChatView {
-
-    func errorView(
-        _ message: String
-    ) -> some View {
-
+    func errorView(_ message: String) -> some View {
         VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 29, weight: .light))
+                .foregroundStyle(.secondary)
 
-            Image(
-                systemName: "exclamationmark.circle"
-            )
-            .font(
-                .system(
-                    size: 29,
-                    weight: .light
-                )
-            )
-            .foregroundStyle(.secondary)
-
-            Text(
-                "Не удалось выполнить поиск"
-            )
-            .font(
-                .system(
-                    size: 17,
-                    weight: .semibold,
-                    design: .rounded
-                )
-            )
+            Text(GRUL10n.text("Не удалось выполнить поиск"))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
 
             Text(message)
-                .font(
-                    .system(
-                        size: 13,
-                        design: .rounded
-                    )
-                )
+                .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button(
-                "Повторить"
-            ) {
-
+            Button(GRUL10n.text("Повторить")) {
                 Task {
-
-                    await searchUsers(
-                        skipDelay: true
-                    )
+                    await searchUsers(skipDelay: true)
                 }
             }
             .buttonStyle(.bordered)
         }
-        .padding(
-            .horizontal,
-            30
-        )
-        .padding(
-            .top,
-            42
-        )
-        .frame(
-            maxWidth: .infinity
-        )
+        .padding(.horizontal, 30)
+        .padding(.top, 42)
+        .frame(maxWidth: .infinity)
     }
-}
-
-// MARK: - Results
-
-private extension NewChatView {
 
     var resultsList: some View {
-
         ScrollView {
-
-            LazyVStack(
-                spacing: 0
-            ) {
-
+            LazyVStack(spacing: 0) {
                 ForEach(results) { user in
-
                     userRow(user)
 
                     Divider()
-                        .padding(
-                            .leading,
-                            78
-                        )
+                        .padding(.leading, 78)
                 }
             }
-            .padding(
-                .horizontal,
-                18
-            )
-            .padding(
-                .top,
-                4
-            )
+            .padding(.horizontal, 18)
+            .padding(.top, 4)
         }
-        .scrollDismissesKeyboard(
-            .interactively
-        )
+        .scrollDismissesKeyboard(.interactively)
     }
-}
 
-// MARK: - User Row
-
-private extension NewChatView {
-
-    func userRow(
-        _ user: UserSearchDTO
-    ) -> some View {
-
+    func userRow(_ user: UserSearchDTO) -> some View {
         Button {
-
             Task {
-
-                await createChat(
-                    with: user
-                )
+                await createChat(with: user)
             }
-
         } label: {
-
             HStack(spacing: 13) {
+                avatar(for: user)
 
-                avatar(
-                    for: user
-                )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(user.nickname)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-
-                    Text(
-                        user.nickname
-                    )
-                    .font(
-                        .system(
-                            size: 16,
-                            weight: .semibold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(.primary)
-
-                    Text(
-                        "@\(user.nickname)"
-                    )
-                    .font(
-                        .system(
-                            size: 13,
-                            weight: .regular,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(.secondary)
+                    Text("@\(user.nickname)")
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                if creatingUserID ==
-                    user.id {
-
+                if creatingUserID == user.id {
                     ProgressView()
                         .controlSize(.small)
-
                 } else {
-
-                    Image(
-                        systemName: "envelope"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .regular
-                        )
-                    )
-                    .foregroundStyle(
-                        GRUColors.accent
-                    )
+                    Image(systemName: "envelope")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(GRUColors.accent)
                 }
             }
-            .padding(
-                .vertical,
-                11
-            )
-            .contentShape(
-                Rectangle()
-            )
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(
-            creatingUserID != nil
+        .disabled(creatingUserID != nil)
+        .accessibilityLabel(
+            GRUL10n.format("Создать чат с %@", user.nickname)
         )
     }
-}
 
-// MARK: - Avatar
-
-private extension NewChatView {
-
-    func avatar(
-        for user: UserSearchDTO
-    ) -> some View {
-
+    func avatar(for user: UserSearchDTO) -> some View {
         ZStack {
+            Circle().fill(GRUColors.card)
 
-            Circle()
-                .fill(
-                    GRUColors.card
-                )
-
-            Text(
-                initial(
-                    for: user.nickname
-                )
-            )
-            .font(
-                .system(
-                    size: 18,
-                    weight: .semibold,
-                    design: .rounded
-                )
-            )
-            .foregroundStyle(
-                GRUColors.accent
-            )
+            Text(initial(for: user.nickname))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundStyle(GRUColors.accent)
         }
-        .frame(
-            width: 48,
-            height: 48
-        )
+        .frame(width: 48, height: 48)
     }
-}
 
-// MARK: - Search
+    func searchUsers(skipDelay: Bool = false) async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-private extension NewChatView {
-
-    func searchUsers(
-        skipDelay: Bool = false
-    ) async {
-
-        let query =
-            searchText
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-
-        guard query.count >= 2
-        else {
-
+        guard query.count >= 2 else {
             results = []
             errorMessage = nil
             isSearching = false
-
             return
         }
 
         if !skipDelay {
-
             do {
-
-                try await Task.sleep(
-                    for: .milliseconds(350)
-                )
-
+                try await Task.sleep(for: .milliseconds(350))
             } catch {
-
                 return
             }
         }
 
-        guard !Task.isCancelled
-        else {
+        guard !Task.isCancelled else { return }
 
-            return
-        }
-
-        guard let token =
-                TokenStorage.shared.token,
-              !token.isEmpty
-        else {
-
+        guard let token = TokenStorage.shared.token,
+              !token.isEmpty else {
             results = []
-
-            errorMessage =
-                "Сессия не найдена"
-
+            errorMessage = GRUL10n.text("Сессия не найдена")
             return
         }
 
         isSearching = true
         errorMessage = nil
-
-        defer {
-
-            isSearching = false
-        }
+        defer { isSearching = false }
 
         do {
+            let found = try await UserAPIService.shared.searchUsers(
+                nickname: query,
+                token: token
+            )
 
-            let found =
-                try await UserAPIService.shared
-                    .searchUsers(
-                        nickname: query,
-                        token: token
-                    )
-
-            guard !Task.isCancelled
-            else {
-
-                return
-            }
-
+            guard !Task.isCancelled else { return }
             results = found
-
         } catch is CancellationError {
-
             return
-
         } catch {
-
             results = []
-
-            errorMessage =
-                error.localizedDescription
-
-            print(
-                "❌ User search error:",
-                error
-            )
+            errorMessage = error.localizedDescription
+            print("❌ User search error:", error)
         }
     }
-}
 
-// MARK: - Create Chat
+    func createChat(with user: UserSearchDTO) async {
+        guard creatingUserID == nil else { return }
 
-private extension NewChatView {
-
-    func createChat(
-        with user: UserSearchDTO
-    ) async {
-
-        guard creatingUserID == nil
-        else {
-
-            return
-        }
-
-        creatingUserID =
-            user.id
-
+        creatingUserID = user.id
         errorMessage = nil
-
-        defer {
-
-            creatingUserID = nil
-        }
+        defer { creatingUserID = nil }
 
         do {
-
-            _ =
-                try await service
-                    .createServerChat(
-                        with: user
-                    )
-
+            _ = try await service.createServerChat(with: user)
             searchIsFocused = false
-
             dismiss()
-
         } catch {
-
-            errorMessage =
-                error.localizedDescription
-
-            print(
-                "❌ Create chat error:",
-                error
-            )
+            errorMessage = error.localizedDescription
+            print("❌ Create chat error:", error)
         }
     }
-}
 
-// MARK: - Helpers
-
-private extension NewChatView {
-
-    func initial(
-        for nickname: String
-    ) -> String {
-
-        let clean =
-            nickname
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-
-        guard let first =
-                clean.first
-        else {
-
-            return "?"
-        }
-
-        return String(first)
-            .uppercased()
+    func initial(for nickname: String) -> String {
+        let clean = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = clean.first else { return "?" }
+        return String(first).uppercased()
     }
 }
-
-// MARK: - Preview
 
 #Preview {
-
     NewChatView()
 }
