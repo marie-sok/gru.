@@ -162,8 +162,14 @@ final class GRUE2EEMediaKeyStore {
 
     static let shared = GRUE2EEMediaKeyStore()
 
+    // A chat-heavy process can otherwise retain one 32-byte media key plus a
+    // path String for every encrypted attachment opened since launch. Keep a
+    // bounded working set; history reload re-registers older keys on demand.
+    private static let maximumRegisteredKeys = 512
+
     private let lock = NSLock()
     private var keysByPath: [String: Data] = [:]
+    private var registrationOrder: [String] = []
 
     private init() {}
 
@@ -173,13 +179,25 @@ final class GRUE2EEMediaKeyStore {
         guard !path.isEmpty else { return }
 
         lock.lock()
+        defer { lock.unlock() }
+
         keysByPath[path] = key
-        lock.unlock()
+
+        if let existingIndex = registrationOrder.firstIndex(of: path) {
+            registrationOrder.remove(at: existingIndex)
+        }
+        registrationOrder.append(path)
+
+        while registrationOrder.count > Self.maximumRegisteredKeys {
+            let evictedPath = registrationOrder.removeFirst()
+            keysByPath.removeValue(forKey: evictedPath)
+        }
     }
 
     func clear() {
         lock.lock()
         keysByPath.removeAll(keepingCapacity: false)
+        registrationOrder.removeAll(keepingCapacity: false)
         lock.unlock()
     }
 
