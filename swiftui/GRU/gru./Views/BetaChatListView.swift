@@ -19,22 +19,19 @@ struct BetaChatListView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                GRUAppBackdrop()
+            VStack(spacing: 6) {
+                searchField
+                    .padding(.horizontal, 12)
+                    .padding(.top, 5)
 
-                VStack(spacing: 6) {
-                    searchField
+                if service.chatLoadingError != nil || service.isUsingCachedChats {
+                    compactConnectionNotice
                         .padding(.horizontal, 12)
-                        .padding(.top, 5)
-
-                    if service.chatLoadingError != nil || service.isUsingCachedChats {
-                        compactConnectionNotice
-                            .padding(.horizontal, 12)
-                    }
-
-                    content
                 }
+
+                content
             }
+            .background(Color.clear)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
@@ -58,7 +55,7 @@ struct BetaChatListView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     GRUNeonIconButton(
                         systemName: "envelope.fill",
-                        accessibilityLabel: "Новый чат",
+                        accessibilityLabel: GRUL10n.text("Новый чат"),
                         size: 36,
                         iconSize: 14
                     ) {
@@ -85,24 +82,24 @@ struct BetaChatListView: View {
             connectWebSocket()
         }
         .confirmationDialog(
-            "Удалить чат целиком?",
+            GRUL10n.text("Удалить чат целиком?"),
             isPresented: Binding(
                 get: { pendingDeleteChat != nil },
                 set: { if !$0 { pendingDeleteChat = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Удалить чат у обоих", role: .destructive) {
+            Button(GRUL10n.text("Удалить чат у обоих"), role: .destructive) {
                 if let chat = pendingDeleteChat {
                     deleteChatEverywhere(chat)
                 }
             }
 
-            Button("Отмена", role: .cancel) {
+            Button(GRUL10n.text("Отмена"), role: .cancel) {
                 pendingDeleteChat = nil
             }
         } message: {
-            Text("История и вложения будут удалены с сервера.")
+            Text(GRUL10n.text("История и вложения будут удалены с сервера."))
         }
     }
 
@@ -134,7 +131,7 @@ struct BetaChatListView: View {
                             .controlSize(.small)
                             .tint(GRUColors.accent)
 
-                        Text("Синхронизирую реальные чаты…")
+                        Text(GRUL10n.text("Синхронизирую реальные чаты…"))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
 
@@ -169,7 +166,7 @@ struct BetaChatListView: View {
                         Button(role: .destructive) {
                             pendingDeleteChat = chat
                         } label: {
-                            Label("Удалить", systemImage: "trash")
+                            Label(GRUL10n.text("Удалить"), systemImage: "trash")
                         }
                         .disabled(deletingChatServerID != nil)
                     }
@@ -215,7 +212,7 @@ struct BetaChatListView: View {
                         .background(GRUColors.accent.opacity(0.10), in: Capsule())
                 }
 
-                Text("Полный локальный чат: voice • кото-кружки • actions")
+                Text(GRUL10n.text("Полный локальный чат: voice • кото-кружки • actions"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -245,7 +242,7 @@ struct BetaChatListView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            TextField("Поиск", text: $searchText)
+            TextField(GRUL10n.text("Поиск"), text: $searchText)
                 .textFieldStyle(.plain)
 
             if !searchText.isEmpty {
@@ -301,7 +298,7 @@ struct BetaChatListView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(GRUColors.accent)
 
-            Text("Ничего не найдено")
+            Text(GRUL10n.text("Ничего не найдено"))
                 .font(.headline)
 
             Spacer()
