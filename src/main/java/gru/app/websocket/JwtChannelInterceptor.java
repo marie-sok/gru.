@@ -20,7 +20,7 @@ import java.security.Principal;
 @RequiredArgsConstructor
 public class JwtChannelInterceptor implements ChannelInterceptor {
 
-    private static final String PRESENCE_TOPIC = "/topic/presence";
+    private static final String PRIVATE_PRESENCE_QUEUE = "/user/queue/presence";
     private static final String CHAT_TOPIC_PREFIX = "/topic/chat/";
     private static final String TYPING_SUFFIX = "/typing";
 
@@ -71,8 +71,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         }
 
         // Some STOMP clients repeat Authorization on SUBSCRIBE/SEND. Validate
-        // the frame token directly instead of mutating message headers, which
-        // may already be immutable by this point in the channel pipeline.
+        // the frame token directly instead of mutating immutable headers.
         return authenticatedUserFromBearer(accessor);
     }
 
@@ -107,12 +106,15 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
             throw new MessagingException("Missing STOMP subscription destination");
         }
 
-        if (PRESENCE_TOPIC.equals(destination)) {
+        // Spring resolves /user destinations to a session-specific broker queue.
+        // A client cannot select another user's queue through this destination.
+        if (PRIVATE_PRESENCE_QUEUE.equals(destination)) {
             return;
         }
 
         String chatId = extractChatId(destination);
         if (chatId == null) {
+            // This also rejects the old global /topic/presence metadata feed.
             throw new MessagingException("STOMP subscription destination is not allowed");
         }
 
