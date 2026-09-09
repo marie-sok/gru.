@@ -19,19 +19,22 @@ struct BetaChatListView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 6) {
-                searchField
-                    .padding(.horizontal, 12)
-                    .padding(.top, 5)
+            ZStack {
+                GRUAppBackdrop()
 
-                if service.chatLoadingError != nil || service.isUsingCachedChats {
-                    compactConnectionNotice
+                VStack(spacing: 6) {
+                    searchField
                         .padding(.horizontal, 12)
-                }
+                        .padding(.top, 5)
 
-                content
+                    if service.chatLoadingError != nil || service.isUsingCachedChats {
+                        compactConnectionNotice
+                            .padding(.horizontal, 12)
+                    }
+
+                    content
+                }
             }
-            .background(Color.clear)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
