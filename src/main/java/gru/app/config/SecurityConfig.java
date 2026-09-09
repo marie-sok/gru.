@@ -11,6 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 @Configuration
 @RequiredArgsConstructor
@@ -27,6 +28,18 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
+                        )
+                )
+
+                .headers(headers -> headers
+                        // GRU does not intentionally expose web resources for
+                        // embedding by unrelated origins. Make that boundary
+                        // explicit for browsers and passive security scanners.
+                        .addHeaderWriter(
+                                new StaticHeadersWriter(
+                                        "Cross-Origin-Resource-Policy",
+                                        "same-origin"
+                                )
                         )
                 )
 
