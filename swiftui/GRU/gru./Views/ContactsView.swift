@@ -10,53 +10,55 @@ struct ContactsView: View {
     @State private var gruSearchResults: [UserSearchDTO] = []
     @State private var isSearchingGRU = false
     @State private var creatingUserID: String?
+    @FocusState private var contactsSearchFocused: Bool
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                GRUAppBackdrop()
+            // MainView owns the single persistent wallpaper. Keeping Contacts
+            // transparent prevents the animated background from restarting on
+            // every tab switch and looking like a broken frame change.
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 18) {
+                    GRUAgentCard()
+                    searchField
 
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 18) {
-                        GRUAgentCard()
-                        searchField
-
-                        if isSearchingGRU {
-                            ProgressView("Ищем в gru.…")
-                                .tint(GRUColors.accent)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if !gruSearchResults.isEmpty {
-                            sectionHeader("Найдено в gru.", icon: "sparkles")
-                            gruSearchSection
-                        }
-
-                        if !filteredGRUContacts.isEmpty {
-                            sectionHeader("Мои контакты gru.", icon: "bolt.horizontal.circle.fill")
-                            gruContactsSection
-                        }
-
-                        sectionHeader("Телефонная книга", icon: "person.crop.circle.badge.plus")
-                        phoneBookSection
-
-                        Spacer(minLength: 120)
+                    if isSearchingGRU {
+                        ProgressView(GRUL10n.text("Ищем в gru.…"))
+                            .tint(GRUColors.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+
+                    if !gruSearchResults.isEmpty {
+                        sectionHeader("Найдено в gru.", icon: "sparkles")
+                        gruSearchSection
+                    }
+
+                    if !filteredGRUContacts.isEmpty {
+                        sectionHeader("Мои контакты gru.", icon: "bolt.horizontal.circle.fill")
+                        gruContactsSection
+                    }
+
+                    sectionHeader("Телефонная книга", icon: "person.crop.circle.badge.plus")
+                    phoneBookSection
+
+                    Spacer(minLength: 120)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
-            .navigationTitle("Люди")
+            .background(Color.clear)
+            .navigationTitle(GRUL10n.text("Люди"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     GRUNeonIconButton(
                         systemName: "envelope.badge.fill",
-                        accessibilityLabel: "Новый чат",
+                        accessibilityLabel: GRUL10n.text("Новый чат"),
                         size: 38,
                         iconSize: 15
                     ) {
+                        contactsSearchFocused = false
                         showingNewChat = true
                     }
                 }
@@ -72,6 +74,12 @@ struct ContactsView: View {
         .task(id: vm.searchText) {
             await searchGRUUsers()
         }
+        .onAppear {
+            contactsSearchFocused = false
+        }
+        .onDisappear {
+            contactsSearchFocused = false
+        }
     }
 }
 
@@ -80,7 +88,8 @@ private extension ContactsView {
         HStack(spacing: 10) {
             GRUNeonIcon(systemName: "magnifyingglass", size: 34, iconSize: 14)
 
-            TextField("Имя или номер", text: $vm.searchText)
+            TextField(GRUL10n.text("Имя или номер"), text: $vm.searchText)
+                .focused($contactsSearchFocused)
                 .textFieldStyle(.plain)
 
             if !vm.searchText.isEmpty {
@@ -90,6 +99,7 @@ private extension ContactsView {
                     GRUNeonIcon(systemName: "xmark", size: 30, iconSize: 12)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(GRUL10n.text("Очистить поиск"))
             }
         }
         .padding(.horizontal, 12)
@@ -105,7 +115,7 @@ private extension ContactsView {
     func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 10) {
             GRUNeonIcon(systemName: icon, size: 32, iconSize: 13)
-            Text(title)
+            Text(GRUL10n.text(title))
                 .font(.headline)
             Spacer()
         }
@@ -136,11 +146,15 @@ private extension ContactsView {
                         )
 
                     Button {
+                        contactsSearchFocused = false
                         createChat(with: user)
                     } label: {
                         GRUNeonIcon(systemName: "envelope.fill", size: 36, iconSize: 14)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        GRUL10n.format("Создать чат с %@", user.displayName)
+                    )
                 }
                 .padding(12)
                 .background(GRUColors.card.opacity(0.88))
@@ -169,7 +183,7 @@ private extension ContactsView {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(user.nickname)
                             .font(.body.weight(.semibold))
-                        Text("Пользователь gru.")
+                        Text(GRUL10n.text("Пользователь gru."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -177,6 +191,7 @@ private extension ContactsView {
                     Spacer()
 
                     Button {
+                        contactsSearchFocused = false
                         createServerChat(with: user)
                     } label: {
                         if creatingUserID == user.id {
@@ -193,6 +208,9 @@ private extension ContactsView {
                     }
                     .buttonStyle(.plain)
                     .disabled(creatingUserID != nil)
+                    .accessibilityLabel(
+                        GRUL10n.format("Создать чат с %@", user.nickname)
+                    )
                 }
                 .padding(12)
                 .background(GRUColors.card.opacity(0.88))
@@ -208,7 +226,7 @@ private extension ContactsView {
             HStack(spacing: 12) {
                 ProgressView()
                     .tint(GRUColors.accent)
-                Text("Загружаем контакты iPhone…")
+                Text(GRUL10n.text("Загружаем контакты iPhone…"))
                     .foregroundStyle(.secondary)
                 Spacer()
             }
@@ -220,15 +238,19 @@ private extension ContactsView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     GRUNeonIcon(systemName: "person.crop.circle.badge.exclamationmark", size: 38, iconSize: 15)
-                    Text("Доступ к контактам выключен")
+                    Text(GRUL10n.text("Доступ к контактам выключен"))
                         .font(.headline)
                 }
 
-                Text("Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(
+                    GRUL10n.text(
+                        "Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-                Button("Открыть Настройки") {
+                Button(GRUL10n.text("Открыть Настройки")) {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     openURL(url)
                 }
@@ -241,13 +263,19 @@ private extension ContactsView {
 
         case .granted:
             if vm.filteredPhoneContacts.isEmpty {
-                Text(vm.searchText.isEmpty ? "В телефонной книге нет контактов с номером." : "Ничего не найдено.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(GRUColors.card.opacity(0.76))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(
+                    GRUL10n.text(
+                        vm.searchText.isEmpty
+                            ? "В телефонной книге нет контактов с номером."
+                            : "Ничего не найдено."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(GRUColors.card.opacity(0.76))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(vm.filteredPhoneContacts) { contact in
@@ -310,7 +338,7 @@ private extension ContactsView {
                 GRUNeonIcon(systemName: "message.fill", size: 38, iconSize: 15)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Пригласить через Messages")
+            .accessibilityLabel(GRUL10n.text("Пригласить через Messages"))
         }
         .padding(12)
         .background(GRUColors.card.opacity(0.88))
@@ -354,8 +382,7 @@ private extension ContactsView {
 
         guard !Task.isCancelled,
               let token = TokenStorage.shared.token,
-              !token.isEmpty
-        else {
+              !token.isEmpty else {
             return
         }
 
@@ -392,6 +419,10 @@ private extension ContactsView {
                 _ = try await service.createServerChat(with: user)
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
+
+                // Creation from People should visibly land in Chats instead of
+                // leaving the user on Contacts wondering where the chat went.
+                NotificationCenter.default.post(name: .gruBotOpenChats, object: nil)
             } catch {
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.error)
@@ -403,6 +434,7 @@ private extension ContactsView {
     func createChat(with user: User) {
         guard let serverID = user.serverID, !serverID.isEmpty else {
             service.createChat(username: user.displayName)
+            NotificationCenter.default.post(name: .gruBotOpenChats, object: nil)
             return
         }
 
