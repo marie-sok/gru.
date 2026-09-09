@@ -180,6 +180,16 @@
 "Проверь nickname" = "Check the nickname";
 "Не удалось выполнить поиск" = "Search failed";
 "Сессия не найдена" = "Session not found";
+"Чат создан на сервере, но не появился в списке. Повтори обновление." = "The chat was created on the server but did not appear in the list. Refresh and try again.";
+
+/* Main tabs / settings */
+"История и вложения будут удалены с сервера." = "History and attachments will be deleted from the server.";
+"Полный локальный чат: voice • кото-кружки • actions" = "Full local chat: voice • cat circles • actions";
+"имя • nickname • bio • аватар" = "name • nickname • bio • avatar";
+"9 фирменных animated micro-art сцен" = "9 signature animated micro-art scenes";
+"Защита экрана активна для записи и трансляции. Снимок экрана iOS можно обнаружить только после события." = "Screen protection is active for recording and broadcasting. iOS screenshot events can only be detected after they occur.";
+"камера • микрофон • фото • контакты • локальная сеть" = "camera • microphone • photos • contacts • local network";
+"Текущая сессия и локальный кэш аккаунта будут очищены." = "The current session and local account cache will be cleared.";
 
 /* Security / root shell */
 "Защита E2EE" = "E2EE Security";
