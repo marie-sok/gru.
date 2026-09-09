@@ -33,12 +33,23 @@ final class MessageAPIService {
                     currentUserID: currentUserID,
                     token: token
                 )
-                if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext),
-                   let remoteURL = message.attachment?.remoteURL {
-                    GRUE2EEMediaKeyStore.shared.register(
-                        keyPayload: plaintext,
-                        remoteURL: remoteURL
-                    )
+
+                if GRUE2EEMediaKeyStore.isMediaKeyPayload(plaintext) {
+                    // A media key is cryptographic material, never user-visible
+                    // message text. Even a malformed server DTO without remoteURL
+                    // must fail closed instead of rendering/caching the raw key.
+                    if let remoteURL = message.attachment?.remoteURL,
+                       !remoteURL.isEmpty {
+                        GRUE2EEMediaKeyStore.shared.register(
+                            keyPayload: plaintext,
+                            remoteURL: remoteURL
+                        )
+                    } else {
+                        #if DEBUG
+                        print("⚠️ E2EE media envelope has no remoteURL; key suppressed")
+                        #endif
+                    }
+
                     result.append(message.replacingText(""))
                 } else {
                     result.append(message.replacingText(plaintext))
