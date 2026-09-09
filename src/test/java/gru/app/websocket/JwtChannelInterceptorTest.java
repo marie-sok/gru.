@@ -82,11 +82,20 @@ class JwtChannelInterceptorTest {
     }
 
     @Test
-    void allowsAuthenticatedPresenceSubscription() {
-        Message<byte[]> message = frame(StompCommand.SUBSCRIBE, "/topic/presence");
+    void allowsAuthenticatedPrivatePresenceQueue() {
+        Message<byte[]> message = frame(StompCommand.SUBSCRIBE, "/user/queue/presence");
 
         assertThatCode(() -> interceptor.preSend(message, channel))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsLegacyGlobalPresenceTopic() {
+        Message<byte[]> message = frame(StompCommand.SUBSCRIBE, "/topic/presence");
+
+        assertThatThrownBy(() -> interceptor.preSend(message, channel))
+                .isInstanceOf(MessagingException.class)
+                .hasMessageContaining("not allowed");
     }
 
     private Message<byte[]> frame(StompCommand command, String destination) {
