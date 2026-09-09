@@ -16,16 +16,29 @@ spring:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/gru}
 
-
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
 
 gru:
   security:
     jwt-secret: ${GRU_JWT_SECRET:}
+    rate-limit:
+      enabled: ${GRU_RATE_LIMIT_ENABLED:true}
+      auth:
+        requests: ${GRU_RATE_LIMIT_AUTH_REQUESTS:10}
+        window-seconds: ${GRU_RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
+      websocket:
+        requests: ${GRU_RATE_LIMIT_WS_REQUESTS:30}
+        window-seconds: ${GRU_RATE_LIMIT_WS_WINDOW_SECONDS:60}
+      media:
+        requests: ${GRU_RATE_LIMIT_MEDIA_REQUESTS:40}
+        window-seconds: ${GRU_RATE_LIMIT_MEDIA_WINDOW_SECONDS:60}
+      api:
+        requests: ${GRU_RATE_LIMIT_API_REQUESTS:240}
+        window-seconds: ${GRU_RATE_LIMIT_API_WINDOW_SECONDS:60}
   moderation:
     blocked-terms: ${GRU_MODERATION_BLOCKED_TERMS:}
   public:
