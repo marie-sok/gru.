@@ -5,6 +5,7 @@ on:
     paths:
       - "src/**"
       - "pom.xml"
+      - ".github/scripts/**"
       - ".github/workflows/dast-baseline.yml"
       - ".zap/**"
   schedule:
@@ -74,6 +75,10 @@ jobs:
           echo "Backend did not become healthy in time" >&2
           cat "$RUNNER_TEMP/gru-dast-backend.log" >&2
           exit 1
+
+      - name: Live A↔B E2EE v2 HTTP integration smoke
+        shell: bash
+        run: bash .github/scripts/two_client_http_smoke.sh
 
       - name: OWASP ZAP baseline gate against PR backend
         uses: zaproxy/action-baseline@v0.15.0
