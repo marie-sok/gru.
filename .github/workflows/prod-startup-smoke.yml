@@ -1,0 +1,89 @@
+name: Production startup smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/prod-startup-smoke.yml"
+  schedule:
+    - cron: "47 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  prod-startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout production backend branch
+        uses: actions/checkout@v5
+        with:
+          ref: all-backand
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Generate ephemeral production-like secrets
+        shell: bash
+        run: |
+          echo "GRU_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MONGODB_URI=mongodb://127.0.0.1:27017/gru_ci" >> "$GITHUB_ENV"
+
+      - name: Package backend
+        run: mvn --batch-mode --no-transfer-progress clean package
+
+      - name: Start production profile and verify health
+        shell: bash
+        env:
+          SPRING_PROFILES_ACTIVE: prod
+          PORT: "18081"
+        run: |
+          set -euo pipefail
+
+          java -jar target/gru-1.0.0.jar > /tmp/gru-prod-smoke.log 2>&1 &
+          APP_PID=$!
+
+          cleanup() {
+            kill "$APP_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 75); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:18081/actuator/health \
+              | grep -q '"status":"UP"'; then
+              echo "Production-profile startup smoke passed."
+              exit 0
+            fi
+
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              echo "GRU exited before becoming healthy."
+              cat /tmp/gru-prod-smoke.log
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "GRU did not become healthy before timeout."
+          cat /tmp/gru-prod-smoke.log
+          exit 1
+
+      - name: Print application log on failure
+        if: failure()
+        shell: bash
+        run: cat /tmp/gru-prod-smoke.log 2>/dev/null || true
