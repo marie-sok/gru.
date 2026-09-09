@@ -28,5 +28,23 @@ jobs:
       - name: Run security regression tests
         run: >-
           mvn --batch-mode --no-transfer-progress
-          -Dtest=JwtChannelInterceptorTest,MessageSocketControllerTest,MediaControllerTest,E2EERecoveryControllerTest,E2EEKeyControllerTest,E2EECryptoVerifierTest,E2EEMessageServiceTwoClientTest
+          -Dtest=JwtChannelInterceptorTest,MessageSocketControllerTest,MessageControllerSecurityTest,MediaControllerTest,E2EERecoveryControllerTest,E2EEKeyControllerTest,E2EECryptoVerifierTest,E2EEMessageServiceTwoClientTest
           test
+      - name: Verify plaintext downgrade surfaces stay closed
+        shell: bash
+        run: |
+          CONTROLLER="src/main/java/gru/app/controller/MessageController.java"
+          SOCKET="src/main/java/gru/app/websocket/MessageSocketController.java"
+
+          grep -F 'HttpStatus.UPGRADE_REQUIRED' "$CONTROLLER"
+          grep -F 'Legacy plaintext STOMP message send is disabled' "$SOCKET"
+
+          ! grep -F '@PostMapping(value = "/messages/photo"' "$CONTROLLER"
+          ! grep -F '@PostMapping(value = "/messages/video"' "$CONTROLLER"
+          ! grep -F '@PostMapping(value = "/messages/video-note"' "$CONTROLLER"
+          ! grep -F '@PostMapping(value = "/messages/document"' "$CONTROLLER"
+          ! grep -F '@PostMapping(value = "/messages/audio"' "$CONTROLLER"
+
+          test ! -e src/main/java/gru/app/websocket/ChatHandler.java
+          test ! -e src/main/java/gru/app/websocket/WebSocketController.java
+          test ! -e src/main/java/gru/app/websocket/WebSocketHandler.java
