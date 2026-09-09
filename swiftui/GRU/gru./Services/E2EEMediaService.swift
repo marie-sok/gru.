@@ -89,9 +89,10 @@ final class E2EEMediaService {
         )
 
         // Sender-side recovery for this device. The value is itself protected
-        // by GRUDataProtection before it touches disk.
+        // by GRUDataProtection and is namespaced to the authenticated account.
         try GRUE2EESentMessageStore.shared.save(
             plaintext: keyPayload,
+            userID: senderID,
             clientMessageID: envelope.clientMessageId
         )
 
