@@ -153,3 +153,40 @@
 "Authentication failed." = "Authentication failed.";
 "Backend rejected the new session (HTTP %d). %@" = "Backend rejected the new session (HTTP %d). %@";
 "Could not verify the new session on the backend. %@" = "Could not verify the new session on the backend. %@";
+
+/* People / contacts / new chat */
+"Ищем в gru.…" = "Searching gru.…";
+"Найдено в gru." = "Found in gru.";
+"Мои контакты gru." = "My gru. contacts";
+"Телефонная книга" = "Phone book";
+"Имя или номер" = "Name or number";
+"Очистить поиск" = "Clear search";
+"Пользователь gru." = "gru. user";
+"Загружаем контакты iPhone…" = "Loading iPhone contacts…";
+"Доступ к контактам выключен" = "Contacts access is off";
+"Разреши gru. доступ к телефонной книге — тогда здесь появятся контакты и приглашение через Messages." = "Allow gru. to access your phone book to see contacts and invite them via Messages.";
+"Открыть Настройки" = "Open Settings";
+"В телефонной книге нет контактов с номером." = "There are no contacts with a phone number in your phone book.";
+"Ничего не найдено." = "Nothing found.";
+"Пригласить через Messages" = "Invite via Messages";
+"Создать чат с %@" = "Create chat with %@";
+"Найти по nickname" = "Search by nickname";
+"Найди человека" = "Find someone";
+"Начни вводить nickname" = "Start typing a nickname";
+"Продолжай ввод" = "Keep typing";
+"Нужно минимум 2 символа" = "Enter at least 2 characters";
+"Ищем…" = "Searching…";
+"Никого не нашли" = "No one found";
+"Проверь nickname" = "Check the nickname";
+"Не удалось выполнить поиск" = "Search failed";
+"Сессия не найдена" = "Session not found";
+
+/* Security / root shell */
+"Защита E2EE" = "E2EE Security";
+"Открыть центр проверки E2EE" = "Open E2EE security center";
+"Your gateway to the world" = "Your gateway to the world";
+"Коснитесь экрана, чтобы продолжить" = "Tap the screen to continue";
+"gru. заблокирован" = "gru. is locked";
+"Для доступа требуется подтверждение личности" = "Authentication is required to continue";
+"Разблокировать" = "Unlock";
+"Разблокируйте доступ к приложению gru." = "Unlock access to gru.";
