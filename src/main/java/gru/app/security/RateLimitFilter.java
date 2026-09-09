@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -28,6 +29,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
     private final AtomicLong cleanupTicker = new AtomicLong();
 
+    @Autowired
     public RateLimitFilter(
             @Value("${gru.security.rate-limit.enabled:true}") boolean enabled,
             @Value("${gru.security.rate-limit.auth.requests:10}") int authRequests,
