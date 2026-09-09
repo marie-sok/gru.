@@ -55,6 +55,7 @@ extension E2EEAPIService {
 
         try GRUE2EESentMessageStore.shared.save(
             plaintext: plaintext,
+            userID: senderID,
             clientMessageID: envelope.clientMessageId
         )
 
