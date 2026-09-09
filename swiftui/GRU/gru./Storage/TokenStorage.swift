@@ -63,6 +63,10 @@ final class TokenStorage {
             return
         }
 
+        // A new authenticated principal must never inherit process-local media
+        // keys from the previous account/session, even when both accounts use
+        // the same backend and media paths happen to collide.
+        clearSessionEphemera()
         clearCurrentService()
         saveToKeychain(value: currentBackend, service: service, account: backendAccount)
         saveToKeychain(value: cleanToken, service: service, account: tokenAccount)
@@ -83,11 +87,13 @@ final class TokenStorage {
     }
 
     func clear() {
+        clearSessionEphemera()
         clearCurrentService()
         removeLegacyDefaults()
     }
 
     func purgeAllKnownSessions() {
+        clearSessionEphemera()
         clearCurrentService()
         for legacyService in legacyServices {
             deleteFromKeychain(service: legacyService, account: tokenAccount)
@@ -104,6 +110,7 @@ final class TokenStorage {
         ) else { return }
 
         guard savedBackend != currentBackend else { return }
+        clearSessionEphemera()
         clearCurrentService()
 
         #if DEBUG
@@ -118,6 +125,10 @@ final class TokenStorage {
             deleteFromKeychain(service: legacyService, account: backendAccount)
         }
         removeLegacyDefaults()
+    }
+
+    private func clearSessionEphemera() {
+        GRUE2EEMediaKeyStore.shared.clear()
     }
 
     private func removeLegacyDefaults() {
