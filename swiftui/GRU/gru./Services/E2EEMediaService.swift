@@ -6,6 +6,12 @@ final class E2EEMediaService {
     static let shared = E2EEMediaService()
     static let mediaKeyPrefix = "gru-media-key-v1:"
 
+    // Multipart uploads are currently assembled in memory. Keeping the beta
+    // client below the backend's 128 MB upload ceiling leaves headroom for the
+    // plaintext Data, encrypted copy and multipart body on a physical iPhone.
+    private static let maximumMediaBytes = 96 * 1024 * 1024
+    private static let maximumMediaMegabytes = 96
+
     private init() {}
 
     func send(
@@ -23,6 +29,11 @@ final class E2EEMediaService {
     ) async throws -> ServerMessageDTO {
         guard !data.isEmpty else {
             throw E2EEMediaError.emptyMedia
+        }
+        guard data.count <= Self.maximumMediaBytes else {
+            throw E2EEMediaError.mediaTooLarge(
+                maximumMegabytes: Self.maximumMediaMegabytes
+            )
         }
         guard let senderID = TokenStorage.shared.userID,
               !senderID.isEmpty else {
@@ -126,6 +137,7 @@ final class E2EEMediaService {
 
 enum E2EEMediaError: LocalizedError {
     case emptyMedia
+    case mediaTooLarge(maximumMegabytes: Int)
     case missingMediaKey
     case invalidMediaKey
 
@@ -133,6 +145,8 @@ enum E2EEMediaError: LocalizedError {
         switch self {
         case .emptyMedia:
             return "Медиафайл пуст."
+        case .mediaTooLarge(let maximumMegabytes):
+            return "Вложение слишком большое. Максимальный размер — \(maximumMegabytes) МБ."
         case .missingMediaKey:
             return "Ключ защищённого медиа недоступен."
         case .invalidMediaKey:
@@ -160,6 +174,12 @@ final class GRUE2EEMediaKeyStore {
 
         lock.lock()
         keysByPath[path] = key
+        lock.unlock()
+    }
+
+    func clear() {
+        lock.lock()
+        keysByPath.removeAll(keepingCapacity: false)
         lock.unlock()
     }
 
