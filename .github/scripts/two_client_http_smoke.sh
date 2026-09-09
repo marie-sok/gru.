@@ -7,11 +7,22 @@ trap 'rm -rf "$TMP"' EXIT
 
 json_post() {
   local path="$1" token="$2" body="$3"
-  local args=(--fail --silent --show-error -X POST "$BASE$path" -H 'Content-Type: application/json' -H 'Accept: application/json' --data "$body")
+  local response_file="$TMP/response-$RANDOM.json"
+  local args=(--silent --show-error --output "$response_file" --write-out '%{http_code}' -X POST "$BASE$path" -H 'Content-Type: application/json' -H 'Accept: application/json' --data "$body")
   if [[ -n "$token" ]]; then
     args+=( -H "Authorization: Bearer $token" )
   fi
-  curl "${args[@]}"
+
+  local status
+  status="$(curl "${args[@]}")"
+  if [[ ! "$status" =~ ^2 ]]; then
+    echo "POST $path failed with HTTP $status" >&2
+    cat "$response_file" >&2 || true
+    echo >&2
+    return 22
+  fi
+
+  cat "$response_file"
 }
 
 register_user() {
@@ -51,18 +62,28 @@ make_identity() {
 
 publish_identity() {
   local name="$1" token="$2"
-  local agreement signing body
+  local agreement signing body response_file status
   agreement="$(raw_public_key_b64 "$TMP/${name}-x25519.pem")"
   signing="$(raw_public_key_b64 "$TMP/${name}-ed25519.pem")"
   body="$(jq -nc --arg agreement "$agreement" --arg signing "$signing" \
     '{keyAgreementPublicKey:$agreement,signingPublicKey:$signing}')"
+  response_file="$TMP/publish-$name.json"
 
-  curl --fail --silent --show-error \
+  status="$(curl --silent --show-error \
+    --output "$response_file" \
+    --write-out '%{http_code}' \
     -X PUT "$BASE/e2ee/keys/me" \
     -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' \
     -H 'Accept: application/json' \
-    --data "$body" >/dev/null
+    --data "$body")"
+
+  if [[ ! "$status" =~ ^2 ]]; then
+    echo "PUT /e2ee/keys/me ($name) failed with HTTP $status" >&2
+    cat "$response_file" >&2 || true
+    echo >&2
+    return 22
+  fi
 }
 
 send_v2() {
@@ -105,6 +126,7 @@ send_v2() {
 }
 
 suffix="$(date +%s)-$RANDOM"
+echo "SMOKE stage: register three isolated accounts" >&2
 alice_json="$(register_user "+1555100${RANDOM}" "ci-alice-$suffix")"
 bob_json="$(register_user "+1555200${RANDOM}" "ci-bob-$suffix")"
 charlie_json="$(register_user "+1555300${RANDOM}" "ci-charlie-$suffix")"
@@ -119,17 +141,21 @@ for value in "$alice_token" "$alice_id" "$bob_token" "$bob_id" "$charlie_token";
   [[ -n "$value" && "$value" != "null" ]]
 done
 
+echo "SMOKE stage: generate and publish independent identities" >&2
 make_identity alice
 make_identity bob
 publish_identity alice "$alice_token"
 publish_identity bob "$bob_token"
 
+echo "SMOKE stage: create direct chat" >&2
 chat_body="$(jq -nc --arg userId "$bob_id" '{userId:$userId}')"
 chat_json="$(json_post '/chats' "$alice_token" "$chat_body")"
 chat_id="$(jq -r '.id' <<<"$chat_json")"
 [[ -n "$chat_id" && "$chat_id" != "null" ]]
 
+echo "SMOKE stage: send A to B v2" >&2
 alice_message="$(send_v2 alice "$alice_id" "$bob_id" "$alice_token" "$chat_id" 'A-to-B')"
+echo "SMOKE stage: send B to A v2" >&2
 bob_message="$(send_v2 bob "$bob_id" "$alice_id" "$bob_token" "$chat_id" 'B-to-A')"
 
 jq -e --arg sender "$alice_id" --arg receiver "$bob_id" '
@@ -150,6 +176,7 @@ jq -e --arg sender "$bob_id" --arg receiver "$alice_id" '
   (.senderRecoveryEphemeralPublicKey | length > 0)
 ' <<<"$bob_message" >/dev/null
 
+echo "SMOKE stage: read encrypted history from both accounts" >&2
 alice_history="$(curl --fail --silent --show-error \
   "$BASE/chats/$chat_id/messages" \
   -H "Authorization: Bearer $alice_token" \
@@ -162,19 +189,18 @@ bob_history="$(curl --fail --silent --show-error \
 jq -e 'length == 2 and all(.[]; .text == "" and .encryptionVersion == "gru-e2ee-v2")' <<<"$alice_history" >/dev/null
 jq -e 'length == 2 and all(.[]; .text == "" and .encryptionVersion == "gru-e2ee-v2")' <<<"$bob_history" >/dev/null
 
-# A third authenticated account must not be able to enumerate the A/B history.
+echo "SMOKE stage: adversarial third-account metadata checks" >&2
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
   "$BASE/chats/$chat_id/messages" \
   -H "Authorization: Bearer $charlie_token")"
 [[ "$status" == "403" ]]
 
-# A third authenticated account must not be able to enumerate Alice's E2EE identity.
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
   "$BASE/e2ee/keys/$alice_id" \
   -H "Authorization: Bearer $charlie_token")"
 [[ "$status" == "403" || "$status" == "404" ]]
 
-# Authenticated stale clients must fail closed rather than storing plaintext.
+echo "SMOKE stage: plaintext downgrade rejection" >&2
 plaintext_body="$(jq -nc --arg chatId "$chat_id" --arg text 'must never persist' '{chatId:$chatId,text:$text}')"
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
   -X POST "$BASE/messages" \
