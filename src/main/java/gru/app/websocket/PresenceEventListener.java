@@ -1,5 +1,9 @@
 package gru.app.websocket;
 
+import gru.app.model.Chat;
+import gru.app.model.User;
+import gru.app.repository.ChatRepository;
+import gru.app.repository.UserRepository;
 import gru.app.service.PresenceRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -10,14 +14,21 @@ import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class PresenceEventListener {
 
+    private static final String PRIVATE_PRESENCE_QUEUE = "/queue/presence";
+
     private final PresenceRegistry presenceRegistry;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ChatRepository chatRepository;
+    private final UserRepository userRepository;
 
     @EventListener
     public void onConnect(SessionConnectEvent event) {
@@ -31,7 +42,7 @@ public class PresenceEventListener {
 
         String userId = principal.getName();
         if (presenceRegistry.connect(userId, sessionId)) {
-            publish(userId, true);
+            publishToAuthorizedPeers(userId, true);
         }
     }
 
@@ -40,17 +51,60 @@ public class PresenceEventListener {
         PresenceRegistry.DisconnectResult result = presenceRegistry.disconnect(event.getSessionId());
 
         if (result.userId() != null && result.becameOffline()) {
-            publish(result.userId(), false);
+            publishToAuthorizedPeers(result.userId(), false);
         }
     }
 
-    private void publish(String userId, boolean online) {
-        messagingTemplate.convertAndSend(
-                "/topic/presence",
-                Map.of(
-                        "userId", userId,
-                        "online", online
-                )
+    private void publishToAuthorizedPeers(String userId, boolean online) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
+        User subject = userRepository.findById(userId).orElse(null);
+        if (subject == null) {
+            return;
+        }
+
+        List<Chat> chats = chatRepository.findByParticipantsContains(userId);
+        if (chats == null || chats.isEmpty()) {
+            return;
+        }
+
+        Set<String> candidatePeerIds = new HashSet<>();
+        for (Chat chat : chats) {
+            if (chat.getParticipants() == null) continue;
+            for (String participantId : chat.getParticipants()) {
+                if (participantId != null
+                        && !participantId.isBlank()
+                        && !participantId.equals(userId)) {
+                    candidatePeerIds.add(participantId);
+                }
+            }
+        }
+
+        if (candidatePeerIds.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> payload = Map.of(
+                "userId", userId,
+                "online", online
         );
+
+        for (User peer : userRepository.findAllById(candidatePeerIds)) {
+            if (peer == null || peer.getId() == null) continue;
+            if (isBlocked(subject, peer.getId()) || isBlocked(peer, subject.getId())) continue;
+
+            messagingTemplate.convertAndSendToUser(
+                    peer.getId(),
+                    PRIVATE_PRESENCE_QUEUE,
+                    payload
+            );
+        }
+    }
+
+    private boolean isBlocked(User user, String targetUserId) {
+        return user.getBlockedUserIds() != null
+                && user.getBlockedUserIds().contains(targetUserId);
     }
 }
