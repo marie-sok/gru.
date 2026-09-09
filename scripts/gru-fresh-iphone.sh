@@ -10,7 +10,8 @@ SCHEME="gru"
 BUNDLE_ID="sok.com.gru"
 DERIVED="$ROOT/.derivedData-p0-device"
 STAMP="P0-$(date +%Y%m%d-%H%M%S)"
-BUILD_NUMBER="$(date +%Y%m%d%H%M)"
+# CFBundleVersion-safe: first component <=4 digits, second/third <=2.
+BUILD_NUMBER="$(date +%y%m).$(date +%d).$(date +%M)"
 
 print_section() {
   echo ""
@@ -59,11 +60,9 @@ CANONICAL_ROOT="$(cd "$ROOT" && pwd -P)"
 TRASH="$HOME/.Trash"
 mkdir -p "$TRASH"
 
-setopt NULL_GLOB
-PROJECT_CANDIDATES=(
-  "$HOME"/**/gru..xcodeproj(N/)
-)
-unsetopt NULL_GLOB
+PROJECT_CANDIDATES=("${(@f)$(find "$HOME" -maxdepth 7 \
+  \( -path "$HOME/Library" -o -path "$HOME/.Trash" \) -prune -o \
+  -type d -name 'gru..xcodeproj' -print 2>/dev/null)}")
 
 seen_roots=()
 for proj in "${PROJECT_CANDIDATES[@]:-}"; do
@@ -87,7 +86,7 @@ for proj in "${PROJECT_CANDIDATES[@]:-}"; do
   [[ "$candidate_remote" == *"$REMOTE_MATCH"* ]] || continue
 
   target="$TRASH/GRU-stale-$(date +%Y%m%d-%H%M%S)-${candidate_root:t}"
-  echo "🗑 Moving stale clone: $candidate_root"
+  echo "🗑 Moving stale clone to Trash: $candidate_root"
   mv "$candidate_root" "$target"
 done
 
@@ -153,6 +152,8 @@ echo "DEVICE_ID: $DEVICE_ID"
 
 print_section "CLEAN BUILD FROM EXACT CHECKOUT"
 cd "$ROOT"
+SOURCE_SHORT="$(git rev-parse --short HEAD)"
+BUILD_STAMP="$STAMP-$SOURCE_SHORT"
 
 xcodebuild \
   -project "$PROJECT" \
@@ -162,7 +163,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   INFOPLIST_KEY_CFBundleDisplayName="gru. P0 FRESH" \
-  INFOPLIST_KEY_GRUBuildStamp="$STAMP-$(git rev-parse --short HEAD)" \
+  INFOPLIST_KEY_GRUBuildStamp="$BUILD_STAMP" \
   clean build
 
 APP="$DERIVED/Build/Products/Debug-iphoneos/gru.app"
@@ -175,14 +176,13 @@ print_section "VERIFY BUILT BINARY"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist"
-/usr/libexec/PlistBuddy -c 'Print :GRUBuildStamp' "$APP/Info.plist"
+/usr/libexec/PlistBuddy -c 'Print :GRUBuildStamp' "$APP/Info.plist" 2>/dev/null || echo "Build stamp: $BUILD_STAMP"
 
-echo "SOURCE: $(git rev-parse --short HEAD)"
+echo "SOURCE: $SOURCE_SHORT"
 echo "APP: $APP"
 
 print_section "FORCE INSTALL TO IPHONE"
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP"
-
 echo "✅ Fresh binary installed"
 
 print_section "LAUNCH EXACT BUNDLE"
@@ -190,8 +190,8 @@ xcrun devicectl device process launch --device "$DEVICE_ID" "$BUNDLE_ID" || true
 
 print_section "DONE"
 echo "✅ Installed physical-device build: gru. P0 FRESH"
-echo "✅ Source: $(git rev-parse --short HEAD)"
+echo "✅ Source: $SOURCE_SHORT"
 echo "✅ Build: $BUILD_NUMBER"
-echo "✅ Stamp: $STAMP-$(git rev-parse --short HEAD)"
+echo "✅ Stamp: $BUILD_STAMP"
 echo ""
-echo "If the iPhone icon still says only 'gru.' instead of 'gru. P0 FRESH', the install did not replace the old binary."
+echo "The iPhone icon must now say 'gru. P0 FRESH'. If it still says only 'gru.', the fresh install did not replace the old binary."
