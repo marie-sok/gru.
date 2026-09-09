@@ -10,14 +10,12 @@ struct ContactsView: View {
     @State private var gruSearchResults: [UserSearchDTO] = []
     @State private var isSearchingGRU = false
     @State private var creatingUserID: String?
+    @State private var chatCreationError: String?
     @FocusState private var contactsSearchFocused: Bool
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
-            // MainView owns the single persistent wallpaper. Keeping Contacts
-            // transparent prevents the animated background from restarting on
-            // every tab switch and looking like a broken frame change.
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 18) {
                     GRUAgentCard()
@@ -79,6 +77,19 @@ struct ContactsView: View {
         }
         .onDisappear {
             contactsSearchFocused = false
+        }
+        .alert(
+            GRUL10n.text("Действие не выполнено"),
+            isPresented: Binding(
+                get: { chatCreationError != nil },
+                set: { if !$0 { chatCreationError = nil } }
+            )
+        ) {
+            Button(GRUL10n.text("Понятно"), role: .cancel) {
+                chatCreationError = nil
+            }
+        } message: {
+            Text(chatCreationError ?? GRUL10n.text("Неизвестная ошибка"))
         }
     }
 }
@@ -411,19 +422,32 @@ private extension ContactsView {
     func createServerChat(with user: UserSearchDTO) {
         guard creatingUserID == nil else { return }
         creatingUserID = user.id
+        chatCreationError = nil
 
         Task {
             defer { creatingUserID = nil }
 
             do {
-                _ = try await service.createServerChat(with: user)
+                let createdChat = try await service.createServerChat(with: user)
+
+                // Re-read server truth immediately. This prevents a successful
+                // POST /chats from being visually lost after the tab switches.
+                await service.loadChats()
+
+                guard service.chats.contains(where: { $0.serverID == createdChat.serverID }) else {
+                    throw NSError(
+                        domain: "gru.chat.create",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: GRUL10n.text("Чат создан на сервере, но не появился в списке. Повтори обновление.")]
+                    )
+                }
+
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
 
-                // Creation from People should visibly land in Chats instead of
-                // leaving the user on Contacts wondering where the chat went.
                 NotificationCenter.default.post(name: .gruBotOpenChats, object: nil)
             } catch {
+                chatCreationError = error.localizedDescription
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.error)
                 print("❌ Create gru. contact chat error:", error)
