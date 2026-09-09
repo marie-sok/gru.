@@ -25,6 +25,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class E2EEMessageService {
 
+    private static final String V1 = "gru-e2ee-v1";
+    private static final String V2 = "gru-e2ee-v2";
+
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
     private final UserRepository userRepository;
@@ -183,7 +186,9 @@ public class E2EEMessageService {
         requireText(request.getClientMessageId(), "clientMessageId", 64);
         requireUUID(request.getClientMessageId(), "clientMessageId");
         requireText(request.getEncryptionVersion(), "encryptionVersion", 40);
-        if (!"gru-e2ee-v1".equals(request.getEncryptionVersion())) {
+
+        String version = request.getEncryptionVersion();
+        if (!V1.equals(version) && !V2.equals(version)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported encryption version");
         }
 
@@ -191,6 +196,27 @@ public class E2EEMessageService {
         validateBase64(request.getSenderEphemeralPublicKey(), "senderEphemeralPublicKey", 32, 32);
         validateBase64(request.getSignature(), "signature", 64, 64);
         requireText(request.getSenderKeyFingerprint(), "senderKeyFingerprint", 128);
+
+        if (V2.equals(version)) {
+            validateBase64(
+                    request.getSenderRecoveryEncryptedPayload(),
+                    "senderRecoveryEncryptedPayload",
+                    16,
+                    256_000
+            );
+            validateBase64(
+                    request.getSenderRecoveryEphemeralPublicKey(),
+                    "senderRecoveryEphemeralPublicKey",
+                    32,
+                    32
+            );
+        } else if (request.getSenderRecoveryEncryptedPayload() != null
+                || request.getSenderRecoveryEphemeralPublicKey() != null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sender recovery fields require gru-e2ee-v2"
+            );
+        }
     }
 
     private Chat requireDirectChat(String chatId, String senderId) {
@@ -206,7 +232,7 @@ public class E2EEMessageService {
                 .distinct()
                 .toList();
         if (receivers.size() != 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "E2EE v1 supports direct chats only");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "E2EE supports direct chats only");
         }
         return chat;
     }
@@ -235,18 +261,39 @@ public class E2EEMessageService {
         if (!cryptoVerifier.fingerprintMatches(sender.getE2eeSigningPublicKey(), request.getSenderKeyFingerprint())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Sender key fingerprint mismatch");
         }
-        if (!cryptoVerifier.verifyMessageSignature(
-                sender.getE2eeSigningPublicKey(),
-                request.getEncryptionVersion(),
-                chat.getId(),
-                sender.getId(),
-                receiver.getId(),
-                request.getClientMessageId(),
-                request.getSenderEphemeralPublicKey(),
-                request.getEncryptedPayload(),
-                request.getSenderKeyFingerprint(),
-                request.getSignature()
-        )) {
+
+        boolean signatureValid;
+        if (V2.equals(request.getEncryptionVersion())) {
+            signatureValid = cryptoVerifier.verifyMessageSignatureV2(
+                    sender.getE2eeSigningPublicKey(),
+                    request.getEncryptionVersion(),
+                    chat.getId(),
+                    sender.getId(),
+                    receiver.getId(),
+                    request.getClientMessageId(),
+                    request.getSenderEphemeralPublicKey(),
+                    request.getEncryptedPayload(),
+                    request.getSenderRecoveryEphemeralPublicKey(),
+                    request.getSenderRecoveryEncryptedPayload(),
+                    request.getSenderKeyFingerprint(),
+                    request.getSignature()
+            );
+        } else {
+            signatureValid = cryptoVerifier.verifyMessageSignature(
+                    sender.getE2eeSigningPublicKey(),
+                    request.getEncryptionVersion(),
+                    chat.getId(),
+                    sender.getId(),
+                    receiver.getId(),
+                    request.getClientMessageId(),
+                    request.getSenderEphemeralPublicKey(),
+                    request.getEncryptedPayload(),
+                    request.getSenderKeyFingerprint(),
+                    request.getSignature()
+            );
+        }
+
+        if (!signatureValid) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid E2EE envelope signature");
         }
     }
@@ -256,6 +303,8 @@ public class E2EEMessageService {
         message.setEncryptedPayload(request.getEncryptedPayload());
         message.setEncryptionVersion(request.getEncryptionVersion());
         message.setSenderEphemeralPublicKey(request.getSenderEphemeralPublicKey());
+        message.setSenderRecoveryEncryptedPayload(request.getSenderRecoveryEncryptedPayload());
+        message.setSenderRecoveryEphemeralPublicKey(request.getSenderRecoveryEphemeralPublicKey());
         message.setE2eeSignature(request.getSignature());
         message.setSenderKeyFingerprint(request.getSenderKeyFingerprint());
         message.setSenderSigningPublicKey(sender.getE2eeSigningPublicKey());
