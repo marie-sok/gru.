@@ -85,6 +85,27 @@ public class E2EECryptoVerifier {
         );
     }
 
+
+    public boolean verifyRecoveryBackup(
+            String signingPublicKeyBase64,
+            String userId,
+            String version,
+            String encryptedBundle,
+            String signatureBase64
+    ) {
+        String canonical = String.join("|",
+                "gru-e2ee-recovery-backup-v1",
+                userId,
+                version,
+                encryptedBundle
+        );
+        return verify(
+                signingPublicKeyBase64,
+                canonical.getBytes(StandardCharsets.UTF_8),
+                signatureBase64
+        );
+    }
+
     private boolean verify(
             String rawSigningPublicKeyBase64,
             byte[] payload,
