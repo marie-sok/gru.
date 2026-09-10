@@ -23,6 +23,9 @@ struct RootView: View {
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
+    @AppStorage(GRUAppLanguage.storageKey)
+    private var appLanguageRawValue = GRUAppLanguage.defaultLanguage.rawValue
+
     @State private var isAuthenticated = false
     @State private var isCheckingSession = true
 
@@ -32,6 +35,10 @@ struct RootView: View {
      created by the previous storage implementation can enter this build.
     */
     private let sessionMigrationKey = "gru.sessionMigration.v3"
+
+    private var appLanguage: GRUAppLanguage {
+        GRUAppLanguage(rawValue: appLanguageRawValue) ?? .defaultLanguage
+    }
 
     var body: some View {
         ZStack {
@@ -112,6 +119,8 @@ struct RootView: View {
             handleSessionInvalidated()
         }
         .preferredColorScheme(.dark)
+        .environment(\.locale, appLanguage.locale)
+        .id(appLanguageRawValue)
         .tint(
             (GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat).accent
         )
