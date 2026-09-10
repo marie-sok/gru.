@@ -6,9 +6,11 @@ on:
       - beta/0.9.0
       - beta/0.9.1-max
       - beta/0.9.2-rc
+      - security/p0-recovery-metadata
   pull_request:
     paths:
       - "swiftui/GRU/**"
+      - ".github/scripts/**"
       - ".github/workflows/ios-build.yml"
 
 permissions:
@@ -25,6 +27,14 @@ jobs:
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Run dual-client E2EE v2 crypto smoke
+        run: |
+          xcrun swift .github/scripts/e2ee_v2_dual_client_smoke.swift
+          grep -F 'static let protocolVersion = "gru-e2ee-v2"' \
+            'swiftui/GRU/gru./Security/GRUE2EEV2.swift'
+          grep -F '"sender-recovery"' \
+            'swiftui/GRU/gru./Security/GRUE2EEV2.swift'
 
       - name: Build unsigned Simulator app
         run: |
@@ -59,8 +69,9 @@ jobs:
           grep -F 'E2EEMediaService.shared.send' "$MESSAGE_API"
           grep -F 'path: "/messages/e2ee"' "$E2EE_API"
           grep -F 'path: "/messages/media-e2ee"' "$MEDIA_API"
+          grep -F 'GRUE2EEV2.shared.encrypt' "$E2EE_API"
+          grep -F 'GRUE2EEV2.shared.encrypt' "$MEDIA_API"
 
-          # Normal direct-chat iOS sends must not regress to legacy plaintext routes.
           ! grep -F 'path: "/messages/photo"' "$MESSAGE_API"
           ! grep -F 'path: "/messages/video"' "$MESSAGE_API"
           ! grep -F 'path: "/messages/video-note"' "$MESSAGE_API"
@@ -80,6 +91,4 @@ jobs:
           grep -F 'return productionHTTPBaseURL' "$CONFIG"
           grep -F 'return productionWebSocketURL' "$CONFIG"
 
-          # Release must have an HTTPS/WSS source-level fallback even if custom
-          # Info.plist keys are absent from an archived product.
           ! grep -F 'Release • production URL not configured' "$CONFIG"

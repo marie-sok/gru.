@@ -3,7 +3,9 @@ package gru.app.controller;
 import gru.app.dto.E2EEKeyRequest;
 import gru.app.dto.E2EEKeyResponse;
 import gru.app.dto.E2EEKeyRotationRequest;
+import gru.app.model.Chat;
 import gru.app.model.User;
+import gru.app.repository.ChatRepository;
 import gru.app.repository.UserRepository;
 import gru.app.security.E2EECryptoVerifier;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 
 @RestController
 @RequestMapping("/e2ee/keys")
@@ -21,6 +24,7 @@ import java.util.Base64;
 public class E2EEKeyController {
 
     private final UserRepository userRepository;
+    private final ChatRepository chatRepository;
     private final E2EECryptoVerifier cryptoVerifier;
 
     @PutMapping("/me")
@@ -107,13 +111,36 @@ public class E2EEKeyController {
             Authentication authentication,
             @PathVariable String userId
     ) {
-        requireUser(authentication.getName());
+        String requesterId = authentication.getName();
+        requireUser(requesterId);
+        requireIdentityAccess(requesterId, userId);
+
         User user = requireUser(userId);
         if (user.getE2eeKeyAgreementPublicKey() == null
                 || user.getE2eeSigningPublicKey() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "E2EE keys are not registered");
         }
         return response(user);
+    }
+
+    private void requireIdentityAccess(String requesterId, String targetId) {
+        if (targetId == null || targetId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "E2EE identity not found");
+        }
+        if (requesterId.equals(targetId)) {
+            return;
+        }
+
+        List<Chat> ownChats = chatRepository.findByParticipantsContains(requesterId);
+        boolean sharesChat = ownChats != null && ownChats.stream()
+                .anyMatch(chat -> chat.getParticipants() != null
+                        && chat.getParticipants().contains(targetId));
+
+        // Use the same 404 for unknown users and users outside the requester's
+        // chat graph so authenticated callers cannot enumerate E2EE identities.
+        if (!sharesChat) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "E2EE identity not found");
+        }
     }
 
     private void validateKey(String encoded, String field) {

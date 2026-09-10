@@ -53,8 +53,8 @@ final class E2EEAPIService {
     }
 
     /// Default production path for a direct-chat text message.
-    /// Sender/receiver ids are resolved from the authenticated session and
-    /// server chat membership so old callers cannot accidentally bypass E2EE.
+    /// v2 stores two opaque ciphertexts: one for the recipient and one for the
+    /// sender's restored identity. The backend still never receives plaintext.
     func sendEncryptedText(
         chatID: String,
         plaintext: String,
@@ -104,9 +104,8 @@ final class E2EEAPIService {
         clientMessageID: String = UUID().uuidString.lowercased(),
         token: String
     ) async throws -> ServerMessageDTO {
-        // Make sure this installation's public identity exists server-side.
-        // Publishing identical keys is idempotent; a conflicting identity is
-        // intentionally fail-closed and requires the signed rotation flow.
+        // Publishing identical keys is idempotent. A conflicting server identity
+        // fails closed; LoginViewModel now restores before MainView is entered.
         _ = try await publishIdentity(token: token)
 
         let recipient = try await identity(for: receiverID, token: token)
@@ -115,14 +114,12 @@ final class E2EEAPIService {
         case .keyChanged:
             throw E2EEAPIError.recipientKeyChanged
         case .firstSeen:
-            // Trust On First Use: pin the first successfully fetched identity.
-            // Any later substitution is blocked until explicitly re-verified.
             try GRUE2EE.shared.trust(identity: recipient.identity, for: receiverID)
         case .trusted:
             break
         }
 
-        let envelope = try GRUE2EE.shared.encrypt(
+        let envelope = try GRUE2EEV2.shared.encrypt(
             plaintext: plaintext,
             chatID: chatID,
             senderID: senderID,
@@ -131,10 +128,8 @@ final class E2EEAPIService {
             clientMessageID: clientMessageID
         )
 
-        // Persist our own readable copy before the request. The server receives
-        // only ciphertext. The copy is scoped to the authenticated principal so
-        // switching accounts on one iPhone can never resolve another account's
-        // local recovery plaintext by clientMessageId.
+        // Keep a fast local cache, but it is no longer the only readable sender
+        // copy. The v2 recovery ciphertext on the server survives reinstall.
         try GRUE2EESentMessageStore.shared.save(
             plaintext: plaintext,
             userID: senderID,
@@ -147,6 +142,8 @@ final class E2EEAPIService {
             let encryptedPayload: String
             let encryptionVersion: String
             let senderEphemeralPublicKey: String
+            let senderRecoveryEncryptedPayload: String
+            let senderRecoveryEphemeralPublicKey: String
             let signature: String
             let senderKeyFingerprint: String
             let replyToMessageId: String?
@@ -159,6 +156,8 @@ final class E2EEAPIService {
                 encryptedPayload: envelope.encryptedPayload,
                 encryptionVersion: envelope.version,
                 senderEphemeralPublicKey: envelope.senderEphemeralPublicKey,
+                senderRecoveryEncryptedPayload: envelope.senderRecoveryEncryptedPayload,
+                senderRecoveryEphemeralPublicKey: envelope.senderRecoveryEphemeralPublicKey,
                 signature: envelope.signature,
                 senderKeyFingerprint: envelope.senderKeyFingerprint,
                 replyToMessageId: replyToMessageID
@@ -179,6 +178,59 @@ final class E2EEAPIService {
         currentUserID: String,
         token: String
     ) async throws -> String {
+        if let envelopeV2 = message.e2eeEnvelopeV2 {
+            if message.senderId == currentUserID {
+                if let own = GRUE2EESentMessageStore.shared.plaintext(
+                    userID: currentUserID,
+                    clientMessageID: envelopeV2.clientMessageId
+                ) {
+                    return own
+                }
+
+                guard let receiverID = message.receiverId, !receiverID.isEmpty else {
+                    throw E2EEAPIError.senderCopyUnavailable
+                }
+                let ownIdentity = try GRUE2EE.shared.publicIdentity()
+                return try GRUE2EEV2.shared.decryptForSenderRecovery(
+                    envelope: envelopeV2,
+                    chatID: message.chatId,
+                    senderID: currentUserID,
+                    receiverID: receiverID,
+                    senderIdentity: ownIdentity
+                )
+            }
+
+            guard message.receiverId == currentUserID else {
+                throw E2EEAPIError.senderCopyUnavailable
+            }
+
+            let sender = try await identity(for: message.senderId, token: token)
+            let trustState = GRUE2EE.shared.trustState(for: message.senderId, identity: sender.identity)
+            if case .keyChanged = trustState {
+                throw E2EEAPIError.senderKeyChanged
+            }
+
+            let plaintext = try GRUE2EEV2.shared.decryptForRecipient(
+                envelope: envelopeV2,
+                chatID: message.chatId,
+                senderID: message.senderId,
+                receiverID: currentUserID,
+                senderIdentity: sender.identity
+            )
+
+            if case .firstSeen = trustState {
+                try GRUE2EE.shared.trust(identity: sender.identity, for: message.senderId)
+            }
+
+            guard GRUE2EEReplayGuard.shared.accept(
+                clientMessageID: envelopeV2.clientMessageId,
+                serverMessageID: message.id
+            ) else {
+                throw E2EEAPIError.replayedEnvelope
+            }
+            return plaintext
+        }
+
         guard let envelope = message.e2eeEnvelope else {
             return message.text
         }
@@ -238,19 +290,19 @@ enum E2EEAPIError: LocalizedError {
         case .replayedEnvelope:
             return "Обнаружен повтор защищённого сообщения."
         case .senderCopyUnavailable:
-            return "Локальная копия отправленного защищённого сообщения недоступна."
+            return "Защищённая копия отправленного сообщения недоступна."
         case .missingCurrentUser:
             return "Не найден ID текущего пользователя."
         case .chatNotFound:
             return "Чат не найден на сервере."
         case .directChatRequired:
-            return "E2EE v1 поддерживает только личные чаты."
+            return "E2EE поддерживает только личные чаты."
         }
     }
 }
 
-/// Protected sender-side plaintext cache. This never leaves the device and is
-/// encrypted with the app's Keychain-backed data-protection key before writing.
+/// Local sender cache remains only as a performance/offline convenience for v2.
+/// It is encrypted with the app's Keychain-backed data-protection key.
 final class GRUE2EESentMessageStore {
 
     static let shared = GRUE2EESentMessageStore()
@@ -275,7 +327,6 @@ final class GRUE2EESentMessageStore {
 
         // v1 had no account namespace. It cannot be migrated safely because an
         // entry does not record which authenticated principal created it.
-        // Remove it rather than ever guessing ownership on a shared iPhone.
         try? FileManager.default.removeItem(
             at: Self.fileURL(fileName: legacyFileName)
         )

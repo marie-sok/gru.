@@ -6,9 +6,6 @@ final class E2EEMediaService {
     static let shared = E2EEMediaService()
     static let mediaKeyPrefix = "gru-media-key-v1:"
 
-    // Multipart uploads are currently assembled in memory. Keeping the beta
-    // client below the backend's 128 MB upload ceiling leaves headroom for the
-    // plaintext Data, encrypted copy and multipart body on a physical iPhone.
     private static let maximumMediaBytes = 96 * 1024 * 1024
     private static let maximumMediaMegabytes = 96
 
@@ -79,7 +76,7 @@ final class E2EEMediaService {
         let keyPayload = Self.mediaKeyPrefix + rawKey.base64EncodedString()
         let clientMessageID = UUID().uuidString.lowercased()
 
-        let envelope = try GRUE2EE.shared.encrypt(
+        let envelope = try GRUE2EEV2.shared.encrypt(
             plaintext: keyPayload,
             chatID: chatID,
             senderID: senderID,
@@ -88,8 +85,6 @@ final class E2EEMediaService {
             clientMessageID: clientMessageID
         )
 
-        // Sender-side recovery for this device. The value is itself protected
-        // by GRUDataProtection and is namespaced to the authenticated account.
         try GRUE2EESentMessageStore.shared.save(
             plaintext: keyPayload,
             userID: senderID,
@@ -105,6 +100,8 @@ final class E2EEMediaService {
             "encryptedPayload": envelope.encryptedPayload,
             "encryptionVersion": envelope.version,
             "senderEphemeralPublicKey": envelope.senderEphemeralPublicKey,
+            "senderRecoveryEncryptedPayload": envelope.senderRecoveryEncryptedPayload,
+            "senderRecoveryEphemeralPublicKey": envelope.senderRecoveryEphemeralPublicKey,
             "signature": envelope.signature,
             "senderKeyFingerprint": envelope.senderKeyFingerprint
         ]
@@ -156,16 +153,9 @@ enum E2EEMediaError: LocalizedError {
     }
 }
 
-/// Ephemeral registry populated only after the parent E2EE envelope has passed
-/// signature verification and AEAD authentication. APIClient uses it to decrypt
-/// `/media/...` bytes transparently after download.
 final class GRUE2EEMediaKeyStore {
 
     static let shared = GRUE2EEMediaKeyStore()
-
-    // A chat-heavy process can otherwise retain one 32-byte media key plus a
-    // path String for every encrypted attachment opened since launch. Keep a
-    // bounded working set; history reload re-registers older keys on demand.
     private static let maximumRegisteredKeys = 512
 
     private let lock = NSLock()

@@ -65,6 +65,39 @@ public class E2EECryptoVerifier {
         );
     }
 
+    public boolean verifyMessageSignatureV2(
+            String signingPublicKeyBase64,
+            String version,
+            String chatId,
+            String senderId,
+            String receiverId,
+            String clientMessageId,
+            String recipientEphemeralPublicKey,
+            String recipientEncryptedPayload,
+            String senderRecoveryEphemeralPublicKey,
+            String senderRecoveryEncryptedPayload,
+            String senderKeyFingerprint,
+            String signatureBase64
+    ) {
+        String canonical = String.join("|",
+                version,
+                chatId,
+                senderId,
+                receiverId,
+                clientMessageId,
+                recipientEphemeralPublicKey,
+                recipientEncryptedPayload,
+                senderRecoveryEphemeralPublicKey,
+                senderRecoveryEncryptedPayload,
+                senderKeyFingerprint
+        );
+        return verify(
+                signingPublicKeyBase64,
+                canonical.getBytes(StandardCharsets.UTF_8),
+                signatureBase64
+        );
+    }
+
     public boolean verifyKeyRotation(
             String oldSigningPublicKeyBase64,
             String userId,
@@ -80,6 +113,26 @@ public class E2EECryptoVerifier {
         );
         return verify(
                 oldSigningPublicKeyBase64,
+                canonical.getBytes(StandardCharsets.UTF_8),
+                signatureBase64
+        );
+    }
+
+    public boolean verifyRecoveryBackup(
+            String signingPublicKeyBase64,
+            String userId,
+            String version,
+            String encryptedBundle,
+            String signatureBase64
+    ) {
+        String canonical = String.join("|",
+                "gru-e2ee-recovery-backup-v1",
+                userId,
+                version,
+                encryptedBundle
+        );
+        return verify(
+                signingPublicKeyBase64,
                 canonical.getBytes(StandardCharsets.UTF_8),
                 signatureBase64
         );

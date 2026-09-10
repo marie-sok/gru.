@@ -43,7 +43,7 @@ struct GRUReleaseSettingsView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 110)
             }
-            .background(GRUAppBackdrop())
+            .background(Color.clear)
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.large)
         }
@@ -413,7 +413,7 @@ struct GRUReleaseThemesView: View {
             .padding(.top, 8)
             .padding(.bottom, 40)
         }
-        .background(GRUAppBackdrop())
+        .background(Color.clear)
         .navigationTitle("Темы")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

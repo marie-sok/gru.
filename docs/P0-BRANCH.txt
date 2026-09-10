@@ -1,0 +1,2 @@
+Base: feature/e2ee-v1
+Purpose: pre-beta E2EE recovery + metadata authorization.

@@ -6,8 +6,8 @@ import gru.app.model.Message;
 import gru.app.service.E2EEMessageService;
 import gru.app.service.MediaStorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -69,6 +69,8 @@ public class E2EEMessageController {
             @RequestParam String encryptedPayload,
             @RequestParam String encryptionVersion,
             @RequestParam String senderEphemeralPublicKey,
+            @RequestParam(required = false) String senderRecoveryEncryptedPayload,
+            @RequestParam(required = false) String senderRecoveryEphemeralPublicKey,
             @RequestParam String signature,
             @RequestParam String senderKeyFingerprint,
             @RequestParam(required = false) Double width,
@@ -104,6 +106,8 @@ public class E2EEMessageController {
             request.setEncryptedPayload(encryptedPayload);
             request.setEncryptionVersion(encryptionVersion);
             request.setSenderEphemeralPublicKey(senderEphemeralPublicKey);
+            request.setSenderRecoveryEncryptedPayload(senderRecoveryEncryptedPayload);
+            request.setSenderRecoveryEphemeralPublicKey(senderRecoveryEphemeralPublicKey);
             request.setSignature(signature);
             request.setSenderKeyFingerprint(senderKeyFingerprint);
             request.setReplyToMessageId(replyToMessageId);

@@ -34,11 +34,12 @@ struct AttachmentMenu: View {
         } label: {
             VStack(spacing: 8) {
                 GRUNeonIcon(systemName: image, size: 54, iconSize: 21)
-                Text(title)
+                Text(GRUL10n.text(title))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(GRUColors.text.opacity(0.82))
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(GRUL10n.text(title))
     }
 }

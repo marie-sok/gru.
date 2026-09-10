@@ -21,7 +21,7 @@ struct ChatRow: View {
     private var chatTitle: String {
         if chat.isGroup {
             let title = chat.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return title.isEmpty ? "Группа" : title
+            return title.isEmpty ? GRUL10n.text("Группа") : title
         }
         if let otherUser {
             let name = otherUser.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -29,7 +29,7 @@ struct ChatRow: View {
             let username = otherUser.username.trimmingCharacters(in: .whitespacesAndNewlines)
             if !username.isEmpty && username.lowercased() != "you" { return username }
         }
-        return "User"
+        return GRUL10n.text("Пользователь")
     }
 
     private var isOnline: Bool { showOnlineStatus && otherUser?.isOnline == true }
@@ -60,7 +60,7 @@ struct ChatRow: View {
 
                 HStack(spacing: 6) {
                     if !chat.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Черновик")
+                        Text(GRUL10n.text("Черновик"))
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(GRUColors.accent)
                         Text(chat.draft)
@@ -160,16 +160,15 @@ struct ChatRow: View {
     }
 
     private var lastMessage: String {
-        guard let message = chat.messages.last else { return "Нет сообщений" }
+        guard let message = chat.messages.last else { return GRUL10n.text("Нет сообщений") }
         let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty { return text }
-        guard let attachment = message.attachment else { return "Сообщение" }
+        guard let attachment = message.attachment else { return GRUL10n.text("Сообщение") }
         switch attachment.type {
-        case .photo: return "Фото"
-        case .video: return "Видео"
-        case .videoNote: return "Видео"
-        case .document: return "Документ"
-        case .audio: return "Голосовое"
+        case .photo: return GRUL10n.text("Фото")
+        case .video, .videoNote: return GRUL10n.text("Видео")
+        case .document: return GRUL10n.text("Документ")
+        case .audio: return GRUL10n.text("Голосовое")
         }
     }
 
@@ -187,11 +186,12 @@ struct ChatRow: View {
     private var lastTime: String {
         guard let date = chat.messages.last?.sentAt else { return "" }
         let formatter = DateFormatter()
+        formatter.locale = GRUL10n.language.locale
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "dd.MM"
         return formatter.string(from: date)
     }
 }
-
 
 private struct GRUCatSignalHalo: Shape {
     func path(in rect: CGRect) -> Path {

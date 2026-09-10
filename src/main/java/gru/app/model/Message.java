@@ -23,9 +23,7 @@ public class Message {
     private String id;
 
     private String chatId;
-
     private String senderId;
-
     private String receiverId;
 
     /** Plaintext for legacy/non-E2EE messages only. */
@@ -34,16 +32,26 @@ public class Message {
     /** Client-generated UUID, signed into the E2EE envelope for replay/idempotency protection. */
     private String e2eeClientMessageId;
 
-    /** Opaque base64 ciphertext produced on the sender device. */
+    /** Recipient ciphertext produced on the sender device. */
     private String encryptedPayload;
 
-    /** Protocol version, e.g. "gru-e2ee-v1". */
+    /** Protocol version, e.g. "gru-e2ee-v1" / "gru-e2ee-v2". */
     private String encryptionVersion;
 
-    /** Sender ephemeral X25519 public key, base64 encoded. */
+    /** Recipient-envelope ephemeral X25519 public key, base64 encoded. */
     private String senderEphemeralPublicKey;
 
-    /** Signature over the canonical encrypted envelope, base64 encoded. */
+    /**
+     * v2 sender-only recovery ciphertext. It contains the same plaintext
+     * payload encrypted to the sender's own long-lived X25519 identity so a
+     * restored device can read outgoing history. The server cannot decrypt it.
+     */
+    private String senderRecoveryEncryptedPayload;
+
+    /** Ephemeral X25519 public key for senderRecoveryEncryptedPayload. */
+    private String senderRecoveryEphemeralPublicKey;
+
+    /** Signature over the complete canonical encrypted envelope, base64 encoded. */
     private String e2eeSignature;
 
     /** SHA-256 fingerprint of the sender signing identity key. */
@@ -56,22 +64,13 @@ public class Message {
     private String senderKeyAgreementPublicKey;
 
     private Instant createdAt;
-
     private Instant deliveredAt;
-
     private Instant readAt;
-
     private Instant deletedAt;
-
     private String reaction;
-
     private Attachment attachment;
-
     private Boolean isEdited;
-
     private Instant editedAt;
-
     private ReplyReference replyTo;
-
     private Set<String> hiddenForUserIds = new HashSet<>();
 }

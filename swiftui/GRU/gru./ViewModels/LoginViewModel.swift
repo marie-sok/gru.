@@ -12,6 +12,17 @@ final class LoginViewModel {
     var loading = false
     var error: String?
 
+    // A fresh login is not allowed to enter MainView while the server already
+    // pins another E2EE identity and this installation cannot prove possession
+    // of the matching private keys.
+    var needsE2EERecovery = false
+    var recoveryCodeInput = ""
+    var recoveryError: String?
+
+    // Shown once when this installation creates or repairs the recovery backup.
+    // The value never goes to the GRU backend.
+    var pendingRecoveryCode: String?
+
     // MARK: - Login
 
     func login() async -> Bool {
@@ -19,6 +30,7 @@ final class LoginViewModel {
 
         loading = true
         error = nil
+        recoveryError = nil
         defer { loading = false }
 
         do {
@@ -33,14 +45,18 @@ final class LoginViewModel {
                 password: password
             )
 
-            try await acceptFreshSession(
+            let ready = try await acceptFreshSession(
                 response: response,
                 fallbackNickname: nil
             )
 
-            print("✅ LOGIN COMPLETE")
-            print("👤 userID:", response.userId)
-            return true
+            if ready {
+                print("✅ LOGIN COMPLETE")
+                print("👤 userID:", response.userId)
+            } else {
+                print("🔐 LOGIN PAUSED FOR E2EE RECOVERY")
+            }
+            return ready
         } catch {
             rejectFailedAuth(error)
             return false
@@ -54,6 +70,7 @@ final class LoginViewModel {
 
         loading = true
         error = nil
+        recoveryError = nil
         defer { loading = false }
 
         do {
@@ -70,18 +87,79 @@ final class LoginViewModel {
                 nickname: cleanNickname
             )
 
-            try await acceptFreshSession(
+            let ready = try await acceptFreshSession(
                 response: response,
                 fallbackNickname: cleanNickname
             )
 
-            print("✅ REGISTER COMPLETE")
-            print("👤 userID:", response.userId)
-            return true
+            if ready {
+                print("✅ REGISTER COMPLETE")
+                print("👤 userID:", response.userId)
+            }
+            return ready
         } catch {
             rejectFailedAuth(error)
             return false
         }
+    }
+
+    // MARK: - E2EE recovery gate
+
+    func restoreE2EEIdentity(recoveryCode: String? = nil) async -> Bool {
+        guard let token = TokenStorage.shared.token, !token.isEmpty,
+              let userID = TokenStorage.shared.userID, !userID.isEmpty else {
+            recoveryError = GRUL10n.text("Сессия недоступна. Войдите снова.")
+            return false
+        }
+
+        loading = true
+        recoveryError = nil
+        defer { loading = false }
+
+        do {
+            let code = recoveryCode?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            try await GRUE2EERecoveryService.shared.restoreIdentity(
+                token: token,
+                userID: userID,
+                recoveryCode: (code?.isEmpty == false) ? code : nil
+            )
+
+            // A restore is complete only if the exact recovered public identity
+            // still equals the account identity pinned by the backend.
+            let serverIdentity = try await E2EEAPIService.shared.identity(
+                for: userID,
+                token: token
+            )
+            let localIdentity = try GRUE2EE.shared.publicIdentity()
+            guard localIdentity == serverIdentity.identity else {
+                throw GRUE2EERecoveryError.identityMismatch
+            }
+
+            needsE2EERecovery = false
+            recoveryCodeInput = ""
+            recoveryError = nil
+            return true
+        } catch {
+            recoveryError = error.localizedDescription
+            return false
+        }
+    }
+
+    func cancelE2EERecovery() {
+        needsE2EERecovery = false
+        recoveryCodeInput = ""
+        recoveryError = nil
+        pendingRecoveryCode = nil
+        WebSocketService.shared.resetSession()
+        TokenStorage.shared.clear()
+        ChatService.shared.clearAuthenticatedUser()
+        CacheStorage.shared.clearCurrentUser()
+    }
+
+    func acknowledgeRecoveryCode() {
+        pendingRecoveryCode = nil
     }
 
     // MARK: - Fresh session transaction
@@ -89,7 +167,7 @@ final class LoginViewModel {
     private func acceptFreshSession(
         response: AuthResponse,
         fallbackNickname: String?
-    ) async throws {
+    ) async throws -> Bool {
         let cleanToken = response.token
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -104,11 +182,6 @@ final class LoginViewModel {
             throw LoginViewModelError.emptyUserID
         }
 
-        /*
-         The auth response alone is not enough. Before MainView can ever see
-         this session, prove that the same backend accepts the freshly issued
-         JWT on an authenticated endpoint.
-        */
         let probe = await APIClient.shared.probeServer(token: cleanToken)
 
         guard let statusCode = probe.statusCode,
@@ -119,13 +192,11 @@ final class LoginViewModel {
             )
         }
 
-        // Stop every reconnect path that still carries the previous JWT.
         WebSocketService.shared.resetSession()
         TokenStorage.shared.clear()
         ChatService.shared.clearAuthenticatedUser()
         CacheStorage.shared.clearCurrentUser()
 
-        // Persist only the JWT that has just passed server validation.
         TokenStorage.shared.save(
             token: cleanToken,
             userID: cleanUserID
@@ -151,12 +222,94 @@ final class LoginViewModel {
             fallbackNickname: fallbackNickname
         )
 
+        let e2eeReady = try await prepareE2EEForAuthenticatedSession(
+            token: cleanToken,
+            userID: cleanUserID
+        )
+
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("✅ FRESH SESSION VERIFIED")
         print("✅ protected endpoint status:", statusCode)
         print("✅ backend binding:", TokenStorage.shared.storedBackend ?? "nil")
         print("🔐 token length:", cleanToken.count)
+        print("🔐 E2EE ready:", e2eeReady)
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        return e2eeReady
+    }
+
+    /// Never call publicIdentity() until we know whether the server already has
+    /// an identity. publicIdentity() creates keys when they are absent; doing it
+    /// first on a reinstall would create the exact accidental identity change
+    /// this gate is designed to prevent.
+    private func prepareE2EEForAuthenticatedSession(
+        token: String,
+        userID: String
+    ) async throws -> Bool {
+        needsE2EERecovery = false
+        recoveryError = nil
+        pendingRecoveryCode = nil
+
+        let serverIdentity: E2EEKeyDTO?
+        do {
+            serverIdentity = try await E2EEAPIService.shared.identity(
+                for: userID,
+                token: token
+            )
+        } catch APIError.notFound {
+            serverIdentity = nil
+        }
+
+        let recoveryStatus = GRUE2EERecoveryService.shared.status(userID: userID)
+
+        if let serverIdentity {
+            // Existing account identity: do not generate any local replacement.
+            guard recoveryStatus.hasLocalIdentity else {
+                needsE2EERecovery = true
+                return false
+            }
+
+            let localIdentity = try GRUE2EE.shared.publicIdentity()
+            guard localIdentity == serverIdentity.identity else {
+                needsE2EERecovery = true
+                return false
+            }
+
+            // Existing device may predate the recovery feature. Repair that
+            // before allowing beta use, rather than waiting for the next phone.
+            let hasRemoteBackup = try await remoteRecoveryBackupExists(token: token)
+            if !recoveryStatus.hasSynchronizedRecoveryKey || !hasRemoteBackup {
+                let created = try await GRUE2EERecoveryService.shared.createOrRefreshBackup(
+                    token: token,
+                    userID: userID
+                )
+                pendingRecoveryCode = created.recoveryCode
+            }
+            return true
+        }
+
+        // No server identity yet: this is a new account or a pre-E2EE account.
+        // Only here is it safe to generate and publish a fresh local identity.
+        _ = try await E2EEAPIService.shared.publishIdentity(token: token)
+        let created = try await GRUE2EERecoveryService.shared.createOrRefreshBackup(
+            token: token,
+            userID: userID
+        )
+        pendingRecoveryCode = created.recoveryCode
+        return true
+    }
+
+    private func remoteRecoveryBackupExists(token: String) async throws -> Bool {
+        do {
+            _ = try await APIClient.shared.request(
+                path: "/e2ee/recovery/me",
+                method: "GET",
+                token: token
+            )
+            return true
+        } catch APIError.notFound {
+            return false
+        }
     }
 
     private func rejectFailedAuth(_ authError: Error) {
@@ -164,58 +317,38 @@ final class LoginViewModel {
         TokenStorage.shared.clear()
         ChatService.shared.clearAuthenticatedUser()
 
+        needsE2EERecovery = false
+        recoveryCodeInput = ""
+        recoveryError = nil
+        pendingRecoveryCode = nil
+
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("❌ AUTH ERROR")
         print(authError.localizedDescription)
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        error = localizedAuthError(
-            authError
-        )
+        error = localizedAuthError(authError)
     }
 
-    private func localizedAuthError(
-        _ authError: Error
-    ) -> String {
-        let raw =
-            authError
-                .localizedDescription
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
+    private func localizedAuthError(_ authError: Error) -> String {
+        let raw = authError.localizedDescription
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = raw.lowercased()
 
-        let normalized =
-            raw.lowercased()
-
-        if normalized.contains(
-            "user already exists"
-        ) {
-            return GRUL10n.text(
-                "An account with this phone number already exists."
-            )
+        if normalized.contains("user already exists") {
+            return GRUL10n.text("An account with this phone number already exists.")
         }
 
-        if normalized.contains(
-            "user not found"
-        ) {
-            return GRUL10n.text(
-                "No account found for this phone number."
-            )
+        if normalized.contains("user not found") {
+            return GRUL10n.text("No account found for this phone number.")
         }
 
-        if normalized.contains(
-            "wrong password"
-        ) {
-            return GRUL10n.text(
-                "Incorrect password."
-            )
+        if normalized.contains("wrong password") {
+            return GRUL10n.text("Incorrect password.")
         }
 
         return raw.isEmpty
-            ? GRUL10n.text(
-                "Authentication failed."
-            )
+            ? GRUL10n.text("Authentication failed.")
             : raw
     }
 
@@ -251,16 +384,12 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = GRUL10n.text(
-                "Enter your phone number."
-            )
+            error = GRUL10n.text("Enter your phone number.")
             return false
         }
 
         guard isPhonePlausible else {
-            error = GRUL10n.text(
-                "Enter a valid phone number with country code."
-            )
+            error = GRUL10n.text("Enter a valid phone number with country code.")
             return false
         }
 
@@ -276,16 +405,12 @@ final class LoginViewModel {
         error = nil
 
         guard !cleanPhone.isEmpty else {
-            error = GRUL10n.text(
-                "Enter your phone number."
-            )
+            error = GRUL10n.text("Enter your phone number.")
             return false
         }
 
         guard isPhonePlausible else {
-            error = GRUL10n.text(
-                "Enter a valid phone number with country code."
-            )
+            error = GRUL10n.text("Enter a valid phone number with country code.")
             return false
         }
 
@@ -316,28 +441,19 @@ final class LoginViewModel {
     }
 
     private var phoneDigitCount: Int {
-        cleanPhone.filter {
-            $0.isNumber
-        }.count
+        cleanPhone.filter { $0.isNumber }.count
     }
 
     private var isPhonePlausible: Bool {
-        (7...15).contains(
-            phoneDigitCount
-        )
+        (7...15).contains(phoneDigitCount)
     }
 
     var canLogin: Bool {
-        isPhonePlausible &&
-        !password.isEmpty &&
-        !loading
+        isPhonePlausible && !password.isEmpty && !loading
     }
 
     var canRegister: Bool {
-        isPhonePlausible &&
-        !cleanNickname.isEmpty &&
-        password.count >= 6 &&
-        !loading
+        isPhonePlausible && !cleanNickname.isEmpty && password.count >= 6 && !loading
     }
 }
 

@@ -1,0 +1,1 @@
+P0 recovery is not complete until sender-readable per-message recovery ciphertext is implemented and tested after reinstall. The current identity-backup foundation intentionally does not claim otherwise.

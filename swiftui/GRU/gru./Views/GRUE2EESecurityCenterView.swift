@@ -16,9 +16,7 @@ struct GRUE2EESecurityCenterView: View {
         for chat in chatService.chats {
             for user in chat.users where user.id != currentID && !user.isBot {
                 guard let serverID = user.serverID, !serverID.isEmpty else { continue }
-                if seen.insert(serverID).inserted {
-                    result.append(user)
-                }
+                if seen.insert(serverID).inserted { result.append(user) }
             }
         }
 
@@ -29,44 +27,72 @@ struct GRUE2EESecurityCenterView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if peers.isEmpty {
-                    ContentUnavailableView(
-                        "Нет чатов для проверки",
-                        systemImage: "lock.shield",
-                        description: Text("Создай личный чат — здесь появится проверка E2EE-ключей.")
-                    )
-                } else {
-                    List(peers) { peer in
-                        NavigationLink {
-                            GRUE2EEPeerVerificationView(peer: peer)
-                        } label: {
-                            HStack(spacing: 12) {
-                                AvatarView(user: peer, size: 42)
+            List {
+                Section {
+                    NavigationLink {
+                        GRUE2EERecoveryManagementView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(GRUColors.accent)
+                                .frame(width: 34, height: 34)
+                                .background(GRUColors.accent.opacity(0.12), in: Circle())
 
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(peer.displayName)
-                                        .font(.headline)
-                                    Text("Проверить защищённый ключ")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                                Image(systemName: "lock.shield")
-                                    .foregroundStyle(GRUColors.accent)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(GRUL10n.text("Восстановление E2EE"))
+                                    .font(.headline)
+                                Text(GRUL10n.text("Смена iPhone, переустановка и recovery code"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                            .padding(.vertical, 4)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text(GRUL10n.text("Моя защита"))
+                } footer: {
+                    Text(GRUL10n.text("Приватные X25519/Ed25519 ключи не хранятся на backend. Сервер получает только зашифрованный recovery backup."))
+                }
+
+                Section(GRUL10n.text("Проверка контактов")) {
+                    if peers.isEmpty {
+                        Label(
+                            GRUL10n.text("Создай личный чат — здесь появится проверка E2EE-ключей."),
+                            systemImage: "lock.shield"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(peers) { peer in
+                            NavigationLink {
+                                GRUE2EEPeerVerificationView(peer: peer)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    AvatarView(user: peer, size: 42)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(peer.displayName)
+                                            .font(.headline)
+                                        Text(GRUL10n.text("Проверить защищённый ключ"))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "lock.shield")
+                                        .foregroundStyle(GRUColors.accent)
+                                }
+                                .padding(.vertical, 4)
+                            }
                         }
                     }
-                    .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("Защита gru.")
+            .listStyle(.insetGrouped)
+            .navigationTitle(GRUL10n.text("Защита gru."))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") { dismiss() }
+                    Button(GRUL10n.text("Готово")) { dismiss() }
                 }
             }
         }
@@ -101,7 +127,7 @@ private struct GRUE2EEPeerVerificationView: View {
                 }
 
                 if loading {
-                    ProgressView("Проверяем ключи…")
+                    ProgressView(GRUL10n.text("Проверяем ключи…"))
                         .padding(.top, 24)
                 } else if let errorText {
                     securityCard {
@@ -114,7 +140,7 @@ private struct GRUE2EEPeerVerificationView: View {
             }
             .padding(20)
         }
-        .navigationTitle("Проверка E2EE")
+        .navigationTitle(GRUL10n.text("Проверка E2EE"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadIdentity() }
     }
@@ -122,15 +148,15 @@ private struct GRUE2EEPeerVerificationView: View {
     @ViewBuilder
     private var statusLabel: some View {
         if explicitlyVerified {
-            Label("Личность ключа подтверждена", systemImage: "checkmark.shield.fill")
+            Label(GRUL10n.text("Личность ключа подтверждена"), systemImage: "checkmark.shield.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.green)
         } else if case .keyChanged? = trustState {
-            Label("Ключ изменился — требуется проверка", systemImage: "exclamationmark.shield.fill")
+            Label(GRUL10n.text("Ключ изменился — требуется проверка"), systemImage: "exclamationmark.shield.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
         } else {
-            Label("E2EE включено, ключ ещё не сверен вручную", systemImage: "lock.shield")
+            Label(GRUL10n.text("E2EE включено, ключ ещё не сверен вручную"), systemImage: "lock.shield")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -143,7 +169,7 @@ private struct GRUE2EEPeerVerificationView: View {
     ) -> some View {
         securityCard {
             VStack(spacing: 14) {
-                Text("SAFETY NUMBER")
+                Text(GRUL10n.text("SAFETY NUMBER"))
                     .font(.caption.weight(.heavy))
                     .tracking(1.6)
                     .foregroundStyle(.secondary)
@@ -161,7 +187,10 @@ private struct GRUE2EEPeerVerificationView: View {
                         copied = false
                     }
                 } label: {
-                    Label(copied ? "Скопировано" : "Скопировать код", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Label(
+                        GRUL10n.text(copied ? "Скопировано" : "Скопировать код"),
+                        systemImage: copied ? "checkmark" : "doc.on.doc"
+                    )
                 }
                 .buttonStyle(.bordered)
             }
@@ -179,7 +208,7 @@ private struct GRUE2EEPeerVerificationView: View {
                         .background(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-                    Text("Сканируйте QR друг у друга или сравните safety number по другому каналу — например лично или по звонку.")
+                    Text(GRUL10n.text("Сканируйте QR друг у друга или сравните safety number по другому каналу — например лично или по звонку."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -189,7 +218,7 @@ private struct GRUE2EEPeerVerificationView: View {
 
         securityCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Fingerprint identity")
+                Text(GRUL10n.text("Fingerprint identity"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(identity.trustFingerprint)
@@ -203,7 +232,7 @@ private struct GRUE2EEPeerVerificationView: View {
             verify(identity: identity)
         } label: {
             Label(
-                explicitlyVerified ? "Ключ подтверждён" : "Коды совпадают — подтвердить",
+                GRUL10n.text(explicitlyVerified ? "Ключ подтверждён" : "Коды совпадают — подтвердить"),
                 systemImage: explicitlyVerified ? "checkmark.shield.fill" : "checkmark.shield"
             )
             .frame(maxWidth: .infinity)
@@ -213,7 +242,7 @@ private struct GRUE2EEPeerVerificationView: View {
         .tint(GRUColors.accent)
         .disabled(explicitlyVerified)
 
-        Text("Подтверждай только после реального сравнения. Эта кнопка может принять новый ключ после его смены, поэтому не нажимай её вслепую.")
+        Text(GRUL10n.text("Подтверждай только после реального сравнения. Эта кнопка может принять новый ключ после его смены, поэтому не нажимай её вслепую."))
             .font(.caption)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -237,7 +266,7 @@ private struct GRUE2EEPeerVerificationView: View {
               !currentUserID.isEmpty,
               let token = TokenStorage.shared.token,
               !token.isEmpty else {
-            errorText = "Сессия или ID собеседника недоступны."
+            errorText = GRUL10n.text("Сессия или ID собеседника недоступны.")
             return
         }
 
@@ -265,8 +294,6 @@ private struct GRUE2EEPeerVerificationView: View {
     private func verify(identity: GRUE2EEPublicIdentity) {
         guard let peerID else { return }
         do {
-            // Explicit OOB confirmation is the only UI path allowed to replace
-            // a previously pinned identity after a key change.
             try GRUE2EE.shared.trust(identity: identity, for: peerID)
             try GRUE2EEVerificationStore.shared.verify(userID: peerID, identity: identity)
             trustState = .trusted

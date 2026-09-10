@@ -1,4 +1,3 @@
-
 import SwiftUI
 import UIKit
 
@@ -8,7 +7,6 @@ private enum MessageDeleteScope: Equatable {
 }
 
 struct MessageBubble: View {
-
     @State private var pendingDeleteScope: MessageDeleteScope?
     @State private var dragOffset: CGFloat = 0
     @State private var hasTriggeredReplyHaptic = false
@@ -30,9 +28,7 @@ struct MessageBubble: View {
 
     var body: some View {
         HStack(alignment: .bottom) {
-            if isCurrentUser {
-                Spacer(minLength: 60)
-            }
+            if isCurrentUser { Spacer(minLength: 60) }
 
             VStack(alignment: .leading, spacing: 8) {
                 if let reply = message.replyTo {
@@ -59,17 +55,15 @@ struct MessageBubble: View {
                 HStack(spacing: 5) {
                     Spacer()
 
-                    Menu {
-                        messageActions
-                    } label: {
+                    Menu { messageActions } label: {
                         GRUNeonIcon(systemName: "ellipsis", size: 26, iconSize: 11)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Действия с сообщением")
+                    .accessibilityLabel(GRUL10n.text("Действия с сообщением"))
 
                     HStack(spacing: 3) {
                         if message.isEdited {
-                            Text("изм.")
+                            Text(GRUL10n.text("изм."))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -78,20 +72,14 @@ struct MessageBubble: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                    if isCurrentUser {
-                        statusView
-                    }
+                    if isCurrentUser { statusView }
                 }
             }
 
-            if !isCurrentUser {
-                Spacer(minLength: 60)
-            }
+            if !isCurrentUser { Spacer(minLength: 60) }
         }
         .padding(.horizontal)
-        .contextMenu {
-            messageActions
-        }
+        .contextMenu { messageActions }
         .offset(x: dragOffset)
         .overlay(alignment: .trailing) {
             if dragOffset < -10 {
@@ -108,24 +96,27 @@ struct MessageBubble: View {
             DragGesture(minimumDistance: 20)
                 .onChanged { value in
                     guard swipeReplyEnabled, !isSelectionMode else { return }
-                    if value.translation.width < 0 && abs(value.translation.width) > abs(value.translation.height) {
-                        let translation = value.translation.width
-                        if translation < -50 {
-                            dragOffset = -50 + (translation + 50) * 0.2
-                        } else {
-                            dragOffset = translation
-                        }
+                    guard value.translation.width < 0,
+                          abs(value.translation.width) > abs(value.translation.height) else { return }
 
-                        if translation < -45 && !hasTriggeredReplyHaptic {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            hasTriggeredReplyHaptic = true
-                        }
+                    let translation = value.translation.width
+                    dragOffset = translation < -50
+                        ? -50 + (translation + 50) * 0.2
+                        : translation
+
+                    if translation < -45 && !hasTriggeredReplyHaptic {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        hasTriggeredReplyHaptic = true
                     }
                 }
-                .onEnded { _ in
-                    if hasTriggeredReplyHaptic {
-                        onReply(message)
-                    }
+                .onEnded { value in
+                    let shouldReply = swipeReplyEnabled &&
+                        !isSelectionMode &&
+                        value.translation.width < -45 &&
+                        abs(value.translation.width) > abs(value.translation.height)
+
+                    if shouldReply { onReply(message) }
+
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                         dragOffset = 0
                         hasTriggeredReplyHaptic = false
@@ -134,9 +125,7 @@ struct MessageBubble: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            if isSelectionMode {
-                onSelect(message)
-            }
+            if isSelectionMode { onSelect(message) }
         }
         .overlay(alignment: .leading) {
             if isSelectionMode {
@@ -149,92 +138,77 @@ struct MessageBubble: View {
         }
         .background(isSelected ? GRUColors.accent.opacity(0.08) : Color.clear)
         .confirmationDialog(
-            "Удалить сообщение?",
+            GRUL10n.text("Удалить сообщение?"),
             isPresented: Binding(
                 get: { pendingDeleteScope != nil },
-                set: { visible in
-                    if !visible { pendingDeleteScope = nil }
-                }
+                set: { visible in if !visible { pendingDeleteScope = nil } }
             ),
             titleVisibility: .visible
         ) {
             if pendingDeleteScope == .local {
-                Button("Удалить только у себя", role: .destructive) {
+                Button(GRUL10n.text("Удалить только у себя"), role: .destructive) {
                     onDeleteLocal(message)
                     pendingDeleteScope = nil
                 }
             }
 
             if pendingDeleteScope == .everyone {
-                Button("Удалить у себя и собеседника", role: .destructive) {
+                Button(GRUL10n.text("Удалить у себя и собеседника"), role: .destructive) {
                     onDeleteForEveryone(message)
                     pendingDeleteScope = nil
                 }
             }
 
-            Button("Отмена", role: .cancel) {
+            Button(GRUL10n.text("Отмена"), role: .cancel) {
                 pendingDeleteScope = nil
             }
         } message: {
-            Text(
+            Text(GRUL10n.text(
                 pendingDeleteScope == .everyone
                     ? "Сообщение исчезнет у обоих участников чата."
                     : "Сообщение исчезнет только на этом устройстве."
-            )
+            ))
         }
     }
 
     @ViewBuilder
     private var messageActions: some View {
-        // Editing is intentionally first for own text messages so it is easy to
-        // discover through the standard long-press menu. It also remains
-        // available for optimistic/failed messages; unsynced edits stay local.
         if isCurrentUser && !message.text.isEmpty {
-            Button {
-                onEdit(message)
-            } label: {
-                Label("Редактировать", systemImage: "pencil")
+            Button { onEdit(message) } label: {
+                Label(GRUL10n.text("Редактировать"), systemImage: "pencil")
             }
         }
 
         if !isSelectionMode {
-            Button {
-                onReply(message)
-            } label: {
-                Label("Ответить", systemImage: "arrowshape.turn.up.left")
+            Button { onReply(message) } label: {
+                Label(GRUL10n.text("Ответить"), systemImage: "arrowshape.turn.up.left")
             }
         }
 
         if !message.text.isEmpty {
-            Button {
-                UIPasteboard.general.string = message.text
-            } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+            Button { UIPasteboard.general.string = message.text } label: {
+                Label(GRUL10n.text("Копировать"), systemImage: "doc.on.doc")
             }
         }
 
         if quickReactions {
-            Menu("Реакция") {
+            Menu(GRUL10n.text("Реакция")) {
                 ForEach(ReactionType.allCases) { reaction in
-                    Button(reaction.emoji) {
-                        onReaction(reaction, message)
-                    }
+                    Button(reaction.emoji) { onReaction(reaction, message) }
                 }
             }
         }
 
-        Button {
-            onSelect(message)
-        } label: {
+        Button { onSelect(message) } label: {
             Label(
-                isSelected ? "Снять выбор" : "Выбрать",
+                GRUL10n.text(isSelected ? "Снять выбор" : "Выбрать"),
                 systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle"
             )
         }
 
         if message.status == .failed {
             Button { onRetry(message) } label: {
-                Label("Повторить отправку", systemImage: "arrow.clockwise")
+                Label(GRUL10n.text("Повторить отправку"), systemImage: "arrow.clockwise")
             }
         }
 
@@ -243,14 +217,14 @@ struct MessageBubble: View {
         Button(role: .destructive) {
             pendingDeleteScope = .local
         } label: {
-            Label("Удалить только у себя", systemImage: "trash")
+            Label(GRUL10n.text("Удалить только у себя"), systemImage: "trash")
         }
 
         if isCurrentUser {
             Button(role: .destructive) {
                 pendingDeleteScope = .everyone
             } label: {
-                Label("Удалить у всех", systemImage: "trash.slash")
+                Label(GRUL10n.text("Удалить у всех"), systemImage: "trash.slash")
             }
         }
     }
@@ -262,16 +236,16 @@ struct MessageBubble: View {
             if message.isQueuedForRetry {
                 HStack(spacing: 3) {
                     Image(systemName: "clock.arrow.circlepath")
-                    Text("очередь")
+                    Text(GRUL10n.text("очередь"))
                 }
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Сообщение в очереди на отправку")
+                .accessibilityLabel(GRUL10n.text("Сообщение в очереди на отправку"))
             } else {
                 Image(systemName: "clock")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Сообщение отправляется")
+                    .accessibilityLabel(GRUL10n.text("Сообщение отправляется"))
             }
         case .sent:
             Text("✓")
@@ -291,11 +265,13 @@ struct MessageBubble: View {
             Image(systemName: "exclamationmark.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
+                .accessibilityLabel(GRUL10n.text("Не удалось отправить сообщение"))
         }
     }
 
     private var timeString: String {
         let formatter = DateFormatter()
+        formatter.locale = GRUL10n.language.locale
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: message.sentAt)
     }
@@ -326,10 +302,7 @@ private struct BubbleText: View {
                         currentUser && gradientBubbles
                             ? GRUColors.neonGradient
                             : LinearGradient(
-                                colors: [
-                                    GRUColors.accent.opacity(0.18),
-                                    Color.white.opacity(0.04)
-                                ],
+                                colors: [GRUColors.accent.opacity(0.18), Color.white.opacity(0.04)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -348,7 +321,7 @@ private struct ReplyPreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Ответ")
+            Text(GRUL10n.text("Ответ"))
                 .font(.caption2.bold())
                 .foregroundStyle(GRUColors.accent)
 
@@ -372,16 +345,11 @@ private struct AttachmentContent: View {
     @ViewBuilder
     var body: some View {
         switch attachment.type {
-        case .photo:
-            ImageBubble(attachment: attachment)
-        case .video:
-            VideoBubble(attachment: attachment)
-        case .videoNote:
-            VideoNoteBubble(attachment: attachment)
-        case .document:
-            DocumentBubble(attachment: attachment)
-        case .audio:
-            AudioBubble(attachment: attachment)
+        case .photo: ImageBubble(attachment: attachment)
+        case .video: VideoBubble(attachment: attachment)
+        case .videoNote: VideoNoteBubble(attachment: attachment)
+        case .document: DocumentBubble(attachment: attachment)
+        case .audio: AudioBubble(attachment: attachment)
         }
     }
 }

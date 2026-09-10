@@ -22,9 +22,7 @@ class E2EECryptoVerifierTest {
     void verifiesSignedEnvelopeAndRejectsTampering() throws Exception {
         KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         String publicKey = rawPublicKeyBase64(pair);
-        String fingerprint = HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(publicKey))
-        );
+        String fingerprint = fingerprint(publicKey);
 
         String version = "gru-e2ee-v1";
         String chatId = "chat-1";
@@ -74,6 +72,67 @@ class E2EECryptoVerifierTest {
     }
 
     @Test
+    void verifiesV2EnvelopeAndBindsSenderRecoveryCiphertext() throws Exception {
+        KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        String publicKey = rawPublicKeyBase64(pair);
+        String fingerprint = fingerprint(publicKey);
+
+        String version = "gru-e2ee-v2";
+        String chatId = "chat-2";
+        String senderId = "alice";
+        String receiverId = "bob";
+        String clientMessageId = UUID.randomUUID().toString();
+        String recipientEphemeral = Base64.getEncoder().encodeToString(new byte[32]);
+        String recipientCiphertext = Base64.getEncoder().encodeToString("recipient-cipher".getBytes(StandardCharsets.UTF_8));
+        String recoveryEphemeral = Base64.getEncoder().encodeToString(new byte[32]);
+        String recoveryCiphertext = Base64.getEncoder().encodeToString("sender-recovery-cipher".getBytes(StandardCharsets.UTF_8));
+
+        String canonical = String.join("|",
+                version,
+                chatId,
+                senderId,
+                receiverId,
+                clientMessageId,
+                recipientEphemeral,
+                recipientCiphertext,
+                recoveryEphemeral,
+                recoveryCiphertext,
+                fingerprint
+        );
+        String signature = sign(pair, canonical);
+
+        assertTrue(verifier.verifyMessageSignatureV2(
+                publicKey,
+                version,
+                chatId,
+                senderId,
+                receiverId,
+                clientMessageId,
+                recipientEphemeral,
+                recipientCiphertext,
+                recoveryEphemeral,
+                recoveryCiphertext,
+                fingerprint,
+                signature
+        ));
+
+        assertFalse(verifier.verifyMessageSignatureV2(
+                publicKey,
+                version,
+                chatId,
+                senderId,
+                receiverId,
+                clientMessageId,
+                recipientEphemeral,
+                recipientCiphertext,
+                recoveryEphemeral,
+                recoveryCiphertext + "tampered",
+                fingerprint,
+                signature
+        ));
+    }
+
+    @Test
     void verifiesSignedKeyRotation() throws Exception {
         KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         String publicKey = rawPublicKeyBase64(pair);
@@ -102,6 +161,12 @@ class E2EECryptoVerifierTest {
                 newSigning + "x",
                 signature
         ));
+    }
+
+    private String fingerprint(String publicKey) throws Exception {
+        return HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(publicKey))
+        );
     }
 
     private String sign(KeyPair pair, String payload) throws Exception {

@@ -8,6 +8,7 @@
 import SwiftUI
 import Combine
 import LocalAuthentication
+import UIKit
 
 @MainActor
 struct RootView: View {
@@ -22,6 +23,9 @@ struct RootView: View {
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
 
+    @AppStorage(GRUAppLanguage.storageKey)
+    private var appLanguageRawValue = GRUAppLanguage.defaultLanguage.rawValue
+
     @State private var isAuthenticated = false
     @State private var isCheckingSession = true
 
@@ -31,6 +35,10 @@ struct RootView: View {
      created by the previous storage implementation can enter this build.
     */
     private let sessionMigrationKey = "gru.sessionMigration.v3"
+
+    private var appLanguage: GRUAppLanguage {
+        GRUAppLanguage(rawValue: appLanguageRawValue) ?? .defaultLanguage
+    }
 
     var body: some View {
         ZStack {
@@ -79,6 +87,14 @@ struct RootView: View {
         .task {
             await checkSession()
         }
+        .onChange(of: isAuthenticated) { _, authenticated in
+            if authenticated {
+                dismissAnyKeyboard()
+                DispatchQueue.main.async {
+                    dismissAnyKeyboard()
+                }
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 if resetBadgeOnOpen {
@@ -103,6 +119,7 @@ struct RootView: View {
             handleSessionInvalidated()
         }
         .preferredColorScheme(.dark)
+        .environment(\.locale, appLanguage.locale)
         .tint(
             (GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat).accent
         )
@@ -146,7 +163,8 @@ private extension RootView {
 
         activateAuthenticatedSession(
             token: token,
-            userID: userID
+            userID: userID,
+            requireBiometricUnlock: true
         )
 
         isCheckingSession = false
@@ -161,6 +179,7 @@ private extension RootView {
     // MARK: - Login callback gate
 
     func handleSuccessfulLogin() {
+        dismissAnyKeyboard()
         isCheckingSession = true
         isAuthenticated = false
 
@@ -197,7 +216,8 @@ private extension RootView {
 
         activateAuthenticatedSession(
             token: token,
-            userID: userID
+            userID: userID,
+            requireBiometricUnlock: false
         )
 
         isCheckingSession = false
@@ -211,7 +231,8 @@ private extension RootView {
 
     func activateAuthenticatedSession(
         token: String,
-        userID: String
+        userID: String,
+        requireBiometricUnlock: Bool
     ) {
         guard TokenStorage.shared.token == token,
               TokenStorage.shared.userID == userID else {
@@ -219,13 +240,22 @@ private extension RootView {
             return
         }
 
+        dismissAnyKeyboard()
         ChatService.shared.restoreSession()
         applyLocalProfile()
         isAuthenticated = true
 
-        if biometricsEnabled {
+        // UIKit can preserve the responder for one run-loop turn while the
+        // LoginView tree is being removed. Resign again after MainView mounts.
+        DispatchQueue.main.async {
+            dismissAnyKeyboard()
+        }
+
+        if biometricsEnabled && requireBiometricUnlock {
             isBiometricLocked = true
             authenticateWithBiometrics()
+        } else {
+            isBiometricLocked = false
         }
     }
 
@@ -284,6 +314,15 @@ private extension RootView {
             service.currentUser.displayName = nickname
         }
     }
+
+    func dismissAnyKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
 }
 
 private extension RootView {
@@ -314,7 +353,7 @@ private struct GRUReleaseOnboardingView: View {
                     .font(.system(size: 48, weight: .black, design: .rounded))
                     .tracking(-1.8)
 
-                Text("Your gateway to the world")
+                Text(GRUL10n.text("Your gateway to the world"))
                     .font(.system(size: 18, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -325,8 +364,8 @@ private struct GRUReleaseOnboardingView: View {
             onFinish()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("gru. — Your gateway to the world")
-        .accessibilityHint("Коснитесь экрана, чтобы продолжить")
+        .accessibilityLabel("gru. — \(GRUL10n.text("Your gateway to the world"))")
+        .accessibilityHint(GRUL10n.text("Коснитесь экрана, чтобы продолжить"))
     }
 }
 
@@ -345,11 +384,11 @@ private extension RootView {
                     .foregroundStyle(GRUColors.accent)
 
                 VStack(spacing: 8) {
-                    Text("gru. заблокирован")
+                    Text(GRUL10n.text("gru. заблокирован"))
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(GRUColors.text)
 
-                    Text("Для доступа требуется подтверждение личности")
+                    Text(GRUL10n.text("Для доступа требуется подтверждение личности"))
                         .font(.system(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -360,7 +399,7 @@ private extension RootView {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "lock.open.fill")
-                        Text("Разблокировать")
+                        Text(GRUL10n.text("Разблокировать"))
                     }
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
@@ -383,7 +422,7 @@ private extension RootView {
 
         let context = LAContext()
         var authError: NSError?
-        let reason = "Разблокируйте доступ к приложению gru."
+        let reason = GRUL10n.text("Разблокируйте доступ к приложению gru.")
 
         if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) {
             context.evaluatePolicy(

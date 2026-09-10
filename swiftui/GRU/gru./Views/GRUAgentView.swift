@@ -39,10 +39,7 @@ private enum GRUAgentHistoryStore {
     ]
 
     static func welcome() -> GRUAgentMessage {
-        GRUAgentMessage(
-            author: .bot,
-            text: "Я gru.bot ✦ Я здесь прежде всего поболтать. Можешь кидать мысли как есть — без формулировок и задач. Если захочешь, я ещё умею помочь с идеями, текстом, планом и несколькими действиями внутри gru."
-        )
+        GRUAgentMessage(author: .bot, text: GRUL10n.text("gru.bot.welcome"))
     }
 
     static func load() -> [GRUAgentMessage] {
@@ -100,37 +97,27 @@ struct GRUAgentView: View {
         .navigationTitle("gru.bot")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            NotificationCenter.default.post(
-                name: .gruAgentPresentationChanged,
-                object: true
-            )
+            NotificationCenter.default.post(name: .gruAgentPresentationChanged, object: true)
         }
         .onDisappear {
-            NotificationCenter.default.post(
-                name: .gruAgentPresentationChanged,
-                object: false
-            )
+            NotificationCenter.default.post(name: .gruAgentPresentationChanged, object: false)
         }
     }
 
     private var header: some View {
         HStack(spacing: 11) {
             ZStack {
-                Circle()
-                    .fill(GRUColors.accent.opacity(0.13))
+                Circle().fill(GRUColors.accent.opacity(0.13))
                 Image(systemName: "bubble.left.and.bubble.right.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(GRUColors.accent)
             }
             .frame(width: 38, height: 38)
-            .overlay {
-                Circle().stroke(GRUColors.accent.opacity(0.24), lineWidth: 1)
-            }
+            .overlay { Circle().stroke(GRUColors.accent.opacity(0.24), lineWidth: 1) }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("gru.bot")
-                    .font(.headline)
-                Text(isSending ? "печатает…" : "болталка • идеи • действия")
+                Text("gru.bot").font(.headline)
+                Text(GRUL10n.text(isSending ? "печатает…" : "болталка • идеи • действия"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -139,10 +126,10 @@ struct GRUAgentView: View {
 
             Menu {
                 Button {
-                    text = "Открой test lab"
+                    text = GRUL10n.text("Открой test lab")
                     inputFocused = true
                 } label: {
-                    Label("Открыть test lab", systemImage: "testtube.2")
+                    Label(GRUL10n.text("Открыть test lab"), systemImage: "testtube.2")
                 }
 
                 Button(role: .destructive) {
@@ -150,7 +137,7 @@ struct GRUAgentView: View {
                     messages = [GRUAgentHistoryStore.welcome()]
                     errorText = nil
                 } label: {
-                    Label("Очистить диалог", systemImage: "trash")
+                    Label(GRUL10n.text("Очистить диалог"), systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -158,6 +145,7 @@ struct GRUAgentView: View {
                     .foregroundStyle(GRUColors.text)
                     .frame(width: 36, height: 36)
             }
+            .accessibilityLabel(GRUL10n.text("Меню gru.bot"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -171,9 +159,7 @@ struct GRUAgentView: View {
 
                     ForEach(messages) { message in
                         HStack(alignment: .bottom, spacing: 8) {
-                            if message.author == .user {
-                                Spacer(minLength: 42)
-                            }
+                            if message.author == .user { Spacer(minLength: 42) }
 
                             VStack(alignment: message.author == .user ? .trailing : .leading, spacing: 4) {
                                 Text(message.text)
@@ -195,19 +181,15 @@ struct GRUAgentView: View {
                                     .padding(.horizontal, 4)
                             }
 
-                            if message.author == .bot {
-                                Spacer(minLength: 42)
-                            }
+                            if message.author == .bot { Spacer(minLength: 42) }
                         }
                         .id(message.id)
                     }
 
                     if isSending {
                         HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(GRUColors.accent)
-                            Text("gru.bot печатает…")
+                            ProgressView().controlSize(.small).tint(GRUColors.accent)
+                            Text(GRUL10n.text("gru.bot печатает…"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -243,19 +225,18 @@ struct GRUAgentView: View {
     }
 
     private func promptButton(_ title: String, icon: String) -> some View {
-        Button {
-            text = title
+        let localizedTitle = GRUL10n.text(title)
+        return Button {
+            text = localizedTitle
             inputFocused = true
         } label: {
-            Label(title, systemImage: icon)
+            Label(localizedTitle, systemImage: icon)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(GRUColors.accent)
                 .padding(.horizontal, 11)
                 .frame(height: 31)
                 .background(GRUColors.accent.opacity(0.08), in: Capsule())
-                .overlay {
-                    Capsule().stroke(GRUColors.accent.opacity(0.16), lineWidth: 1)
-                }
+                .overlay { Capsule().stroke(GRUColors.accent.opacity(0.16), lineWidth: 1) }
         }
         .buttonStyle(.plain)
     }
@@ -271,32 +252,21 @@ struct GRUAgentView: View {
             }
 
             HStack(spacing: 9) {
-                TextField("Напиши что-нибудь…", text: $text, axis: .vertical)
+                TextField(GRUL10n.text("Напиши что-нибудь…"), text: $text, axis: .vertical)
                     .focused($inputFocused)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(
-                        GRUColors.card,
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    )
-                    .onSubmit {
-                        send()
-                    }
+                    .background(GRUColors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .onSubmit { send() }
 
-                Button {
-                    send()
-                } label: {
-                    GRUNeonIcon(
-                        systemName: "arrow.up",
-                        size: 40,
-                        iconSize: 16,
-                        isActive: canSend
-                    )
+                Button { send() } label: {
+                    GRUNeonIcon(systemName: "arrow.up", size: 40, iconSize: 16, isActive: canSend)
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSend)
+                .accessibilityLabel(GRUL10n.text("Отправить"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -312,10 +282,7 @@ struct GRUAgentView: View {
         guard !clean.isEmpty, !isSending else { return }
 
         let history = messages.suffix(30).map { message in
-            GRUBotTurnDTO(
-                role: message.author == .user ? "user" : "assistant",
-                text: message.text
-            )
+            GRUBotTurnDTO(role: message.author == .user ? "user" : "assistant", text: message.text)
         }
 
         messages.append(GRUAgentMessage(author: .user, text: clean))
@@ -328,14 +295,8 @@ struct GRUAgentView: View {
 
         Task {
             do {
-                let response = try await GRUBotService.shared.ask(
-                    text: clean,
-                    history: history
-                )
-
-                messages.append(
-                    GRUAgentMessage(author: .bot, text: response.reply)
-                )
+                let response = try await GRUBotService.shared.ask(text: clean, history: history)
+                messages.append(GRUAgentMessage(author: .bot, text: response.reply))
                 GRUAgentHistoryStore.save(messages)
                 isSending = false
             } catch {
@@ -364,24 +325,20 @@ struct GRUAgentCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("gru.bot")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text("поболтать • идеи • помощь • actions")
+                    Text(GRUL10n.text("поболтать • идеи • помощь • actions"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
 
                 Spacer()
-
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 11)
             .frame(height: 56)
-            .background(
-                GRUColors.card.opacity(0.76),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+            .background(GRUColors.card.opacity(0.76), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
     }
