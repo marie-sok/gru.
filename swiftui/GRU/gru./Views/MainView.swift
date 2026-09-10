@@ -126,7 +126,7 @@ struct MainView: View {
             ContactsView()
         } else if selectedTab == .settings {
             ZStack(alignment: .bottomTrailing) {
-                GRUReleaseSettingsView()
+                SettingsView()
 
                 Button {
                     showE2EESecurityCenter = true
