@@ -120,7 +120,6 @@ struct RootView: View {
         }
         .preferredColorScheme(.dark)
         .environment(\.locale, appLanguage.locale)
-        .id(appLanguageRawValue)
         .tint(
             (GRUAppTheme(rawValue: themeRawValue) ?? .blackMoonCat).accent
         )
@@ -164,7 +163,8 @@ private extension RootView {
 
         activateAuthenticatedSession(
             token: token,
-            userID: userID
+            userID: userID,
+            requireBiometricUnlock: true
         )
 
         isCheckingSession = false
@@ -216,7 +216,8 @@ private extension RootView {
 
         activateAuthenticatedSession(
             token: token,
-            userID: userID
+            userID: userID,
+            requireBiometricUnlock: false
         )
 
         isCheckingSession = false
@@ -230,7 +231,8 @@ private extension RootView {
 
     func activateAuthenticatedSession(
         token: String,
-        userID: String
+        userID: String,
+        requireBiometricUnlock: Bool
     ) {
         guard TokenStorage.shared.token == token,
               TokenStorage.shared.userID == userID else {
@@ -249,9 +251,11 @@ private extension RootView {
             dismissAnyKeyboard()
         }
 
-        if biometricsEnabled {
+        if biometricsEnabled && requireBiometricUnlock {
             isBiometricLocked = true
             authenticateWithBiometrics()
+        } else {
+            isBiometricLocked = false
         }
     }
 
