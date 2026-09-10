@@ -38,8 +38,6 @@ struct NewChatView: View {
             await searchUsers()
         }
         .onAppear {
-            // Deliberately do not focus the search field here. Opening New Chat
-            // must never summon the keyboard until the user taps the field.
             searchIsFocused = false
         }
         .onDisappear {
@@ -67,8 +65,7 @@ private extension NewChatView {
             .submitLabel(.search)
 
             if isSearching {
-                ProgressView()
-                    .controlSize(.small)
+                ProgressView().controlSize(.small)
             } else if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -114,31 +111,20 @@ private extension NewChatView {
     var startView: some View {
         VStack(spacing: 14) {
             Spacer()
-
             ZStack {
-                Circle()
-                    .fill(GRUColors.card)
-                    .frame(width: 74, height: 74)
-
+                Circle().fill(GRUColors.card).frame(width: 74, height: 74)
                 GRUEnvelope()
                     .stroke(
                         GRUColors.accent,
-                        style: StrokeStyle(
-                            lineWidth: 1.7,
-                            lineCap: .round,
-                            lineJoin: .round
-                        )
+                        style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
                     )
                     .frame(width: 32, height: 23)
             }
-
             Text(GRUL10n.text("Найди человека"))
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
-
             Text(GRUL10n.text("Начни вводить nickname"))
                 .font(.system(size: 14, weight: .regular, design: .rounded))
                 .foregroundStyle(.secondary)
-
             Spacer()
         }
         .padding(.bottom, 70)
@@ -148,7 +134,6 @@ private extension NewChatView {
         VStack(spacing: 8) {
             Text(GRUL10n.text("Продолжай ввод"))
                 .font(.system(size: 16, weight: .medium, design: .rounded))
-
             Text(GRUL10n.text("Нужно минимум 2 символа"))
                 .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(.secondary)
@@ -160,7 +145,6 @@ private extension NewChatView {
     var searchingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-
             Text(GRUL10n.text("Ищем…"))
                 .font(.system(size: 14, design: .rounded))
                 .foregroundStyle(.secondary)
@@ -174,10 +158,8 @@ private extension NewChatView {
             Image(systemName: "person.crop.circle.badge.questionmark")
                 .font(.system(size: 30, weight: .light))
                 .foregroundStyle(.secondary)
-
             Text(GRUL10n.text("Никого не нашли"))
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
-
             Text(GRUL10n.text("Проверь nickname"))
                 .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(.secondary)
@@ -191,19 +173,14 @@ private extension NewChatView {
             Image(systemName: "exclamationmark.circle")
                 .font(.system(size: 29, weight: .light))
                 .foregroundStyle(.secondary)
-
             Text(GRUL10n.text("Не удалось выполнить поиск"))
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
-
             Text(message)
                 .font(.system(size: 13, design: .rounded))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
             Button(GRUL10n.text("Повторить")) {
-                Task {
-                    await searchUsers(skipDelay: true)
-                }
+                Task { await searchUsers(skipDelay: true) }
             }
             .buttonStyle(.bordered)
         }
@@ -217,9 +194,7 @@ private extension NewChatView {
             LazyVStack(spacing: 0) {
                 ForEach(results) { user in
                     userRow(user)
-
-                    Divider()
-                        .padding(.leading, 78)
+                    Divider().padding(.leading, 78)
                 }
             }
             .padding(.horizontal, 18)
@@ -230,28 +205,21 @@ private extension NewChatView {
 
     func userRow(_ user: UserSearchDTO) -> some View {
         Button {
-            Task {
-                await createChat(with: user)
-            }
+            Task { await createChat(with: user) }
         } label: {
             HStack(spacing: 13) {
                 avatar(for: user)
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(user.nickname)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
-
                     Text("@\(user.nickname)")
                         .font(.system(size: 13, weight: .regular, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
-
                 Spacer()
-
                 if creatingUserID == user.id {
-                    ProgressView()
-                        .controlSize(.small)
+                    ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: "envelope")
                         .font(.system(size: 18, weight: .regular))
@@ -263,15 +231,12 @@ private extension NewChatView {
         }
         .buttonStyle(.plain)
         .disabled(creatingUserID != nil)
-        .accessibilityLabel(
-            GRUL10n.format("Создать чат с %@", user.nickname)
-        )
+        .accessibilityLabel(GRUL10n.format("Создать чат с %@", user.nickname))
     }
 
     func avatar(for user: UserSearchDTO) -> some View {
         ZStack {
             Circle().fill(GRUColors.card)
-
             Text(initial(for: user.nickname))
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundStyle(GRUColors.accent)
@@ -281,7 +246,6 @@ private extension NewChatView {
 
     func searchUsers(skipDelay: Bool = false) async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
         guard query.count >= 2 else {
             results = []
             errorMessage = nil
@@ -290,17 +254,12 @@ private extension NewChatView {
         }
 
         if !skipDelay {
-            do {
-                try await Task.sleep(for: .milliseconds(350))
-            } catch {
-                return
-            }
+            do { try await Task.sleep(for: .milliseconds(350)) }
+            catch { return }
         }
 
         guard !Task.isCancelled else { return }
-
-        guard let token = TokenStorage.shared.token,
-              !token.isEmpty else {
+        guard let token = TokenStorage.shared.token, !token.isEmpty else {
             results = []
             errorMessage = GRUL10n.text("Сессия не найдена")
             return
@@ -311,11 +270,7 @@ private extension NewChatView {
         defer { isSearching = false }
 
         do {
-            let found = try await UserAPIService.shared.searchUsers(
-                nickname: query,
-                token: token
-            )
-
+            let found = try await UserAPIService.shared.searchUsers(nickname: query, token: token)
             guard !Task.isCancelled else { return }
             results = found
         } catch is CancellationError {
@@ -336,6 +291,7 @@ private extension NewChatView {
 
         do {
             _ = try await service.createServerChat(with: user)
+            await service.loadChats()
             searchIsFocused = false
             dismiss()
         } catch {
@@ -351,6 +307,4 @@ private extension NewChatView {
     }
 }
 
-#Preview {
-    NewChatView()
-}
+#Preview { NewChatView() }
