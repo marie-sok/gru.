@@ -14,15 +14,9 @@ struct GRUE2EERecoveryManagementView: View {
 
     var body: some View {
         List {
-            Section("Состояние") {
-                statusRow(
-                    title: "Локальная E2EE-личность",
-                    ready: status.hasLocalIdentity
-                )
-                statusRow(
-                    title: "Ключ восстановления в iCloud Keychain",
-                    ready: status.hasSynchronizedRecoveryKey
-                )
+            Section(GRUL10n.text("Состояние")) {
+                statusRow(title: "Локальная E2EE-личность", ready: status.hasLocalIdentity)
+                statusRow(title: "Ключ восстановления в iCloud Keychain", ready: status.hasSynchronizedRecoveryKey)
             }
 
             Section {
@@ -30,7 +24,7 @@ struct GRUE2EERecoveryManagementView: View {
                     Task { await refreshBackup() }
                 } label: {
                     Label(
-                        "Создать / обновить резервную копию",
+                        GRUL10n.text("Создать / обновить резервную копию"),
                         systemImage: "arrow.triangle.2.circlepath.icloud.fill"
                     )
                 }
@@ -39,22 +33,17 @@ struct GRUE2EERecoveryManagementView: View {
                 Button {
                     revealRecoveryCode()
                 } label: {
-                    Label(
-                        "Показать recovery code",
-                        systemImage: "key.viewfinder"
-                    )
+                    Label(GRUL10n.text("Показать recovery code"), systemImage: "key.viewfinder")
                 }
                 .disabled(loading || !status.hasSynchronizedRecoveryKey)
             } header: {
-                Text("Восстановление")
+                Text(GRUL10n.text("Восстановление"))
             } footer: {
-                Text(
-                    "Backend хранит только зашифрованный backup. Recovery key и приватные X25519/Ed25519 ключи серверу не передаются."
-                )
+                Text(GRUL10n.text("Backend хранит только зашифрованный backup. Recovery key и приватные X25519/Ed25519 ключи серверу не передаются."))
             }
 
             if let recoveryCode {
-                Section("Recovery code") {
+                Section(GRUL10n.text("Recovery code")) {
                     Text(recoveryCode)
                         .font(.system(.footnote, design: .monospaced, weight: .semibold))
                         .textSelection(.enabled)
@@ -69,7 +58,7 @@ struct GRUE2EERecoveryManagementView: View {
                         }
                     } label: {
                         Label(
-                            copied ? "Скопировано" : "Скопировать",
+                            GRUL10n.text(copied ? "Скопировано" : "Скопировать"),
                             systemImage: copied ? "checkmark" : "doc.on.doc"
                         )
                     }
@@ -85,19 +74,19 @@ struct GRUE2EERecoveryManagementView: View {
         }
         .overlay {
             if loading {
-                ProgressView("Обновляем защиту…")
+                ProgressView(GRUL10n.text("Обновляем защиту…"))
                     .padding(16)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
         }
-        .navigationTitle("Восстановление E2EE")
+        .navigationTitle(GRUL10n.text("Восстановление E2EE"))
         .navigationBarTitleDisplayMode(.inline)
         .task { refreshStatus() }
     }
 
     private func statusRow(title: String, ready: Bool) -> some View {
         HStack {
-            Text(title)
+            Text(GRUL10n.text(title))
             Spacer()
             Image(systemName: ready ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(ready ? .green : .orange)
@@ -118,7 +107,7 @@ struct GRUE2EERecoveryManagementView: View {
     private func refreshBackup() async {
         guard let token = TokenStorage.shared.token, !token.isEmpty,
               let userID = TokenStorage.shared.userID, !userID.isEmpty else {
-            errorText = "Сессия недоступна."
+            errorText = GRUL10n.text("Сессия недоступна.")
             return
         }
 
@@ -140,14 +129,12 @@ struct GRUE2EERecoveryManagementView: View {
 
     private func revealRecoveryCode() {
         guard let userID = TokenStorage.shared.userID, !userID.isEmpty else {
-            errorText = "Сессия недоступна."
+            errorText = GRUL10n.text("Сессия недоступна.")
             return
         }
 
         do {
-            recoveryCode = try GRUE2EERecoveryService.shared.exportedRecoveryCode(
-                userID: userID
-            )
+            recoveryCode = try GRUE2EERecoveryService.shared.exportedRecoveryCode(userID: userID)
             errorText = nil
         } catch {
             errorText = error.localizedDescription
