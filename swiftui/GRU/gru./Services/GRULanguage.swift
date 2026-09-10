@@ -196,7 +196,14 @@ enum GRUL10n {
                 "Recovery code": "Recovery code",
                 "Скопировать": "Copy",
                 "Обновляем защиту…": "Updating security…",
-                "Сессия недоступна.": "Session unavailable."
+                "Сессия недоступна.": "Session unavailable.",
+                "Test lab использует тот же сценарий видео, что и обычный чат.": "Test lab uses the same video flow as a regular chat.",
+                "полный локальный полигон чата": "full local chat playground",
+                "Следующая тема": "Next theme",
+                "Сбросить test lab": "Reset test lab",
+                "Проверяй здесь обычный текст, reply, edit, delete, reactions, multi-select, фото, видео, документы, контакты, голосовые и кото-кружки. Ничего из этого test lab не отправляет в реальные чаты.": "Test regular text, reply, edit, delete, reactions, multi-select, photos, videos, documents, contacts, voice messages and cat circles here. Nothing in test lab is sent to real chats.",
+                "Я локальный собеседник test lab. Свайпни это сообщение влево для reply или зажми для реакций и действий.": "I am the local test lab peer. Swipe this message left to reply, or press and hold for reactions and actions.",
+                "Это моё тестовое сообщение — его можно редактировать, копировать, выбрать и удалить.": "This is my test message — you can edit, copy, select and delete it."
             ]
         }
     }
