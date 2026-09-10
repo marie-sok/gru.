@@ -12,12 +12,10 @@ struct ChatView: View {
 
     @State private var showPhotoPicker = false
     @State private var selectedPhoto: PhotosPickerItem?
-
     @State private var showVideoSourceDialog = false
     @State private var showVideoLibraryPicker = false
     @State private var selectedVideo: PhotosPickerItem?
     @State private var showVideoCamera = false
-
     @State private var showVideoNoteRecorder = false
     @State private var videoNoteHolding = false
     @State private var videoNoteLocked = false
@@ -37,12 +35,10 @@ struct ChatView: View {
     @AppStorage("showStatus") private var showOnlineStatus = true
     @AppStorage("gru.settings.privacy.typing") private var showTypingStatus = true
     @AppStorage("gru.settings.chats.wallpaperBlur") private var wallpaperBlur = false
-
     @AppStorage private var chatBackgroundRaw: String
 
     init(chat: Chat) {
         _vm = State(initialValue: ChatViewModel(chat: chat))
-
         let key = chat.serverID ?? chat.id.uuidString
         _chatBackgroundRaw = AppStorage(
             wrappedValue: ChatBackgroundStyle.obsidian.rawValue,
@@ -81,10 +77,10 @@ struct ChatView: View {
                 if !socket.isConnected {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(socket.isReconnecting ? "Подключаемся…" : "Нет соединения")
+                        Text(GRUL10n.text(socket.isReconnecting ? "Подключаемся…" : "Нет соединения"))
                             .font(.caption.weight(.semibold))
                         Spacer()
-                        Text("Сообщения можно повторить после восстановления связи")
+                        Text(GRUL10n.text("Сообщения можно повторить после восстановления связи"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -111,40 +107,26 @@ struct ChatView: View {
                 }
 
                 Divider().opacity(0.08)
-
                 messages
 
                 if let editing = vm.editingMessage {
-                    EditBar(message: editing) {
-                        vm.cancelEditing()
-                    }
+                    EditBar(message: editing) { vm.cancelEditing() }
                 }
 
                 if let reply = vm.replyMessage {
-                    ReplyBar(message: reply) {
-                        vm.cancelReply()
-                    }
+                    ReplyBar(message: reply) { vm.cancelReply() }
                 }
 
                 ChatInputBar(
                     text: $vm.messageText,
                     sendTrigger: $vm.sendTrigger,
-                    onSend: {
-                        vm.sendMessage()
-                    },
+                    onSend: { vm.sendMessage() },
                     onAttachment: { action in
                         switch action {
-                        case .photo:
-                            showPhotoPicker = true
-
-                        case .video:
-                            showVideoSourceDialog = true
-
-                        case .document:
-                            showDocumentPicker = true
-
-                        case .contact:
-                            showContactPicker = true
+                        case .photo: showPhotoPicker = true
+                        case .video: showVideoSourceDialog = true
+                        case .document: showDocumentPicker = true
+                        case .contact: showContactPicker = true
                         }
                     },
                     onAudioRecorded: { recording in
@@ -160,19 +142,15 @@ struct ChatView: View {
                     onVideoNoteStarted: {
                         videoNoteHolding = true
                         videoNoteLocked = false
-
                         withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
                             showVideoNoteRecorder = true
                         }
                     },
-                    onVideoNoteReleased: {
-                        videoNoteHolding = false
-                    },
+                    onVideoNoteReleased: { videoNoteHolding = false },
                     onVideoNoteCancelled: {
                         videoNoteHolding = false
                         videoNoteLocked = false
                         videoNoteCancelSerial &+= 1
-
                         withAnimation(.easeOut(duration: 0.16)) {
                             showVideoNoteRecorder = false
                         }
@@ -190,75 +168,54 @@ struct ChatView: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
-        .task {
-            await vm.loadMessages()
-        }
+        .task { await vm.loadMessages() }
         .onDisappear {
             vm.stopRealtime()
+            if showVideoNoteRecorder {
+                videoNoteCancelSerial &+= 1
+                showVideoNoteRecorder = false
+                videoNoteHolding = false
+                videoNoteLocked = false
+            }
         }
         .onChange(of: vm.chatWasDeleted) { _, deleted in
             if deleted { dismiss() }
         }
         .confirmationDialog(
-            "Видео",
+            GRUL10n.text("Видео"),
             isPresented: $showVideoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button("Выбрать из медиатеки") {
-                showVideoLibraryPicker = true
-            }
-
-            Button("Снять камерой") {
-                showVideoCamera = true
-            }
-            .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
-
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Выбрать из медиатеки")) { showVideoLibraryPicker = true }
+            Button(GRUL10n.text("Снять камерой")) { showVideoCamera = true }
+                .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("Отправь обычное видео из медиатеки или сними новое.")
+            Text(GRUL10n.text("Отправь обычное видео из медиатеки или сними новое."))
         }
-        .photosPicker(
-            isPresented: $showPhotoPicker,
-            selection: $selectedPhoto,
-            matching: .images
-        )
-        .photosPicker(
-            isPresented: $showVideoLibraryPicker,
-            selection: $selectedVideo,
-            matching: .videos
-        )
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)
+        .photosPicker(isPresented: $showVideoLibraryPicker, selection: $selectedVideo, matching: .videos)
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
-
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     vm.sendImage(image)
                 }
-
-                await MainActor.run {
-                    selectedPhoto = nil
-                }
+                await MainActor.run { selectedPhoto = nil }
             }
         }
         .onChange(of: selectedVideo) { _, item in
             guard let item else { return }
-
             Task {
                 do {
-                    guard let picked = try await item.loadTransferable(type: PickedVideo.self) else {
-                        return
-                    }
-
+                    guard let picked = try await item.loadTransferable(type: PickedVideo.self) else { return }
                     await vm.sendVideo(picked.url)
                     try? FileManager.default.removeItem(at: picked.url)
                 } catch {
                     print("❌ Video library error:", error)
                 }
-
-                await MainActor.run {
-                    selectedVideo = nil
-                }
+                await MainActor.run { selectedVideo = nil }
             }
         }
         .fullScreenCover(isPresented: $showVideoCamera) {
@@ -270,9 +227,7 @@ struct ChatView: View {
                         try? FileManager.default.removeItem(at: url)
                     }
                 },
-                onCancel: {
-                    showVideoCamera = false
-                }
+                onCancel: { showVideoCamera = false }
             )
             .ignoresSafeArea()
         }
@@ -284,9 +239,7 @@ struct ChatView: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                Task {
-                    await vm.sendDocument(url)
-                }
+                Task { await vm.sendDocument(url) }
             case .failure(let error):
                 print("❌ Document picker error:", error)
             }
@@ -294,10 +247,7 @@ struct ChatView: View {
         .sheet(isPresented: $showContactPicker) {
             ContactSharePickerView { contact in
                 guard let phone = contact.primaryPhone else { return }
-                vm.sendContactCard(
-                    name: contact.displayName,
-                    phone: phone
-                )
+                vm.sendContactCard(name: contact.displayName, phone: phone)
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -309,15 +259,11 @@ struct ChatView: View {
                     chat: vm.chat,
                     onSearch: {
                         showPeerProfile = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                            searching = true
-                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { searching = true }
                     },
                     onAppearance: {
                         showPeerProfile = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                            showBackgroundPicker = true
-                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { showBackgroundPicker = true }
                     }
                 )
             }
@@ -328,56 +274,50 @@ struct ChatView: View {
                 .presentationDragIndicator(.visible)
         }
         .alert(
-            "Действие не выполнено",
+            GRUL10n.text("Действие не выполнено"),
             isPresented: Binding(
                 get: { vm.actionError != nil },
-                set: { visible in
-                    if !visible {
-                        vm.clearActionError()
-                    }
-                }
+                set: { visible in if !visible { vm.clearActionError() } }
             )
         ) {
-            Button("Понятно", role: .cancel) {
-                vm.clearActionError()
-            }
+            Button(GRUL10n.text("Понятно"), role: .cancel) { vm.clearActionError() }
         } message: {
-            Text(vm.actionError ?? "Неизвестная ошибка")
+            Text(vm.actionError ?? GRUL10n.text("Неизвестная ошибка"))
         }
         .confirmationDialog(
-            "Удалить выбранные сообщения?",
+            GRUL10n.text("Удалить выбранные сообщения?"),
             isPresented: $showBulkDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Удалить у себя (\(selectedMessages.count))", role: .destructive) {
+            Button(GRUL10n.format("Удалить у себя (%d)", selectedMessages.count), role: .destructive) {
                 selectedMessages.forEach { vm.deleteLocal($0) }
                 finishMessageSelection()
             }
 
             if canDeleteSelectionForEveryone {
-                Button("Удалить у всех (\(selectedMessages.count))", role: .destructive) {
+                Button(GRUL10n.format("Удалить у всех (%d)", selectedMessages.count), role: .destructive) {
                     selectedMessages.forEach { vm.deleteForEveryone($0) }
                     finishMessageSelection()
                 }
             }
 
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text(canDeleteSelectionForEveryone
-                 ? "Выбранные сообщения исчезнут без служебных заглушек."
-                 : "У всех можно удалить только сообщения, отправленные тобой. Для смешанного выбора доступно удаление у себя.")
+            Text(GRUL10n.text(
+                canDeleteSelectionForEveryone
+                    ? "Выбранные сообщения исчезнут без служебных заглушек."
+                    : "У всех можно удалить только сообщения, отправленные тобой. Для смешанного выбора доступно удаление у себя."
+            ))
         }
         .confirmationDialog(
-            "Удалить чат целиком?",
+            GRUL10n.text("Удалить чат целиком?"),
             isPresented: $showDeleteChatConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Удалить чат у обоих", role: .destructive) {
-                deleteCurrentChat()
-            }
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Удалить чат у обоих"), role: .destructive) { deleteCurrentChat() }
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("История и вложения этого чата будут удалены с сервера. Действие нельзя отменить.")
+            Text(GRUL10n.text("История и вложения этого чата будут удалены с сервера. Действие нельзя отменить."))
         }
         .overlay(alignment: .bottomTrailing) {
             if showVideoNoteRecorder {
@@ -388,11 +328,7 @@ struct ChatView: View {
                     onFinished: { url in
                         videoNoteHolding = false
                         videoNoteLocked = false
-
-                        withAnimation(.easeOut(duration: 0.20)) {
-                            showVideoNoteRecorder = false
-                        }
-
+                        withAnimation(.easeOut(duration: 0.20)) { showVideoNoteRecorder = false }
                         Task {
                             await vm.sendVideoNote(url)
                             try? FileManager.default.removeItem(at: url)
@@ -401,25 +337,17 @@ struct ChatView: View {
                     onCancel: {
                         videoNoteHolding = false
                         videoNoteLocked = false
-
-                        withAnimation(.easeOut(duration: 0.20)) {
-                            showVideoNoteRecorder = false
-                        }
+                        withAnimation(.easeOut(duration: 0.20)) { showVideoNoteRecorder = false }
                     }
                 )
                 .padding(.trailing, 14)
                 .padding(.bottom, 76)
-                .transition(
-                    .scale(scale: 0.86, anchor: .bottomTrailing)
-                        .combined(with: .opacity)
-                )
+                .transition(.scale(scale: 0.86, anchor: .bottomTrailing).combined(with: .opacity))
                 .zIndex(20)
             }
         }
     }
 }
-
-// MARK: - Header
 
 private extension ChatView {
     var header: some View {
@@ -427,48 +355,35 @@ private extension ChatView {
             if isSelectingMessages {
                 GRUNeonIconButton(
                     systemName: "xmark",
-                    accessibilityLabel: "Отменить выбор",
+                    accessibilityLabel: GRUL10n.text("Отменить выбор"),
                     size: 38,
                     iconSize: 14
-                ) {
-                    finishMessageSelection()
-                }
+                ) { finishMessageSelection() }
 
-                Text(
-                    GRUL10n.format(
-                        "Выбрано: %d",
-                        selectedMessageIDs.count
-                    )
-                )
+                Text(GRUL10n.format("Выбрано: %d", selectedMessageIDs.count))
                     .font(.headline)
 
                 Spacer()
 
                 GRUNeonIconButton(
                     systemName: "trash.fill",
-                    accessibilityLabel: "Удалить выбранные",
+                    accessibilityLabel: GRUL10n.text("Удалить выбранные"),
                     size: 38,
                     iconSize: 14,
                     isActive: !selectedMessageIDs.isEmpty
                 ) {
-                    if !selectedMessageIDs.isEmpty {
-                        showBulkDeleteConfirmation = true
-                    }
+                    if !selectedMessageIDs.isEmpty { showBulkDeleteConfirmation = true }
                 }
             } else {
                 GRUNeonIconButton(
                     systemName: "chevron.left",
-                    accessibilityLabel: "Назад",
+                    accessibilityLabel: GRUL10n.text("Назад"),
                     size: 38,
                     iconSize: 15
-                ) {
-                    dismiss()
-                }
+                ) { dismiss() }
 
                 Button {
-                    if peerUser != nil {
-                        showPeerProfile = true
-                    }
+                    if peerUser != nil { showPeerProfile = true }
                 } label: {
                     HStack(spacing: 10) {
                         if let peerUser {
@@ -485,28 +400,26 @@ private extension ChatView {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(chatName)
-                                .font(.headline)
-
+                            Text(chatName).font(.headline)
                             Text(
                                 showTypingStatus && vm.isOtherUserTyping
                                     ? GRUL10n.text("печатает…")
                                     : GRUL10n.text(chatStatus)
                             )
-                                .font(.caption)
-                                .foregroundStyle(showTypingStatus && vm.isOtherUserTyping ? GRUColors.accent : .secondary)
+                            .font(.caption)
+                            .foregroundStyle(showTypingStatus && vm.isOtherUserTyping ? GRUColors.accent : .secondary)
                         }
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Открыть профиль пользователя")
+                .accessibilityLabel(GRUL10n.text("Открыть профиль пользователя"))
 
                 Spacer()
 
                 GRUNeonIconButton(
                     systemName: "magnifyingglass",
-                    accessibilityLabel: "Поиск",
+                    accessibilityLabel: GRUL10n.text("Поиск"),
                     size: 38,
                     iconSize: 15,
                     isActive: searching
@@ -518,31 +431,18 @@ private extension ChatView {
                 }
 
                 Menu {
-                    Button {
-                        beginMessageSelection()
-                    } label: {
-                        Label("Выбрать сообщения", systemImage: "checkmark.circle")
+                    Button { beginMessageSelection() } label: {
+                        Label(GRUL10n.text("Выбрать сообщения"), systemImage: "checkmark.circle")
                     }
-
-                    Button {
-                        showBackgroundPicker = true
-                    } label: {
-                        Label("Фон чата", systemImage: "paintpalette.fill")
+                    Button { showBackgroundPicker = true } label: {
+                        Label(GRUL10n.text("Фон чата"), systemImage: "paintpalette.fill")
                     }
-
                     Divider()
-
-                    Button(role: .destructive) {
-                        showDeleteChatConfirmation = true
-                    } label: {
-                        Label("Удалить чат", systemImage: "trash")
+                    Button(role: .destructive) { showDeleteChatConfirmation = true } label: {
+                        Label(GRUL10n.text("Удалить чат"), systemImage: "trash")
                     }
                 } label: {
-                    GRUNeonIcon(
-                        systemName: "ellipsis",
-                        size: 38,
-                        iconSize: 15
-                    )
+                    GRUNeonIcon(systemName: "ellipsis", size: 38, iconSize: 15)
                 }
                 .buttonStyle(.plain)
                 .disabled(deletingChat)
@@ -554,20 +454,14 @@ private extension ChatView {
     }
 
     var chatName: String {
-        vm.chat.users.first {
-            $0.id != ChatService.shared.currentUser.id
-        }?.displayName ?? "Chat"
+        vm.chat.users.first { $0.id != ChatService.shared.currentUser.id }?.displayName
+            ?? GRUL10n.text("Chat")
     }
 
     var chatStatus: String {
-        guard let user = vm.chat.users.first(where: {
-            $0.id != ChatService.shared.currentUser.id
-        }) else {
-            return ""
-        }
-
+        guard let user = vm.chat.users.first(where: { $0.id != ChatService.shared.currentUser.id }) else { return "" }
         guard showOnlineStatus else { return "" }
-        return user.isOnline ? "Online" : "Offline"
+        return user.isOnline ? "online" : "offline"
     }
 }
 
@@ -577,17 +471,13 @@ private extension ChatView {
     }
 
     var canDeleteSelectionForEveryone: Bool {
-        !selectedMessages.isEmpty &&
-        selectedMessages.allSatisfy {
-            $0.senderID == ChatService.shared.currentUser.id &&
-            $0.serverID?.isEmpty == false
+        !selectedMessages.isEmpty && selectedMessages.allSatisfy {
+            $0.senderID == ChatService.shared.currentUser.id && $0.serverID?.isEmpty == false
         }
     }
 
     func beginMessageSelection() {
-        withAnimation(.easeInOut(duration: 0.16)) {
-            isSelectingMessages = true
-        }
+        withAnimation(.easeInOut(duration: 0.16)) { isSelectingMessages = true }
     }
 
     func toggleMessageSelection(_ message: Message) {
@@ -601,9 +491,7 @@ private extension ChatView {
 
     func finishMessageSelection() {
         selectedMessageIDs.removeAll()
-        withAnimation(.easeInOut(duration: 0.16)) {
-            isSelectingMessages = false
-        }
+        withAnimation(.easeInOut(duration: 0.16)) { isSelectingMessages = false }
     }
 
     func deleteCurrentChat() {
@@ -612,7 +500,7 @@ private extension ChatView {
               !serverID.isEmpty,
               let token = TokenStorage.shared.token,
               !token.isEmpty else {
-            vm.actionError = "Не удалось удалить чат: серверный идентификатор или сессия недоступны."
+            vm.actionError = GRUL10n.text("Не удалось удалить чат: серверный идентификатор или сессия недоступны.")
             return
         }
 
@@ -624,13 +512,11 @@ private extension ChatView {
                 dismiss()
             } catch {
                 deletingChat = false
-                vm.actionError = "Не удалось удалить чат: \(error.localizedDescription)"
+                vm.actionError = GRUL10n.format("Не удалось удалить чат: %@", error.localizedDescription)
             }
         }
     }
 }
-
-// MARK: - Messages
 
 private extension ChatView {
     var messages: some View {
@@ -641,21 +527,11 @@ private extension ChatView {
                         MessageBubble(
                             message: message,
                             isCurrentUser: message.senderID == ChatService.shared.currentUser.id,
-                            onReply: { message in
-                                vm.startReply(to: message)
-                            },
-                            onEdit: { message in
-                                vm.startEditing(message)
-                            },
-                            onDeleteLocal: { message in
-                                vm.deleteLocal(message)
-                            },
-                            onDeleteForEveryone: { message in
-                                vm.deleteForEveryone(message)
-                            },
-                            onRetry: { message in
-                                vm.retryMessage(message)
-                            },
+                            onReply: { vm.startReply(to: $0) },
+                            onEdit: { vm.startEditing($0) },
+                            onDeleteLocal: { vm.deleteLocal($0) },
+                            onDeleteForEveryone: { vm.deleteForEveryone($0) },
+                            onRetry: { vm.retryMessage($0) },
                             onReaction: { reaction, message in
                                 if message.reaction == reaction {
                                     vm.removeReaction(from: message)
@@ -665,9 +541,7 @@ private extension ChatView {
                             },
                             isSelectionMode: isSelectingMessages,
                             isSelected: selectedMessageIDs.contains(message.id),
-                            onSelect: { message in
-                                toggleMessageSelection(message)
-                            }
+                            onSelect: { toggleMessageSelection($0) }
                         )
                         .id(message.id)
                     }
@@ -676,22 +550,15 @@ private extension ChatView {
                 .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onAppear {
-                scrollToLast(proxy: proxy, animated: false)
-            }
-            .onChange(of: vm.chat.messages.count) { _, _ in
-                scrollToLast(proxy: proxy, animated: true)
-            }
+            .onAppear { scrollToLast(proxy: proxy, animated: false) }
+            .onChange(of: vm.chat.messages.count) { _, _ in scrollToLast(proxy: proxy, animated: true) }
         }
     }
 
     func scrollToLast(proxy: ScrollViewProxy, animated: Bool) {
         guard let last = vm.chat.messages.last else { return }
-
         if animated {
-            withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(last.id, anchor: .bottom)
-            }
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(last.id, anchor: .bottom) }
         } else {
             proxy.scrollTo(last.id, anchor: .bottom)
         }
@@ -714,12 +581,8 @@ private struct ChatPeerProfileView: View {
     @State private var safetyMessage: String?
     @State private var safetyError: String?
 
-    private var mediaMessages: [Message] {
-        chat.messages.filter { $0.attachment != nil }
-    }
-
+    private var mediaMessages: [Message] { chat.messages.filter { $0.attachment != nil } }
     private var mediaCount: Int { mediaMessages.count }
-
     private var serverUserID: String? { user.serverID }
 
     var body: some View {
@@ -738,29 +601,19 @@ private struct ChatPeerProfileView: View {
                         }
 
                         VStack(spacing: 10) {
-                            Button(action: onSearch) {
-                                profileAction("Поиск в переписке", "magnifyingglass")
-                            }
-
-                            Button {
-                                showMedia = true
-                            } label: {
-                                profileAction("Общие медиа", "photo.stack.fill")
-                            }
-                            .disabled(mediaMessages.isEmpty)
-
-                            Button(action: onAppearance) {
-                                profileAction("Оформление переписки", "paintpalette.fill")
-                            }
+                            Button(action: onSearch) { profileAction("Поиск в переписке", "magnifyingglass") }
+                            Button { showMedia = true } label: { profileAction("Общие медиа", "photo.stack.fill") }
+                                .disabled(mediaMessages.isEmpty)
+                            Button(action: onAppearance) { profileAction("Оформление переписки", "paintpalette.fill") }
                         }
 
                         safetyCard
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("SIGNAL CARD", systemImage: "dot.radiowaves.left.and.right")
+                            Label(GRUL10n.text("SIGNAL CARD"), systemImage: "dot.radiowaves.left.and.right")
                                 .font(.caption.weight(.black))
                                 .foregroundStyle(GRUColors.accent)
-                            Text("Профиль связан с реальным участником переписки. Поиск, медиа, оформление, жалоба и блокировка находятся в одном месте.")
+                            Text(GRUL10n.text("Профиль связан с реальным участником переписки. Поиск, медиа, оформление, жалоба и блокировка находятся в одном месте."))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -771,11 +624,11 @@ private struct ChatPeerProfileView: View {
                     .padding(20)
                 }
             }
-            .navigationTitle("Профиль")
+            .navigationTitle(GRUL10n.text("Профиль"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") { dismiss() }
+                    Button(GRUL10n.text("Готово")) { dismiss() }
                 }
             }
         }
@@ -785,30 +638,20 @@ private struct ChatPeerProfileView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .confirmationDialog(
-            "Пожаловаться",
-            isPresented: $showReportDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Спам") { submitReport(reason: "spam") }
-            Button("Оскорбления или травля") { submitReport(reason: "harassment") }
-            Button("Опасный или незаконный контент") { submitReport(reason: "illegal") }
-            Button("Другое") { submitReport(reason: "other") }
-            Button("Отмена", role: .cancel) {}
+        .confirmationDialog(GRUL10n.text("Пожаловаться"), isPresented: $showReportDialog, titleVisibility: .visible) {
+            Button(GRUL10n.text("Спам")) { submitReport(reason: "spam") }
+            Button(GRUL10n.text("Оскорбления или травля")) { submitReport(reason: "harassment") }
+            Button(GRUL10n.text("Опасный или незаконный контент")) { submitReport(reason: "illegal") }
+            Button(GRUL10n.text("Другое")) { submitReport(reason: "other") }
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("Жалоба сохраняется на backend GRU для последующей модерации.")
+            Text(GRUL10n.text("Жалоба сохраняется на backend GRU для последующей модерации."))
         }
-        .confirmationDialog(
-            "Заблокировать пользователя?",
-            isPresented: $showBlockConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Заблокировать", role: .destructive) {
-                updateBlocked(true)
-            }
-            Button("Отмена", role: .cancel) {}
+        .confirmationDialog(GRUL10n.text("Заблокировать пользователя?"), isPresented: $showBlockConfirmation, titleVisibility: .visible) {
+            Button(GRUL10n.text("Заблокировать"), role: .destructive) { updateBlocked(true) }
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("После блокировки новые сообщения между вами будут отклоняться backend.")
+            Text(GRUL10n.text("После блокировки новые сообщения между вами будут отклоняться backend."))
         }
         .alert(
             "GRU Safety",
@@ -822,7 +665,7 @@ private struct ChatPeerProfileView: View {
                 }
             )
         ) {
-            Button("Понятно", role: .cancel) {
+            Button(GRUL10n.text("Понятно"), role: .cancel) {
                 safetyMessage = nil
                 safetyError = nil
             }
@@ -834,9 +677,7 @@ private struct ChatPeerProfileView: View {
     private var profileHero: some View {
         VStack(spacing: 10) {
             AvatarView(user: user, size: 104)
-                .overlay {
-                    Circle().stroke(GRUColors.neonGradient, lineWidth: 2)
-                }
+                .overlay { Circle().stroke(GRUColors.neonGradient, lineWidth: 2) }
                 .shadow(color: GRUColors.accent.opacity(0.28), radius: 22)
 
             Text(user.displayName.isEmpty ? user.username : user.displayName)
@@ -852,7 +693,7 @@ private struct ChatPeerProfileView: View {
                 Circle()
                     .fill(user.isOnline ? GRUColors.accent : Color.secondary.opacity(0.6))
                     .frame(width: 7, height: 7)
-                Text(user.isOnline ? "Online" : "Offline")
+                Text(GRUL10n.text(user.isOnline ? "online" : "offline"))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(user.isOnline ? GRUColors.accent : .secondary)
             }
@@ -862,13 +703,13 @@ private struct ChatPeerProfileView: View {
     private var safetyCard: some View {
         VStack(spacing: 10) {
             HStack {
-                Label("Безопасность", systemImage: "shield.lefthalf.filled")
+                Label(GRUL10n.text("Безопасность"), systemImage: "shield.lefthalf.filled")
                     .font(.subheadline.weight(.black))
                 Spacer()
                 if isSafetyLoading {
                     ProgressView().controlSize(.small)
                 } else if isBlocked {
-                    Text("BLOCKED")
+                    Text(GRUL10n.text("BLOCKED"))
                         .font(.system(size: 8, weight: .black, design: .rounded))
                         .tracking(0.8)
                         .foregroundStyle(.red)
@@ -876,11 +717,7 @@ private struct ChatPeerProfileView: View {
             }
 
             Button {
-                if isBlocked {
-                    updateBlocked(false)
-                } else {
-                    showBlockConfirmation = true
-                }
+                if isBlocked { updateBlocked(false) } else { showBlockConfirmation = true }
             } label: {
                 safetyAction(
                     isBlocked ? "Разблокировать" : "Заблокировать",
@@ -890,9 +727,7 @@ private struct ChatPeerProfileView: View {
             }
             .disabled(serverUserID == nil || isSafetyLoading)
 
-            Button {
-                showReportDialog = true
-            } label: {
+            Button { showReportDialog = true } label: {
                 safetyAction("Пожаловаться", "exclamationmark.bubble.fill", destructive: true)
             }
             .disabled(serverUserID == nil || isSafetyLoading)
@@ -906,7 +741,7 @@ private struct ChatPeerProfileView: View {
         VStack(spacing: 5) {
             Image(systemName: icon).foregroundStyle(GRUColors.accent)
             Text(value).font(.headline.weight(.black))
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(GRUL10n.text(label)).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 13)
@@ -916,7 +751,7 @@ private struct ChatPeerProfileView: View {
     private func profileAction(_ title: String, _ icon: String) -> some View {
         HStack {
             GRUNeonIcon(systemName: icon, size: 36, iconSize: 14)
-            Text(title).font(.body.weight(.semibold))
+            Text(GRUL10n.text(title)).font(.body.weight(.semibold))
             Spacer()
             Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.secondary)
         }
@@ -930,7 +765,7 @@ private struct ChatPeerProfileView: View {
                 .font(.system(size: 15, weight: .bold))
                 .frame(width: 32, height: 32)
                 .background((destructive ? Color.red : GRUColors.accent).opacity(0.10), in: Circle())
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(GRUL10n.text(title)).font(.subheadline.weight(.semibold))
             Spacer()
             Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.secondary)
         }
@@ -941,8 +776,7 @@ private struct ChatPeerProfileView: View {
     }
 
     private func loadSafetyState() async {
-        guard let userID = serverUserID,
-              let token = TokenStorage.shared.token else { return }
+        guard let userID = serverUserID, let token = TokenStorage.shared.token else { return }
         isSafetyLoading = true
         defer { isSafetyLoading = false }
         do {
@@ -954,17 +788,18 @@ private struct ChatPeerProfileView: View {
     }
 
     private func updateBlocked(_ blocked: Bool) {
-        guard let userID = serverUserID,
-              let token = TokenStorage.shared.token else { return }
+        guard let userID = serverUserID, let token = TokenStorage.shared.token else { return }
         isSafetyLoading = true
         Task {
             defer { isSafetyLoading = false }
             do {
                 let state = try await UserAPIService.shared.setBlocked(blocked, userID: userID, token: token)
                 isBlocked = state.blocked
-                safetyMessage = state.blocked
-                    ? "Пользователь заблокирован. Backend не позволит отправлять новые сообщения между вами."
-                    : "Пользователь разблокирован."
+                safetyMessage = GRUL10n.text(
+                    state.blocked
+                        ? "Пользователь заблокирован. Backend не позволит отправлять новые сообщения между вами."
+                        : "Пользователь разблокирован."
+                )
             } catch {
                 safetyError = error.localizedDescription
             }
@@ -972,8 +807,7 @@ private struct ChatPeerProfileView: View {
     }
 
     private func submitReport(reason: String) {
-        guard let userID = serverUserID,
-              let token = TokenStorage.shared.token else { return }
+        guard let userID = serverUserID, let token = TokenStorage.shared.token else { return }
         isSafetyLoading = true
         Task {
             defer { isSafetyLoading = false }
@@ -985,7 +819,7 @@ private struct ChatPeerProfileView: View {
                     details: nil,
                     token: token
                 )
-                safetyMessage = "Жалоба отправлена."
+                safetyMessage = GRUL10n.text("Жалоба отправлена.")
             } catch {
                 safetyError = error.localizedDescription
             }
@@ -1004,9 +838,9 @@ private struct SharedMediaSummaryView: View {
 
                 if messages.isEmpty {
                     ContentUnavailableView(
-                        "Медиа пока нет",
+                        GRUL10n.text("Медиа пока нет"),
                         systemImage: "photo.stack",
-                        description: Text("Фото, видео, голосовые и файлы из переписки появятся здесь.")
+                        description: Text(GRUL10n.text("Фото, видео, голосовые и файлы из переписки появятся здесь."))
                     )
                 } else {
                     ScrollView {
@@ -1014,23 +848,16 @@ private struct SharedMediaSummaryView: View {
                             ForEach(messages) { message in
                                 if let attachment = message.attachment {
                                     HStack(spacing: 12) {
-                                        GRUNeonIcon(
-                                            systemName: mediaIcon(attachment.type),
-                                            size: 42,
-                                            iconSize: 16
-                                        )
-
+                                        GRUNeonIcon(systemName: mediaIcon(attachment.type), size: 42, iconSize: 16)
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(mediaTitle(attachment.type))
+                                            Text(GRUL10n.text(mediaTitle(attachment.type)))
                                                 .font(.subheadline.weight(.bold))
-                                            Text(attachment.fileName.isEmpty ? "Вложение" : attachment.fileName)
+                                            Text(attachment.fileName.isEmpty ? GRUL10n.text("Вложение") : attachment.fileName)
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                                 .lineLimit(1)
                                         }
-
                                         Spacer()
-
                                         Text(message.sentAt.formatted(date: .abbreviated, time: .shortened))
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
@@ -1044,11 +871,11 @@ private struct SharedMediaSummaryView: View {
                     }
                 }
             }
-            .navigationTitle("Общие медиа")
+            .navigationTitle(GRUL10n.text("Общие медиа"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") { dismiss() }
+                    Button(GRUL10n.text("Готово")) { dismiss() }
                 }
             }
         }
@@ -1084,10 +911,7 @@ private struct SharedMediaSummaryView: View {
                 ],
                 messages: [
                     Message(senderID: UUID(), text: "Привет 👋"),
-                    Message(
-                        senderID: ChatService.shared.currentUser.id,
-                        text: "GRU Messenger"
-                    )
+                    Message(senderID: ChatService.shared.currentUser.id, text: "GRU Messenger")
                 ]
             )
         )
