@@ -59,7 +59,7 @@ struct GRUBetaTestChatView: View {
 
                 if let editing = vm.editingMessage {
                     localActionBar(
-                        title: "Редактирование",
+                        title: GRUL10n.text("Редактирование"),
                         subtitle: editing.text,
                         icon: "pencil"
                     ) {
@@ -69,8 +69,8 @@ struct GRUBetaTestChatView: View {
 
                 if let reply = vm.replyMessage {
                     localActionBar(
-                        title: "Ответ",
-                        subtitle: reply.text.isEmpty ? "Вложение" : reply.text,
+                        title: GRUL10n.text("Ответ"),
+                        subtitle: reply.text.isEmpty ? GRUL10n.text("Вложение") : reply.text,
                         icon: "arrowshape.turn.up.left"
                     ) {
                         vm.cancelReply()
@@ -138,22 +138,22 @@ struct GRUBetaTestChatView: View {
             vm.stopRealtime()
         }
         .confirmationDialog(
-            "Видео",
+            GRUL10n.text("Видео"),
             isPresented: $showVideoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button("Выбрать из медиатеки") {
+            Button(GRUL10n.text("Выбрать из медиатеки")) {
                 showVideoLibraryPicker = true
             }
 
-            Button("Снять камерой") {
+            Button(GRUL10n.text("Снять камерой")) {
                 showVideoCamera = true
             }
             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
 
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         } message: {
-            Text("Test lab использует тот же сценарий видео, что и обычный чат.")
+            Text(GRUL10n.text("Test lab использует тот же сценарий видео, что и обычный чат."))
         }
         .photosPicker(
             isPresented: $showPhotoPicker,
@@ -273,21 +273,21 @@ struct GRUBetaTestChatView: View {
             if isSelectingMessages {
                 GRUNeonIconButton(
                     systemName: "xmark",
-                    accessibilityLabel: "Отменить выбор",
+                    accessibilityLabel: GRUL10n.text("Отменить выбор"),
                     size: 38,
                     iconSize: 14
                 ) {
                     finishSelection()
                 }
 
-                Text("Выбрано: \(selectedMessageIDs.count)")
+                Text(GRUL10n.format("Выбрано: %d", selectedMessageIDs.count))
                     .font(.headline)
 
                 Spacer()
 
                 GRUNeonIconButton(
                     systemName: "trash.fill",
-                    accessibilityLabel: "Удалить выбранные",
+                    accessibilityLabel: GRUL10n.text("Удалить выбранные"),
                     size: 38,
                     iconSize: 14,
                     isActive: !selectedMessageIDs.isEmpty
@@ -297,7 +297,7 @@ struct GRUBetaTestChatView: View {
             } else {
                 GRUNeonIconButton(
                     systemName: "chevron.left",
-                    accessibilityLabel: "Назад",
+                    accessibilityLabel: GRUL10n.text("Назад"),
                     size: 38,
                     iconSize: 15
                 ) {
@@ -323,7 +323,7 @@ struct GRUBetaTestChatView: View {
                             .foregroundStyle(currentTheme.accent)
                     }
 
-                    Text("полный локальный полигон чата")
+                    Text(GRUL10n.text("полный локальный полигон чата"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -341,19 +341,19 @@ struct GRUBetaTestChatView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Следующая тема")
+                .accessibilityLabel(GRUL10n.text("Следующая тема"))
 
                 Menu {
                     Button {
                         isSelectingMessages = true
                     } label: {
-                        Label("Выбрать сообщения", systemImage: "checkmark.circle")
+                        Label(GRUL10n.text("Выбрать сообщения"), systemImage: "checkmark.circle")
                     }
 
                     Button {
                         resetLab()
                     } label: {
-                        Label("Сбросить test lab", systemImage: "arrow.counterclockwise")
+                        Label(GRUL10n.text("Сбросить test lab"), systemImage: "arrow.counterclockwise")
                     }
                 } label: {
                     GRUNeonIcon(
@@ -414,7 +414,11 @@ struct GRUBetaTestChatView: View {
                 .font(.caption.weight(.black))
                 .foregroundStyle(currentTheme.accent)
 
-            Text("Проверяй здесь обычный текст, reply, edit, delete, reactions, multi-select, фото, видео, документы, контакты, голосовые и кото-кружки. Ничего из этого test lab не отправляет в реальные чаты.")
+            Text(
+                GRUL10n.text(
+                    "Проверяй здесь обычный текст, reply, edit, delete, reactions, multi-select, фото, видео, документы, контакты, голосовые и кото-кружки. Ничего из этого test lab не отправляет в реальные чаты."
+                )
+            )
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -535,14 +539,18 @@ struct GRUBetaTestChatView: View {
 
         let incoming = Message(
             senderID: lab.id,
-            text: "Я локальный собеседник test lab. Свайпни это сообщение влево для reply или зажми для реакций и действий.",
+            text: GRUL10n.text(
+                "Я локальный собеседник test lab. Свайпни это сообщение влево для reply или зажми для реакций и действий."
+            ),
             sentAt: Date().addingTimeInterval(-90),
             status: .read
         )
 
         let own = Message(
             senderID: me.id,
-            text: "Это моё тестовое сообщение — его можно редактировать, копировать, выбрать и удалить.",
+            text: GRUL10n.text(
+                "Это моё тестовое сообщение — его можно редактировать, копировать, выбрать и удалить."
+            ),
             sentAt: Date().addingTimeInterval(-45),
             status: .read
         )
