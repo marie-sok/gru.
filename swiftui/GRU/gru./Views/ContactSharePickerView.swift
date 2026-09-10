@@ -15,7 +15,7 @@ struct ContactSharePickerView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         GRUNeonIcon(systemName: "magnifyingglass", size: 34, iconSize: 14)
-                        TextField("Найти контакт", text: $vm.searchText)
+                        TextField(GRUL10n.text("Найти контакт"), text: $vm.searchText)
                             .textFieldStyle(.plain)
                     }
                     .padding(10)
@@ -66,11 +66,11 @@ struct ContactSharePickerView: View {
                 }
                 .padding(.top, 12)
             }
-            .navigationTitle("Отправить контакт")
+            .navigationTitle(GRUL10n.text("Отправить контакт"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") { dismiss() }
+                    Button(GRUL10n.text("Готово")) { dismiss() }
                 }
             }
         }
