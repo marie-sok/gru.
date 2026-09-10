@@ -35,7 +35,7 @@ struct ProfileView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     GRUNeonIconButton(
                         systemName: "chevron.left",
-                        accessibilityLabel: "Назад",
+                        accessibilityLabel: GRUL10n.text("Назад"),
                         size: 36,
                         iconSize: 14
                     ) {
@@ -44,7 +44,7 @@ struct ProfileView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    Text("Профиль")
+                    Text(GRUL10n.text("Профиль"))
                         .font(.headline)
                 }
             }
@@ -52,7 +52,11 @@ struct ProfileView: View {
         .onAppear {
             profile.applyFallbackNickname(service.currentUser.displayName)
             service.currentUser.username = profile.username
-            service.currentUser.displayName = profile.nickname
+
+            let nickname = profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !nickname.isEmpty {
+                service.currentUser.displayName = nickname
+            }
         }
         .onChange(of: profile.username) { _, value in
             service.currentUser.username = value
@@ -62,6 +66,10 @@ struct ProfileView: View {
             if !clean.isEmpty {
                 service.currentUser.displayName = clean
             }
+        }
+        .onChange(of: profile.bio) { _, value in
+            guard value.count > 160 else { return }
+            profile.bio = String(value.prefix(160))
         }
         .onChange(of: selectedAvatar) { _, item in
             loadAvatar(item)
@@ -84,27 +92,27 @@ struct ProfileView: View {
             .ignoresSafeArea()
         }
         .confirmationDialog(
-            "Аватар",
+            GRUL10n.text("Аватар"),
             isPresented: $showAvatarSource,
             titleVisibility: .visible
         ) {
-            Button("Выбрать из медиатеки") {
+            Button(GRUL10n.text("Выбрать из медиатеки")) {
                 showAvatarLibrary = true
             }
 
-            Button("Снять камерой") {
+            Button(GRUL10n.text("Снять камерой")) {
                 showAvatarCamera = true
             }
             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
 
             if profile.avatarData != nil {
-                Button("Удалить аватар", role: .destructive) {
+                Button(GRUL10n.text("Удалить аватар"), role: .destructive) {
                     profile.removeAvatar()
                     service.currentUser.avatarData = nil
                 }
             }
 
-            Button("Отмена", role: .cancel) {}
+            Button(GRUL10n.text("Отмена"), role: .cancel) {}
         }
     }
 }
@@ -134,7 +142,7 @@ private extension ProfileView {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Изменить аватар")
+            .accessibilityLabel(GRUL10n.text("Изменить аватар"))
 
             Text(profile.nickname.isEmpty ? "gru." : profile.nickname)
                 .font(.title2.bold())
@@ -167,7 +175,7 @@ private extension ProfileView {
     var identitySection: some View {
         VStack(spacing: 12) {
             fieldRow(icon: "person.text.rectangle.fill", title: "Никнейм") {
-                TextField("Никнейм", text: $profile.nickname)
+                TextField(GRUL10n.text("Никнейм"), text: $profile.nickname)
                     .multilineTextAlignment(.trailing)
                     .textInputAutocapitalization(.words)
             }
@@ -182,7 +190,7 @@ private extension ProfileView {
             profileRow(
                 icon: "circle.fill",
                 title: "Статус",
-                value: service.currentUser.isOnline ? "Online" : "Offline"
+                value: service.currentUser.isOnline ? "online" : "offline"
             )
         }
     }
@@ -195,7 +203,7 @@ private extension ProfileView {
                     size: 34,
                     iconSize: 14
                 )
-                Text("Био")
+                Text(GRUL10n.text("Био"))
                     .font(.headline)
                 Spacer()
                 Text("\(profile.bio.count)/160")
@@ -224,7 +232,7 @@ private extension ProfileView {
                 iconSize: 14
             )
 
-            Text("Голосовые и видео-сообщения остаются только внутри переписок и не создают отдельную медиатеку.")
+            Text(GRUL10n.text("Голосовые и видео-сообщения остаются только внутри переписок и не создают отдельную медиатеку."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -237,9 +245,9 @@ private extension ProfileView {
     func profileRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 12) {
             GRUNeonIcon(systemName: icon, size: 36, iconSize: 14)
-            Text(title)
+            Text(GRUL10n.text(title))
             Spacer()
-            Text(value)
+            Text(GRUL10n.text(value))
                 .foregroundStyle(.secondary)
         }
         .padding(12)
@@ -254,7 +262,7 @@ private extension ProfileView {
     ) -> some View {
         HStack(spacing: 12) {
             GRUNeonIcon(systemName: icon, size: 36, iconSize: 14)
-            Text(title)
+            Text(GRUL10n.text(title))
             Spacer()
             content()
                 .foregroundStyle(.secondary)
