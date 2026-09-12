@@ -39,6 +39,7 @@ def check_regex(relative: str, pattern: str, label: str) -> None:
 SCHEME = "swiftui/GRU/gru..xcodeproj/xcshareddata/xcschemes/gru.xcscheme"
 PROJECT = "swiftui/GRU/gru..xcodeproj/project.pbxproj"
 APP = "swiftui/GRU/gru./Apps/gru_App.swift"
+ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
@@ -69,6 +70,19 @@ require(APP, ".environment(\n                \\.locale,", "runtime locale enviro
 forbid(APP, ".id(languageRaw)", "language switching would recreate RootView")
 forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
+
+# Biometric authentication is deliberately user-initiated only. Face ID system
+# sheets can move the app inactive/active; automatic prompts tied to scenePhase
+# caused a re-entrant loop on physical iPhones.
+root_view_text = read(ROOT_VIEW)
+if root_view_text.count("authenticateWithBiometrics()") != 2:
+    failures.append(
+        "RootView biometric prompt count changed; expected exactly one explicit button call plus the function declaration"
+    )
+forbid(ROOT_VIEW, "authenticateWithBiometrics(userInitiated:",
+       "automatic/userInitiated biometric prompt API returned")
+require(ROOT_VIEW, "Intentionally no automatic LocalAuthentication call here.",
+        "scenePhase biometric loop guard is missing")
 
 # Screen privacy: still-screenshot redaction uses one isolated secure compositor
 # host. The secure field must be a non-responder with an empty keyboard host so
