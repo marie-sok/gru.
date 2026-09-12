@@ -6,11 +6,16 @@ enum GRUColors {
     static var background: Color { GRUAppTheme.current.background }
     static var card: Color { GRUAppTheme.current.card }
     static var input: Color { GRUAppTheme.current.card.opacity(0.94) }
-    static var text: Color { Color.white.opacity(0.96) }
-    static var secondary: Color { Color.white.opacity(0.58) }
-    static var separator: Color { Color.white.opacity(0.075) }
-    static var incomingBubble: Color { GRUAppTheme.current.card.opacity(0.96) }
-    static var outgoingBubble: Color { GRUAppTheme.current.accent.opacity(0.19) }
+    static var text: Color { Color.white.opacity(0.98) }
+    static var secondary: Color { Color.white.opacity(0.64) }
+    static var separator: Color { Color.white.opacity(0.10) }
+
+    // Message bubbles must stay readable even when an illustrated wallpaper has
+    // a bright detail directly underneath the text. Keep the bubble body opaque
+    // and express the selected theme through the accent stroke/glow instead of
+    // letting the wallpaper bleed through the text surface.
+    static var incomingBubble: Color { GRUAppTheme.current.card }
+    static var outgoingBubble: Color { GRUAppTheme.current.card }
 
     static var neonGradient: LinearGradient {
         LinearGradient(
