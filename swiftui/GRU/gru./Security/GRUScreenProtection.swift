@@ -2,6 +2,23 @@ import Combine
 import SwiftUI
 import UIKit
 
+@_silgen_name("GRUSetLayerDisableScreenshots")
+private func GRUSetLayerDisableScreenshotsRuntime(
+    _ layer: UnsafeMutableRawPointer,
+    _ disableScreenshots: Bool
+) -> Bool
+
+@MainActor
+private enum GRUSecureLayerBridge {
+    @discardableResult
+    static func setProtected(_ layer: CALayer, enabled: Bool) -> Bool {
+        GRUSetLayerDisableScreenshotsRuntime(
+            Unmanaged.passUnretained(layer).toOpaque(),
+            enabled
+        )
+    }
+}
+
 @MainActor
 final class GRUScreenProtectionModel: ObservableObject {
     @Published private(set) var isCaptureActive = false
@@ -160,9 +177,10 @@ private final class GRUChatNonResponderSecureField: UITextField {
 /// The privacy artwork is rendered behind this controller, so a compositor that
 /// omits secure text content reveals the GRU privacy scene instead of messages.
 ///
-/// Important: there is deliberately no ordinary UIView fallback. If a future
-/// iOS version changes the secure canvas internals, the chat fails closed and
-/// the privacy artwork remains visible rather than exposing the conversation.
+/// In addition to living inside the secure canvas, the root layer of the chat
+/// is marked through the same secure UITextField layer substitution used by
+/// Telegram-iOS. Both conditions must succeed before conversation content is
+/// revealed. There is deliberately no ordinary UIView fallback.
 @MainActor
 private final class GRUChatSecureHostController<Content: View>: UIViewController {
     private let secureField = GRUChatNonResponderSecureField(frame: .zero)
@@ -174,6 +192,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     private var retryCount = 0
     private var didPrimeSecureField = false
     private var didLogHierarchy = false
+    private var layerProtectionApplied = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -182,6 +201,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         host.view.backgroundColor = .clear
         host.view.insetsLayoutMarginsFromSafeArea = false
         host.additionalSafeAreaInsets = .zero
+        host.view.isHidden = true
     }
 
     @available(*, unavailable)
@@ -250,11 +270,24 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         installSecureCanvasIfNeeded()
     }
 
+    func disableProtection() {
+        retryWorkItem?.cancel()
+        retryWorkItem = nil
+
+        if layerProtectionApplied {
+            _ = GRUSecureLayerBridge.setProtected(host.view.layer, enabled: false)
+            layerProtectionApplied = false
+        }
+
+        host.view.isHidden = true
+    }
+
     private func installSecureCanvasIfNeeded() {
         guard isViewLoaded,
               view.window != nil,
               view.bounds.width > 1,
               view.bounds.height > 1 else {
+            host.view.isHidden = true
             scheduleRetry()
             return
         }
@@ -262,11 +295,19 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         if let protectedCanvas,
            protectedCanvas.isDescendant(of: secureField),
            host.view.superview === protectedCanvas {
+            guard ensureHostLayerProtection() else {
+                host.view.isHidden = true
+                scheduleRetry()
+                return
+            }
+
+            host.view.isHidden = false
             retryWorkItem?.cancel()
             retryWorkItem = nil
             return
         }
 
+        host.view.isHidden = true
         primeSecureFieldIfNeeded()
 
         guard let canvas = Self.findSecureCanvas(in: secureField) else {
@@ -277,12 +318,39 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
 
         mountHost(in: canvas)
         protectedCanvas = canvas
+
+        guard ensureHostLayerProtection() else {
+            logHierarchyOnce(reason: "secure layer guard not applied")
+            host.view.isHidden = true
+            scheduleRetry()
+            return
+        }
+
+        host.view.isHidden = false
         retryWorkItem?.cancel()
         retryWorkItem = nil
 
         #if DEBUG
         print("[GRUPrivacy] secure canvas mounted: \(NSStringFromClass(type(of: canvas)))")
+        print("[GRUPrivacy] secure host layer protected")
         #endif
+    }
+
+    private func ensureHostLayerProtection() -> Bool {
+        if layerProtectionApplied {
+            return true
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let didProtect = GRUSecureLayerBridge.setProtected(
+            host.view.layer,
+            enabled: true
+        )
+        CATransaction.commit()
+
+        layerProtectionApplied = didProtect
+        return didProtect
     }
 
     private func primeSecureFieldIfNeeded() {
@@ -315,6 +383,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         NSLayoutConstraint.deactivate(hostConstraints)
         hostConstraints.removeAll()
         host.view.removeFromSuperview()
+        host.view.isHidden = true
 
         host.view.translatesAutoresizingMaskIntoConstraints = false
         canvas.addSubview(host.view)
@@ -350,8 +419,8 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     }
 
     /// Restrict matching to known UITextField layout-canvas families. A generic
-    /// Canvas match is unsafe because unrelated UIKit/SwiftUI views can carry
-    /// that token and are not screenshot-protected.
+    /// canvas-name match is unsafe because unrelated UIKit/SwiftUI views can
+    /// carry that token and are not screenshot-protected.
     private static func findSecureCanvas(in field: UITextField) -> UIView? {
         let descendants = allDescendants(of: field)
 
@@ -445,6 +514,13 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         context: Context
     ) {
         uiViewController.update(rootView: content)
+    }
+
+    static func dismantleUIViewController(
+        _ uiViewController: GRUChatSecureHostController<Content>,
+        coordinator: ()
+    ) {
+        uiViewController.disableProtection()
     }
 }
 
