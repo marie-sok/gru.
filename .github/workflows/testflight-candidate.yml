@@ -9,7 +9,7 @@ permissions:
 jobs:
   archive-and-upload:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
 
     env:
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -23,6 +23,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Release hardening audit
+        run: python3 scripts/release_hardening_audit.py
+
+      - name: Runtime localization audit
+        run: python3 scripts/localization_audit.py
+
+      - name: Dual-client E2EE v2 crypto smoke
+        run: xcrun swift .github/scripts/e2ee_v2_dual_client_smoke.swift
 
       - name: Validate signing secrets
         shell: bash
@@ -118,6 +130,22 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             clean archive
+
+      - name: Verify archived production transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/gru.xcarchive/Products/Applications/gru.app"
+          test -d "$APP"
+
+          HTTP_VALUE="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionHTTPBaseURL' "$APP/Info.plist")"
+          WSS_VALUE="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionWebSocketURL' "$APP/Info.plist")"
+
+          test "$HTTP_VALUE" = 'https://gru-edge-v2.onrender.com'
+          test "$WSS_VALUE" = 'wss://gru-edge-v2.onrender.com/ws'
+
+          echo "Verified Release HTTP: $HTTP_VALUE"
+          echo "Verified Release WSS: $WSS_VALUE"
 
       - name: Export signed IPA
         shell: bash
