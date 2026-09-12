@@ -151,15 +151,23 @@ struct GRUScreenProtectionView<Content: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeOut(duration: 0.12), value: model.shouldRedact)
-        .alert(GRUL10n.text("Защита gru."), isPresented: $model.showScreenshotWarning) {
+        .alert(screenshotAlertTitle, isPresented: $model.showScreenshotWarning) {
             Button(GRUL10n.text("Понятно"), role: .cancel) {}
         } message: {
-            Text(
-                GRUL10n.text(
-                    "Защита экрана активна для записи и трансляции. Снимок экрана iOS можно обнаружить только после события."
-                )
-            )
+            Text(screenshotAlertMessage)
         }
+    }
+
+    private var screenshotAlertTitle: String {
+        GRUAppLanguage.selected == .english
+            ? "gru. privacy"
+            : "Приватность gru."
+    }
+
+    private var screenshotAlertMessage: String {
+        GRUAppLanguage.selected == .english
+            ? "Screenshot taken. Screen recording, broadcasting and app previews are hidden to protect your chats."
+            : "Скриншот сделан. Запись экрана, трансляция и превью приложения скрываются для защиты переписки."
     }
 
     private var privacyShield: some View {
