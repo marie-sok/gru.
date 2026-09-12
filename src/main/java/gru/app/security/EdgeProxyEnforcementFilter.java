@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Set;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
@@ -21,6 +22,11 @@ public class EdgeProxyEnforcementFilter extends OncePerRequestFilter {
 
     private static final String SECRET_HEADER = "X-GRU-Edge-Secret";
     private static final String CLIENT_IP_HEADER = "X-GRU-Client-IP";
+    private static final Set<String> PUBLIC_PROBES = Set.of(
+            "/health",
+            "/ready",
+            "/actuator/health"
+    );
 
     private final boolean required;
     private final String sharedSecret;
@@ -45,6 +51,11 @@ public class EdgeProxyEnforcementFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        if (isPublicProbe(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (!required) {
             // Until DNS/proxy cutover, never trust caller-supplied edge headers.
             filterChain.doFilter(request, response);
@@ -68,6 +79,14 @@ public class EdgeProxyEnforcementFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(effectiveRequest, response);
+    }
+
+    private boolean isPublicProbe(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())
+                && !"HEAD".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        return PUBLIC_PROBES.contains(request.getRequestURI());
     }
 
     private boolean constantTimeEquals(String expected, String supplied) {
