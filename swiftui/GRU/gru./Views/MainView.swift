@@ -12,8 +12,9 @@ struct MainView: View {
 
     var body: some View {
         ZStack {
-            // Keep one persistent animated backdrop alive while tabs change.
-            // Child tabs should not replace the root hierarchy during a tab switch.
+            // One persistent animated backdrop stays alive across tab changes.
+            // Individual tabs render only their content so the wallpaper never
+            // restarts or flashes during Chats <-> Settings switching.
             GRUAppBackdrop()
 
             selectedContent
@@ -78,6 +79,9 @@ struct MainView: View {
         }
         .onChange(of: selectedTab) { _, _ in
             dismissAnyKeyboard()
+            DispatchQueue.main.async {
+                dismissAnyKeyboard()
+            }
             if isChatPresented {
                 isChatPresented = false
             }
@@ -119,10 +123,7 @@ struct MainView: View {
         if selectedTab == .contacts {
             ContactsView()
         } else if selectedTab == .settings {
-            // Stable settings implementation used on the physical beta.
-            // E2EE remains an internal transport guarantee and is intentionally
-            // not exposed as a floating user-facing control.
-            SettingsView()
+            GRUStableSettingsView()
         } else {
             BetaChatListView(
                 onChatPresentationChanged: { isPresented in
