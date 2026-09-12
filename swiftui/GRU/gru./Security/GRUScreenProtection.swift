@@ -160,14 +160,14 @@ struct GRUScreenProtectionView<Content: View>: View {
 
     private var screenshotAlertTitle: String {
         GRUAppLanguage.selected == .english
-            ? "gru. privacy"
-            : "Приватность gru."
+            ? "Privacy matters"
+            : "Частная жизнь имеет значение"
     }
 
     private var screenshotAlertMessage: String {
         GRUAppLanguage.selected == .english
-            ? "Screenshot taken. Screen recording, broadcasting and app previews are hidden to protect your chats."
-            : "Скриншот сделан. Запись экрана, трансляция и превью приложения скрываются для защиты переписки."
+            ? "gru. respects the value of privacy. A conversation between two people should stay between them — so screen recording, broadcasting and app previews are hidden."
+            : "gru. уважает ценность частной жизни. Разговор между двумя людьми должен оставаться между ними — поэтому мы скрываем запись экрана, трансляцию и превью приложения."
     }
 
     private var privacyShield: some View {
