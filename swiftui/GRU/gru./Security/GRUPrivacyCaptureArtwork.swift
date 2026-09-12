@@ -1,66 +1,40 @@
 import SwiftUI
+import UIKit
 
-/// Emergency switch for the experimental still-screenshot compositor.
+/// Emergency switch for the still-screenshot compositor.
 /// Keep this scoped to ChatView; RootView/auth must never depend on it.
 enum GRUPrivacyFeatures {
     static let chatScreenshotShieldEnabled = true
 }
 
-/// Capture replacement artwork intentionally styled like the GRU chat surface:
-/// dark, sparse, playful and recognisably cat-first rather than a heavy modal.
+/// The approved cyberpunk GRU privacy artwork.
+/// This embeds the exact cat/screen approved during the physical-iPhone privacy pass.
+private enum GRUPrivacyCyberCatAsset {
+    static let image: UIImage? = {
+        guard let data = Data(base64Encoded: encodedImage) else { return nil }
+        return UIImage(data: data)
+    }()
+
+    private static let encodedImage = "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"
+}
+
 struct GRUPrivacyCaptureArtwork: View {
     var onDismiss: (() -> Void)? = nil
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                background
-                chatDoodles(in: proxy.size)
+                Color.black
 
-                VStack(spacing: 22) {
-                    Spacer(minLength: 70)
-
-                    GRUPrivacyCat()
-                        .frame(width: min(proxy.size.width * 0.56, 230), height: 250)
-
-                    VStack(spacing: 8) {
-                        Text("Упс…")
-                            .font(.system(size: 31, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        Text("this stays between us")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(GRUColors.accent)
-                            .textCase(.lowercase)
-
-                        Text("Частная жизнь имеет значение")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.96))
-                            .padding(.top, 8)
-
-                        Text("gru. уважает ценность частной жизни. Разговор между двумя людьми должен оставаться между ними.")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.64))
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(3)
-                            .frame(maxWidth: 330)
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(GRUColors.accent)
-                            .frame(width: 6, height: 6)
-                            .shadow(color: GRUColors.accent.opacity(0.85), radius: 7)
-
-                        Text("people for people")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.44))
-                    }
-                    .padding(.bottom, 26)
+                if let image = GRUPrivacyCyberCatAsset.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                } else {
+                    fallback
                 }
-                .padding(.horizontal, 24)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .contentShape(Rectangle())
@@ -71,163 +45,19 @@ struct GRUPrivacyCaptureArtwork: View {
         .accessibilityLabel("gru. privacy")
     }
 
-    private var background: some View {
-        ZStack {
-            Color(red: 0.025, green: 0.029, blue: 0.041)
+    private var fallback: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 48, weight: .semibold))
+                .foregroundStyle(GRUColors.accent)
 
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.025),
-                    Color.clear,
-                    GRUColors.accent.opacity(0.035)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Text("Упс…")
+                .font(.system(size: 30, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
 
-            RadialGradient(
-                colors: [GRUColors.accent.opacity(0.10), .clear],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 320
-            )
+            Text("this stays between us")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(GRUColors.accent)
         }
-    }
-
-    @ViewBuilder
-    private func chatDoodles(in size: CGSize) -> some View {
-        ZStack {
-            bubble(width: 112, height: 38, opacity: 0.045)
-                .offset(x: -size.width * 0.31, y: -size.height * 0.31)
-
-            bubble(width: 84, height: 34, opacity: 0.07)
-                .offset(x: size.width * 0.34, y: -size.height * 0.22)
-
-            bubble(width: 128, height: 42, opacity: 0.035)
-                .offset(x: size.width * 0.27, y: size.height * 0.28)
-
-            Circle()
-                .stroke(GRUColors.accent.opacity(0.10), lineWidth: 1)
-                .frame(width: 210, height: 210)
-                .offset(x: size.width * 0.32, y: -size.height * 0.34)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func bubble(width: CGFloat, height: CGFloat, opacity: Double) -> some View {
-        RoundedRectangle(cornerRadius: height / 2.2, style: .continuous)
-            .fill(Color.white.opacity(opacity))
-            .frame(width: width, height: height)
-    }
-}
-
-private struct GRUPrivacyCat: View {
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(GRUColors.accent.opacity(0.08))
-                .frame(width: 196, height: 196)
-                .blur(radius: 8)
-                .offset(y: -18)
-
-            VStack(spacing: -9) {
-                catHead
-                hoodie
-            }
-        }
-    }
-
-    private var catHead: some View {
-        ZStack {
-            HStack(spacing: 68) {
-                ear(rotation: -14)
-                ear(rotation: 14)
-            }
-            .offset(y: -39)
-
-            RoundedRectangle(cornerRadius: 52, style: .continuous)
-                .fill(Color(red: 0.055, green: 0.061, blue: 0.078))
-                .frame(width: 128, height: 112)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 52, style: .continuous)
-                        .stroke(GRUColors.accent.opacity(0.92), lineWidth: 2)
-                        .shadow(color: GRUColors.accent.opacity(0.55), radius: 8)
-                }
-
-            HStack(spacing: 31) {
-                eye
-                eye
-            }
-            .offset(y: -5)
-
-            Path { path in
-                path.move(to: CGPoint(x: 58, y: 67))
-                path.addQuadCurve(
-                    to: CGPoint(x: 70, y: 67),
-                    control: CGPoint(x: 64, y: 74)
-                )
-            }
-            .stroke(Color.white.opacity(0.75), style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
-            .frame(width: 128, height: 112)
-        }
-        .frame(width: 164, height: 118)
-    }
-
-    private var hoodie: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 42, style: .continuous)
-                .fill(Color(red: 0.070, green: 0.076, blue: 0.096))
-                .frame(width: 174, height: 118)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 42, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                }
-
-            Text("ШТОШ")
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.92))
-                .offset(y: 6)
-
-            HStack(spacing: 122) {
-                paw(rotation: -23)
-                paw(rotation: 23)
-            }
-            .offset(y: 18)
-        }
-    }
-
-    private var eye: some View {
-        Circle()
-            .fill(Color.white.opacity(0.96))
-            .frame(width: 14, height: 14)
-            .overlay {
-                Circle()
-                    .fill(Color.black.opacity(0.82))
-                    .frame(width: 6, height: 6)
-            }
-    }
-
-    private func ear(rotation: Double) -> some View {
-        RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(Color(red: 0.055, green: 0.061, blue: 0.078))
-            .frame(width: 35, height: 45)
-            .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(GRUColors.accent.opacity(0.78), lineWidth: 1.7)
-            }
-            .rotationEffect(.degrees(rotation))
-    }
-
-    private func paw(rotation: Double) -> some View {
-        Capsule(style: .continuous)
-            .fill(Color(red: 0.055, green: 0.061, blue: 0.078))
-            .frame(width: 33, height: 71)
-            .overlay {
-                Capsule(style: .continuous)
-                    .stroke(GRUColors.accent.opacity(0.75), lineWidth: 1.7)
-            }
-            .rotationEffect(.degrees(rotation))
-            .shadow(color: GRUColors.accent.opacity(0.28), radius: 8)
     }
 }
