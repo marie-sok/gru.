@@ -19,6 +19,9 @@ struct AudioBubble: View {
     @State private var isTranscribing = false
     @State private var transcriptionTask: Task<Void, Never>?
 
+    @AppStorage("gru.settings.language.transliterateVoiceTranscripts")
+    private var transliterateVoiceTranscripts = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
@@ -341,7 +344,12 @@ struct AudioBubble: View {
                     }
                 }
 
-                Text(transcript.text)
+                Text(
+                    GRUTransliterator.display(
+                        transcript.text,
+                        enabled: transliterateVoiceTranscripts
+                    )
+                )
                     .font(
                         .system(
                             size: 13,
