@@ -97,20 +97,23 @@ forbid(ROOT_VIEW, "isBiometricLocked",
 # Screen privacy.
 #
 # Root protection uses only public recording/lifecycle signals. Still-screenshot
-# replacement is allowed exclusively inside the authenticated ChatView surface:
-# the chat is rendered in a non-responder secure compositor while the normal
-# GRU privacy scene sits behind it. RootView/auth must never be secure-hosted.
+# replacement is allowed exclusively inside authenticated ChatView. GRU mirrors
+# Telegram-iOS' layer-level secure-rendering guard: temporarily substitute the
+# protected CALayer into UITextField's TextLayoutCanvasView, toggle secureTextEntry,
+# then restore the original canvas layer. RootView/auth must never use this path.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
-require(SCREEN, "GRUChatNonResponderSecureField",
-        "chat-scoped secure screenshot host is missing")
+require(SCREEN, "GRUTelegramLayerScreenshotGuard",
+        "Telegram-style chat screenshot layer guard is missing")
 require(SCREEN, "GRUChatSecureCaptureContainer",
         "chat-scoped secure compositor is missing")
-require(SCREEN, "secureField.isSecureTextEntry = true",
-        "chat secure compositor is not enabled")
+require(SCREEN, 'secureView.setValue(layer, forKey: "layer")',
+        "Telegram-style protected layer substitution is missing")
+require(SCREEN, "textField.isSecureTextEntry = true",
+        "Telegram-style secureTextEntry toggle is missing")
 require(SCREEN, "GRUPrivacyCaptureScene",
         "GRU privacy replacement scene is missing")
 require(CHAT_VIEW, "GRUChatCaptureProtection",
@@ -129,6 +132,8 @@ if "struct GRUScreenProtectionView" in screen_text:
     root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
     if "GRUChatSecureCaptureContainer" in root_section:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
+    if "GRUTelegramLayerScreenshotGuard" in root_section:
+        failures.append("Telegram-style screenshot guard leaked into root/auth protection")
 
 # Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
