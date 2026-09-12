@@ -31,6 +31,7 @@ jobs:
       PORT: "8081"
       MONGODB_URI: "mongodb://127.0.0.1:27017/gru_dast"
       GRU_JWT_SECRET: "ci-only-gru-dast-secret-0123456789abcdef0123456789abcdef"
+      SERVER_ERROR_INCLUDE_MESSAGE: "always"
 
     steps:
       - name: Checkout
