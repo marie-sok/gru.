@@ -91,7 +91,7 @@ forbid(APP_TAB, "case music", "Music tab returned")
 require(APP, "GRURadioHandoffMonitor.shared.start()", "radio handoff monitor is not started")
 require(APP, "GRUConnectivityCenter.shared.reconnectRealtime()", "foreground realtime recovery is missing")
 require(RADIO, "path.usesInterfaceType(.cellular)", "cellular handoff detection is missing")
-require(RADIO, "WebSocketService.shared", "radio handoff does not reconnect realtime")
+require(RADIO, "GRUConnectivityCenter.shared.reconnectRealtime()", "radio handoff does not reconnect realtime")
 
 # Audio/video capture must keep blocking session work off the main queue.
 require(VOICE, "DispatchQueue.global(qos: .userInitiated).async", "voice AVAudioSession activation is not off-main")
