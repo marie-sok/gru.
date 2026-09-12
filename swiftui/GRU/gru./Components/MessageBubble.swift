@@ -283,9 +283,10 @@ private struct BubbleText: View {
 
     @AppStorage("gru.settings.chats.textScale") private var textScale = 1.0
     @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
+    @AppStorage("gru.settings.language.transliterateMessages") private var transliterateMessages = false
 
     var body: some View {
-        Text(text)
+        Text(GRUTransliterator.display(text, enabled: transliterateMessages))
             .font(.system(size: 16.5 * textScale))
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -319,6 +320,8 @@ private struct BubbleText: View {
 private struct ReplyPreview: View {
     let message: Message
 
+    @AppStorage("gru.settings.language.transliterateMessages") private var transliterateMessages = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(GRUL10n.text("Ответ"))
@@ -328,7 +331,7 @@ private struct ReplyPreview: View {
             if let attachment = message.attachment {
                 AttachmentContent(attachment: attachment)
             } else {
-                Text(message.text)
+                Text(GRUTransliterator.display(message.text, enabled: transliterateMessages))
                     .font(.caption)
                     .lineLimit(1)
             }
