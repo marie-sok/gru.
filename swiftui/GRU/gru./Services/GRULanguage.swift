@@ -203,7 +203,23 @@ enum GRUL10n {
                 "Сбросить test lab": "Reset test lab",
                 "Проверяй здесь обычный текст, reply, edit, delete, reactions, multi-select, фото, видео, документы, контакты, голосовые и кото-кружки. Ничего из этого test lab не отправляет в реальные чаты.": "Test regular text, reply, edit, delete, reactions, multi-select, photos, videos, documents, contacts, voice messages and cat circles here. Nothing in test lab is sent to real chats.",
                 "Я локальный собеседник test lab. Свайпни это сообщение влево для reply или зажми для реакций и действий.": "I am the local test lab peer. Swipe this message left to reply, or press and hold for reactions and actions.",
-                "Это моё тестовое сообщение — его можно редактировать, копировать, выбрать и удалить.": "This is my test message — you can edit, copy, select and delete it."
+                "Это моё тестовое сообщение — его можно редактировать, копировать, выбрать и удалить.": "This is my test message — you can edit, copy, select and delete it.",
+                "%d непрочитанных сообщений": "%d unread messages",
+                "gru.bot печатает…": "gru.bot is typing…",
+                "Вы:": "You:",
+                "Группа": "Group",
+                "Меню gru.bot": "gru.bot menu",
+                "Напиши что-нибудь…": "Write something…",
+                "Начните общение": "Start chatting",
+                "Нет сообщений": "No messages",
+                "Открой test lab": "Open test lab",
+                "Открыть test lab": "Open test lab",
+                "Очистить диалог": "Clear conversation",
+                "Пользователь": "User",
+                "Сессия недоступна. Войдите снова.": "Session unavailable. Sign in again.",
+                "Черновик": "Draft",
+                "вчера": "yesterday",
+                "поболтать • идеи • помощь • actions": "chat • ideas • help • actions"
             ]
         }
     }
