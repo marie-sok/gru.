@@ -14,6 +14,16 @@ BOOL GRUSetLayerDisableScreenshots(CALayer *layer, BOOL disableScreenshots) {
                 break;
             }
         }
+
+        if (secureView == nil) {
+            NSMutableArray<NSString *> *classNames = [[NSMutableArray alloc] init];
+            for (UIView *subview in textField.subviews) {
+                [classNames addObject:NSStringFromClass([subview class])];
+            }
+            NSLog(@"[GRUPrivacy] secure layer guard unavailable; UITextField subviews=%@", classNames);
+        } else {
+            NSLog(@"[GRUPrivacy] secure layer guard canvas=%@", NSStringFromClass([secureView class]));
+        }
     });
 
     if (secureView == nil) {
@@ -34,5 +44,6 @@ BOOL GRUSetLayerDisableScreenshots(CALayer *layer, BOOL disableScreenshots) {
 
     [secureView setValue:previousLayer forKey:@"layer"];
 
+    NSLog(@"[GRUPrivacy] secure layer guard %@", disableScreenshots ? @"enabled" : @"disabled");
     return YES;
 }
