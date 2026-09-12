@@ -8,14 +8,12 @@ struct MainView: View {
     @State private var isAgentPresented = false
     @State private var showBotTestLab = false
     @State private var showConnectivityDiagnostics = false
-    @State private var showE2EESecurityCenter = false
     @StateObject private var connectivity = GRUConnectivityCenter.shared
 
     var body: some View {
         ZStack {
-            // Keep one persistent animated backdrop alive while tabs change.
-            // Child tabs must not recreate their own wallpaper, otherwise the
-            // animation restarts and looks like a broken frame swap.
+            // One persistent animated backdrop for all tabs.
+            // Individual tabs must not create another animated wallpaper.
             GRUAppBackdrop()
 
             selectedContent
@@ -48,7 +46,6 @@ struct MainView: View {
                 GRUTabBar(selectedTab: $selectedTab)
                     .padding(.top, 6)
                     .padding(.bottom, 6)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .onAppear {
@@ -78,9 +75,6 @@ struct MainView: View {
                         }
                     }
             }
-        }
-        .sheet(isPresented: $showE2EESecurityCenter) {
-            GRUE2EESecurityCenterView()
         }
         .onChange(of: selectedTab) { _, _ in
             dismissAnyKeyboard()
@@ -125,29 +119,7 @@ struct MainView: View {
         if selectedTab == .contacts {
             ContactsView()
         } else if selectedTab == .settings {
-            ZStack(alignment: .bottomTrailing) {
-                SettingsView()
-
-                Button {
-                    showE2EESecurityCenter = true
-                } label: {
-                    Label(GRUL10n.text("Защита E2EE"), systemImage: "checkmark.shield.fill")
-                        .font(.subheadline.weight(.bold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .overlay {
-                            Capsule()
-                                .stroke(GRUColors.accent.opacity(0.55), lineWidth: 1)
-                        }
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(GRUColors.accent)
-                .padding(.trailing, 16)
-                .padding(.bottom, 14)
-                .accessibilityLabel(GRUL10n.text("Открыть центр проверки E2EE"))
-            }
+            BetaSettingsView()
         } else {
             BetaChatListView(
                 onChatPresentationChanged: { isPresented in
