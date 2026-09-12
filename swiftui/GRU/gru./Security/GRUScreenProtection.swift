@@ -187,13 +187,15 @@ private enum GRUTelegramLayerScreenshotGuard {
     }
 }
 
-/// Hosts the complete ChatView and protects the representable controller's root
-/// layer. The approved cyberpunk cat is rendered as a sibling underneath it.
-/// No secure UITextField enters the responder or view hierarchy.
+/// Hosts the complete ChatView. Unlike a single root-layer marker, SwiftUI may
+/// create additional compositing/media layers after the host has appeared. Every
+/// current layer in the chat subtree is therefore marked with the same Telegram
+/// secure-rendering helper, and new layers are picked up on later layout/update
+/// passes. If any protection pass cannot be established, the chat fails closed.
 @MainActor
 private final class GRUTelegramProtectedChatHostController<Content: View>: UIViewController {
     private let host: UIHostingController<Content>
-    private var screenshotProtectionApplied = false
+    private var protectedLayerIDs: Set<ObjectIdentifier> = []
     private var retryWorkItem: DispatchWorkItem?
     private var retryCount = 0
 
@@ -222,8 +224,8 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
         view.insetsLayoutMarginsFromSafeArea = false
         additionalSafeAreaInsets = .zero
 
-        // Fail closed: until the exact Telegram-style marker is applied, the
-        // real chat remains hidden and the cyberpunk privacy scene underneath is visible.
+        // Fail closed: privacy artwork remains visible until the complete
+        // current chat layer tree has been marked protected.
         host.view.isHidden = true
 
         addChild(host)
@@ -242,32 +244,33 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        applyProtectionIfNeeded()
+        applyProtectionToCurrentTree()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         retryCount = 0
-        applyProtectionIfNeeded()
+        applyProtectionToCurrentTree()
     }
 
     func update(rootView: Content) {
         host.rootView = rootView
-        applyProtectionIfNeeded()
+        applyProtectionToCurrentTree()
+
+        // SwiftUI can materialize additional rendering layers after update.
+        DispatchQueue.main.async { [weak self] in
+            self?.applyProtectionToCurrentTree()
+        }
     }
 
-    private func applyProtectionIfNeeded() {
-        guard !screenshotProtectionApplied else {
-            host.view.isHidden = false
-            return
-        }
-
+    private func applyProtectionToCurrentTree() {
         guard isViewLoaded,
               view.window != nil,
               view.bounds.width > 1,
               view.bounds.height > 1,
               host.view.bounds.width > 1,
               host.view.bounds.height > 1 else {
+            host.view.isHidden = true
             scheduleRetry()
             return
         }
@@ -275,39 +278,68 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        // Telegram protects a container layer. Protect our outer chat container
-        // and the SwiftUI host root as a belt-and-suspenders measure.
-        let outerProtected = GRUTelegramLayerScreenshotGuard.setProtected(
-            view.layer,
-            enabled: true
-        )
-        let hostProtected = GRUTelegramLayerScreenshotGuard.setProtected(
-            host.view.layer,
-            enabled: true
-        )
+        let layers = uniqueLayerTree()
+        var passSucceeded = true
+
+        for layer in layers {
+            let identifier = ObjectIdentifier(layer)
+            guard !protectedLayerIDs.contains(identifier) else { continue }
+
+            if GRUTelegramLayerScreenshotGuard.setProtected(layer, enabled: true) {
+                protectedLayerIDs.insert(identifier)
+            } else {
+                passSucceeded = false
+                break
+            }
+        }
 
         CATransaction.commit()
 
-        guard outerProtected && hostProtected else {
+        let rootsProtected = protectedLayerIDs.contains(ObjectIdentifier(view.layer)) &&
+            protectedLayerIDs.contains(ObjectIdentifier(host.view.layer))
+
+        guard passSucceeded && rootsProtected else {
             host.view.isHidden = true
             scheduleRetry()
             return
         }
 
-        screenshotProtectionApplied = true
         host.view.isHidden = false
         retryWorkItem?.cancel()
         retryWorkItem = nil
+
+        #if DEBUG
+        print("[GRU Privacy] secure chat layer tree protected: \(protectedLayerIDs.count) layers")
+        #endif
+    }
+
+    private func uniqueLayerTree() -> [CALayer] {
+        var result: [CALayer] = []
+        var seen: Set<ObjectIdentifier> = []
+        var queue: [CALayer] = [view.layer, host.view.layer]
+
+        while !queue.isEmpty {
+            let layer = queue.removeFirst()
+            let identifier = ObjectIdentifier(layer)
+            guard seen.insert(identifier).inserted else { continue }
+
+            result.append(layer)
+            if let sublayers = layer.sublayers {
+                queue.append(contentsOf: sublayers)
+            }
+        }
+
+        return result
     }
 
     private func scheduleRetry() {
-        guard retryWorkItem == nil, retryCount < 100 else { return }
+        guard retryWorkItem == nil, retryCount < 120 else { return }
 
         retryCount += 1
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.retryWorkItem = nil
-            self.applyProtectionIfNeeded()
+            self.applyProtectionToCurrentTree()
         }
 
         retryWorkItem = work
