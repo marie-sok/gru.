@@ -268,7 +268,7 @@ private extension RootView {
             return false
         }
 
-        let reason = GRUL10n.text("Подтвердите личность для входа в GRU")
+        let reason = GRUL10n.text("Разблокируйте доступ к приложению gru.")
 
         return await withCheckedContinuation { continuation in
             context.evaluatePolicy(
