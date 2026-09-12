@@ -18,9 +18,7 @@ struct AudioBubble: View {
     @State private var transcriptionError: String?
     @State private var isTranscribing = false
     @State private var transcriptionTask: Task<Void, Never>?
-
-    @AppStorage("gru.settings.language.transliterateVoiceTranscripts")
-    private var transliterateVoiceTranscripts = false
+    @State private var showTranslation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -238,7 +236,7 @@ struct AudioBubble: View {
                     .tint(GRUColors.accent)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Распознаю RU + EN…")
+                    Text(GRUL10n.text("Распознаю RU + EN…"))
                         .font(
                             .system(
                                 size: 12,
@@ -248,7 +246,7 @@ struct AudioBubble: View {
                         )
 
                     Text(
-                        "автоматически выбираю лучший язык"
+                        GRUL10n.text("автоматически выбираю лучший язык")
                     )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -260,7 +258,7 @@ struct AudioBubble: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
                     Label(
-                        "Расшифровка",
+                        GRUL10n.text("Расшифровка"),
                         systemImage: "quote.bubble.fill"
                     )
                     .font(
@@ -281,7 +279,7 @@ struct AudioBubble: View {
                             )
                         } label: {
                             Label(
-                                "Русский",
+                                GRUL10n.text("Русский"),
                                 systemImage:
                                     transcript.language == .russian
                                     ? "checkmark"
@@ -311,7 +309,7 @@ struct AudioBubble: View {
                             )
                         } label: {
                             Label(
-                                "Авто RU + EN",
+                                GRUL10n.text("Авто RU + EN"),
                                 systemImage: "wand.and.stars"
                             )
                         }
@@ -344,12 +342,7 @@ struct AudioBubble: View {
                     }
                 }
 
-                Text(
-                    GRUTransliterator.display(
-                        transcript.text,
-                        enabled: transliterateVoiceTranscripts
-                    )
-                )
+                Text(transcript.text)
                     .font(
                         .system(
                             size: 13,
@@ -364,17 +357,43 @@ struct AudioBubble: View {
                     )
                     .textSelection(.enabled)
 
-                HStack(spacing: 5) {
-                    Text(transcript.language.title)
-                    Text("•")
-                    Text(
-                        confidenceText(
-                            transcript.confidence
+                HStack(spacing: 8) {
+                    HStack(spacing: 5) {
+                        Text(transcript.language.title)
+                        Text("•")
+                        Text(
+                            confidenceText(
+                                transcript.confidence
+                            )
                         )
-                    )
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 4)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            showTranslation.toggle()
+                        }
+                    } label: {
+                        Label(
+                            GRUAppLanguage.selected == .english
+                                ? (showTranslation ? "Hide translation" : "Translate")
+                                : (showTranslation ? "Скрыть перевод" : "Перевести"),
+                            systemImage: "character.book.closed"
+                        )
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(GRUColors.accent)
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
+                GRUInlineTranslation(
+                    text: transcript.text,
+                    sourceHint: transcript.language == .russian ? .russian : .english,
+                    isPresented: $showTranslation
+                )
             }
 
         } else if let transcriptionError {
@@ -394,14 +413,14 @@ struct AudioBubble: View {
                     )
 
                 HStack(spacing: 12) {
-                    Button("Авто RU + EN") {
+                    Button(GRUL10n.text("Авто RU + EN")) {
                         startTranscription(
                             forcedLanguage: nil
                         )
                     }
 
-                    Menu("Язык") {
-                        Button("Русский") {
+                    Menu(GRUL10n.text("Язык")) {
+                        Button(GRUL10n.text("Русский")) {
                             startTranscription(
                                 forcedLanguage: .russian
                             )
@@ -632,6 +651,7 @@ struct AudioBubble: View {
         transcriptionTask = Task { @MainActor in
             isTranscribing = true
             transcriptionError = nil
+            showTranslation = false
 
             await preparePlayerIfNeeded()
 
