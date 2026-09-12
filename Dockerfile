@@ -7,7 +7,8 @@ RUN mvn -q clean package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /workspace/target/gru-1.0.0.jar /app/gru.jar
+COPY --from=build --chown=10001:10001 /workspace/target/gru-1.0.0.jar /app/gru.jar
 ENV PORT=8081
 EXPOSE 8081
+USER 10001:10001
 ENTRYPOINT ["java","-XX:MaxRAMPercentage=75.0","-jar","/app/gru.jar"]

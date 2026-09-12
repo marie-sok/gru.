@@ -50,9 +50,9 @@ public class GRUBotController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Text is required");
         }
 
-        String apiKey = System.getenv("OPENAI_API_KEY");
-        if (apiKey == null || apiKey.isBlank()) {
-            System.err.println("gru.bot: OPENAI_API_KEY is missing; conversational fallback enabled");
+        String apiKey = env("GRU_AI_KEY", env("OPENAI_API_KEY", ""));
+        if (apiKey.isBlank()) {
+            System.err.println("gru.bot: GRU_AI_KEY is missing; conversational fallback enabled");
             return localFallback(request, "local");
         }
 
@@ -116,11 +116,11 @@ public class GRUBotController {
 
         } catch (RestClientResponseException error) {
             System.err.println(
-                    "gru.bot OpenAI HTTP " + error.getStatusCode() + ": " + error.getResponseBodyAsString()
+                    "gru.bot OpenAI HTTP " + error.getStatusCode()
             );
             return localFallback(request, "provider-http-error");
         } catch (Exception error) {
-            System.err.println("gru.bot provider timeout/error: " + error.getMessage());
+            System.err.println("gru.bot provider timeout/error: " + error.getClass().getSimpleName());
             return localFallback(request, "provider-timeout-or-error");
         }
     }
