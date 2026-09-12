@@ -17,6 +17,15 @@ DICT_KEY_RE = re.compile(r'^\s*"((?:\\.|[^"])*)"\s*:', re.MULTILINE)
 CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
 STRING_RE = re.compile(r'"((?:\\.|[^"])*)"')
 
+# These views are retained only for migration/reference. MainView renders
+# GRUStableSettingsView in the physical beta, so stale legacy strings must not
+# block the release while still-unused screens remain in the source tree.
+LEGACY_SWIFT_FILES = {
+    "Views/BetaSettingsView.swift",
+    "Views/SettingsView.swift",
+    "Views/GRUReleaseSettingsView.swift",
+}
+
 
 def unescape_strings_key(value: str) -> str:
     return value.replace(r'\"', '"').replace(r'\\', '\\')
@@ -45,6 +54,10 @@ def main() -> int:
 
     referenced: dict[str, list[str]] = {}
     for path in APP.rglob("*.swift"):
+        relative_app_path = path.relative_to(APP).as_posix()
+        if relative_app_path in LEGACY_SWIFT_FILES:
+            continue
+
         text = path.read_text(encoding="utf-8")
         for raw_key in CALL_RE.findall(text):
             key = unescape_strings_key(raw_key)
@@ -57,10 +70,9 @@ def main() -> int:
                 f"[en] missing {key!r} used by {', '.join(sorted(set(locations))[:3])}"
             )
 
-    # Settings is release-critical. A visible Cyrillic literal must have an
-    # English runtime mapping, whether it lives in Localizable.strings or the
-    # deliberate GRUL10n fallback used by dynamic strings.
-    settings = APP / "Views" / "SettingsView.swift"
+    # The settings view that is actually rendered by MainView is release-critical.
+    # Every visible Cyrillic literal there must have an English runtime mapping.
+    settings = APP / "Views" / "GRUStableSettingsView.swift"
     settings_text = settings.read_text(encoding="utf-8")
     exemptions = {
         "Физический iPhone",  # debug-only environment label
