@@ -20,13 +20,11 @@ struct gru_App: App {
     var body: some Scene {
         WindowGroup {
             GRUScreenProtectionView {
-                RootView()
+                releaseTransportGate
             }
-            // Runtime locale changes must not recreate RootView. Rebuilding the
-            // root destroys the active NavigationStack / selected tab and used
-            // to throw the user back to Chats whenever the language changed.
-            // SwiftUI propagates the new locale through the environment without
-            // replacing the navigation hierarchy.
+            // Runtime locale changes must not recreate RootView. SwiftUI pushes
+            // the new locale through the environment while tab/navigation state
+            // remains alive.
             .environment(
                 \.locale,
                 appLanguage.locale
@@ -47,16 +45,41 @@ struct gru_App: App {
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
 
-                // A URLSessionWebSocketTask may look connected after iOS has
-                // suspended the app or changed radios while it was backgrounded.
-                // Refresh backend readiness and deliberately establish a fresh
-                // STOMP session whenever an authenticated app returns active.
                 GRUConnectivityCenter.shared.refresh()
 
                 guard TokenStorage.shared.token != nil else { return }
                 GRUConnectivityCenter.shared.reconnectRealtime()
             }
         }
+    }
+
+    @ViewBuilder
+    private var releaseTransportGate: some View {
+        #if DEBUG
+        RootView()
+        #else
+        if isReleaseTransportSafe {
+            RootView()
+        } else {
+            GRUReleaseTransportErrorView()
+        }
+        #endif
+    }
+
+    private var isReleaseTransportSafe: Bool {
+        guard
+            let httpURL = URL(string: GRUServerConfiguration.httpBaseURL),
+            let socketURL = URL(string: GRUServerConfiguration.webSocketURL)
+        else {
+            return false
+        }
+
+        return
+            httpURL.scheme?.lowercased() == "https" &&
+            httpURL.host?.lowercased() == "gru-edge-v2.onrender.com" &&
+            socketURL.scheme?.lowercased() == "wss" &&
+            socketURL.host?.lowercased() == "gru-edge-v2.onrender.com" &&
+            socketURL.path == "/ws"
     }
 
     @MainActor
@@ -72,6 +95,35 @@ struct gru_App: App {
             #if DEBUG
             print("E2EE identity publish skipped/failed:", error.localizedDescription)
             #endif
+        }
+    }
+}
+
+private struct GRUReleaseTransportErrorView: View {
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Image(systemName: "network.slash")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(GRUColors.accent)
+
+                Text("gru.")
+                    .font(.system(size: 32, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text(GRUL10n.text("Не удалось открыть безопасное подключение GRU."))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+
+                Text(GRUL10n.text("Обновите приложение и попробуйте снова. Ваши данные не отправлялись напрямую в обход защищённого шлюза."))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.60))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(28)
         }
     }
 }
