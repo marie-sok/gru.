@@ -19,6 +19,8 @@ struct RootView: View {
     @AppStorage("gru.release.onboarding.v11") private var didFinishOnboarding = false
     @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
     @State private var isBiometricLocked = false
+    @State private var isBiometricPromptInFlight = false
+    @State private var suppressAutomaticBiometricRetry = false
 
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
@@ -101,15 +103,26 @@ struct RootView: View {
                     NotificationService.shared.clearBadge()
                 }
 
+                // LocalAuthentication can temporarily move the app through
+                // inactive/active while its system sheet is presented. Never
+                // treat that transition as a fresh unlock opportunity.
                 if biometricsEnabled &&
                     isAuthenticated &&
                     didFinishOnboarding &&
-                    isBiometricLocked {
-                    authenticateWithBiometrics()
+                    isBiometricLocked &&
+                    !isBiometricPromptInFlight &&
+                    !suppressAutomaticBiometricRetry {
+                    authenticateWithBiometrics(userInitiated: false)
                 }
             } else if newPhase == .background {
-                if biometricsEnabled && isAuthenticated {
+                // A real app background should relock GRU. A background-like
+                // transition caused by an in-flight Face ID sheet must not
+                // restart the lock cycle.
+                if biometricsEnabled &&
+                    isAuthenticated &&
+                    !isBiometricPromptInFlight {
                     isBiometricLocked = true
+                    suppressAutomaticBiometricRetry = false
                 }
             }
         }
@@ -253,9 +266,12 @@ private extension RootView {
 
         if biometricsEnabled && requireBiometricUnlock {
             isBiometricLocked = true
-            authenticateWithBiometrics()
+            suppressAutomaticBiometricRetry = false
+            authenticateWithBiometrics(userInitiated: false)
         } else {
             isBiometricLocked = false
+            isBiometricPromptInFlight = false
+            suppressAutomaticBiometricRetry = false
         }
     }
 
@@ -285,6 +301,9 @@ private extension RootView {
         ChatService.shared.clearAuthenticatedUser()
         NotificationService.shared.removeAllNotifications()
         NotificationService.shared.clearBadge()
+        isBiometricLocked = false
+        isBiometricPromptInFlight = false
+        suppressAutomaticBiometricRetry = false
     }
 
     func handleSessionInvalidated() {
@@ -395,7 +414,8 @@ private extension RootView {
                 }
 
                 Button {
-                    authenticateWithBiometrics()
+                    suppressAutomaticBiometricRetry = false
+                    authenticateWithBiometrics(userInitiated: true)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "lock.open.fill")
@@ -410,6 +430,7 @@ private extension RootView {
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(isBiometricPromptInFlight)
                 .padding(.top, 12)
             }
             .padding(32)
@@ -417,28 +438,44 @@ private extension RootView {
         .transition(.opacity)
     }
 
-    func authenticateWithBiometrics() {
+    func authenticateWithBiometrics(userInitiated: Bool) {
         guard biometricsEnabled && isAuthenticated else { return }
+        guard !isBiometricPromptInFlight else { return }
+        guard userInitiated || !suppressAutomaticBiometricRetry else { return }
+
+        isBiometricPromptInFlight = true
 
         let context = LAContext()
         var authError: NSError?
         let reason = GRUL10n.text("Разблокируйте доступ к приложению gru.")
 
-        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) {
-            context.evaluatePolicy(
-                .deviceOwnerAuthentication,
-                localizedReason: reason
-            ) { success, _ in
-                DispatchQueue.main.async {
-                    if success {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            isBiometricLocked = false
-                        }
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) else {
+            isBiometricPromptInFlight = false
+            isBiometricLocked = false
+            suppressAutomaticBiometricRetry = false
+            return
+        }
+
+        context.evaluatePolicy(
+            .deviceOwnerAuthentication,
+            localizedReason: reason
+        ) { success, _ in
+            DispatchQueue.main.async {
+                isBiometricPromptInFlight = false
+
+                if success {
+                    suppressAutomaticBiometricRetry = false
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isBiometricLocked = false
                     }
+                } else {
+                    // Do not immediately call Face ID again when the system
+                    // sheet returns the app to active. The user can explicitly
+                    // retry from the lock overlay.
+                    isBiometricLocked = true
+                    suppressAutomaticBiometricRetry = true
                 }
             }
-        } else {
-            isBiometricLocked = false
         }
     }
 }
