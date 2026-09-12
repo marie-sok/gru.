@@ -2,23 +2,6 @@ import Combine
 import SwiftUI
 import UIKit
 
-@_silgen_name("GRUSetLayerDisableScreenshots")
-private func GRUSetLayerDisableScreenshotsRuntime(
-    _ layer: UnsafeMutableRawPointer,
-    _ disableScreenshots: Bool
-) -> Bool
-
-@MainActor
-private enum GRUSecureLayerBridge {
-    @discardableResult
-    static func setProtected(_ layer: CALayer, enabled: Bool) -> Bool {
-        GRUSetLayerDisableScreenshotsRuntime(
-            Unmanaged.passUnretained(layer).toOpaque(),
-            enabled
-        )
-    }
-}
-
 @MainActor
 final class GRUScreenProtectionModel: ObservableObject {
     @Published private(set) var isCaptureActive = false
@@ -156,14 +139,41 @@ final class GRUScreenProtectionModel: ObservableObject {
 
 // MARK: - Chat-only still screenshot protection
 
+/// Exists only inside an authenticated ChatView. It must never wrap RootView,
+/// LoginView or the LocalAuthentication lifecycle.
+private final class GRUChatNonResponderSecureField: UITextField {
+    override var canBecomeFirstResponder: Bool { false }
+
+    override func becomeFirstResponder() -> Bool {
+        false
+    }
+
+    override func canPerformAction(
+        _ action: Selector,
+        withSender sender: Any?
+    ) -> Bool {
+        false
+    }
+}
+
+/// Hosts the conversation inside UIKit's actual secure-text rendering canvas.
+/// The privacy artwork is rendered behind this controller, so a compositor that
+/// omits secure text content reveals the GRU privacy scene instead of messages.
+///
+/// Important: there is deliberately no ordinary UIView fallback. If a future
+/// iOS version changes the secure canvas internals, the chat fails closed and
+/// the privacy artwork remains visible rather than exposing the conversation.
 @MainActor
-private final class GRUProtectedChatHostController<Content: View>: UIViewController {
-    private let protectedContainer = UIView(frame: .zero)
+private final class GRUChatSecureHostController<Content: View>: UIViewController {
+    private let secureField = GRUChatNonResponderSecureField(frame: .zero)
     private let host: UIHostingController<Content>
 
-    private var protectionApplied = false
+    private weak var protectedCanvas: UIView?
+    private var hostConstraints: [NSLayoutConstraint] = []
     private var retryWorkItem: DispatchWorkItem?
     private var retryCount = 0
+    private var didPrimeSecureField = false
+    private var didLogHierarchy = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -190,82 +200,136 @@ private final class GRUProtectedChatHostController<Content: View>: UIViewControl
         view.insetsLayoutMarginsFromSafeArea = false
         additionalSafeAreaInsets = .zero
 
-        protectedContainer.backgroundColor = .clear
-        protectedContainer.translatesAutoresizingMaskIntoConstraints = false
-        protectedContainer.isHidden = true
-        protectedContainer.clipsToBounds = false
+        secureField.text = " "
+        secureField.textColor = .clear
+        secureField.tintColor = .clear
+        secureField.backgroundColor = .clear
+        secureField.borderStyle = .none
+        secureField.autocorrectionType = .no
+        secureField.spellCheckingType = .no
+        secureField.smartDashesType = .no
+        secureField.smartQuotesType = .no
+        secureField.smartInsertDeleteType = .no
+        secureField.textContentType = nil
+        secureField.isAccessibilityElement = false
+        secureField.accessibilityElementsHidden = false
+        secureField.clipsToBounds = true
+        secureField.isUserInteractionEnabled = true
+        secureField.translatesAutoresizingMaskIntoConstraints = false
+        secureField.inputView = UIView(frame: .zero)
+        secureField.inputAccessoryView = UIView(frame: .zero)
+        secureField.isSecureTextEntry = true
 
-        view.addSubview(protectedContainer)
+        view.addSubview(secureField)
         NSLayoutConstraint.activate([
-            protectedContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            protectedContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            protectedContainer.topAnchor.constraint(equalTo: view.topAnchor),
-            protectedContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            secureField.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            secureField.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            secureField.topAnchor.constraint(equalTo: view.topAnchor),
+            secureField.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+    }
 
-        addChild(host)
-        host.view.translatesAutoresizingMaskIntoConstraints = false
-        protectedContainer.addSubview(host.view)
-        NSLayoutConstraint.activate([
-            host.view.leadingAnchor.constraint(equalTo: protectedContainer.leadingAnchor),
-            host.view.trailingAnchor.constraint(equalTo: protectedContainer.trailingAnchor),
-            host.view.topAnchor.constraint(equalTo: protectedContainer.topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: protectedContainer.bottomAnchor)
-        ])
-        host.didMove(toParent: self)
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        installSecureCanvasIfNeeded()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         retryCount = 0
-        applyProtectionIfNeeded()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        applyProtectionIfNeeded()
+        installSecureCanvasIfNeeded()
     }
 
     func update(rootView: Content) {
         host.rootView = rootView
-        applyProtectionIfNeeded()
+
+        if secureField.isFirstResponder {
+            secureField.resignFirstResponder()
+        }
+
+        installSecureCanvasIfNeeded()
     }
 
-    private func applyProtectionIfNeeded() {
-        guard !protectionApplied else {
-            protectedContainer.isHidden = false
-            return
-        }
-
+    private func installSecureCanvasIfNeeded() {
         guard isViewLoaded,
               view.window != nil,
-              protectedContainer.bounds.width > 1,
-              protectedContainer.bounds.height > 1 else {
-            protectedContainer.isHidden = true
+              view.bounds.width > 1,
+              view.bounds.height > 1 else {
             scheduleRetry()
             return
         }
 
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        let didProtect = GRUSecureLayerBridge.setProtected(
-            protectedContainer.layer,
-            enabled: true
-        )
-        CATransaction.commit()
+        if let protectedCanvas,
+           protectedCanvas.isDescendant(of: secureField),
+           host.view.superview === protectedCanvas {
+            retryWorkItem?.cancel()
+            retryWorkItem = nil
+            return
+        }
 
-        guard didProtect else {
-            protectedContainer.isHidden = true
+        primeSecureFieldIfNeeded()
+
+        guard let canvas = Self.findSecureCanvas(in: secureField) else {
+            logHierarchyOnce(reason: "secure canvas not found")
             scheduleRetry()
             return
         }
 
-        protectionApplied = true
-        protectedContainer.isHidden = false
+        mountHost(in: canvas)
+        protectedCanvas = canvas
         retryWorkItem?.cancel()
         retryWorkItem = nil
 
-        print("[GRU Privacy] Objective-C secure chat layer enabled")
+        #if DEBUG
+        print("[GRUPrivacy] secure canvas mounted: \(NSStringFromClass(type(of: canvas)))")
+        #endif
+    }
+
+    private func primeSecureFieldIfNeeded() {
+        if !didPrimeSecureField {
+            // The field must already be attached to a real window before this
+            // toggle so UIKit creates its secure rendering subtree for this OS.
+            secureField.isSecureTextEntry = false
+            secureField.layoutIfNeeded()
+            secureField.isSecureTextEntry = true
+            secureField.setNeedsLayout()
+            secureField.layoutIfNeeded()
+            didPrimeSecureField = true
+        } else {
+            secureField.setNeedsLayout()
+            secureField.layoutIfNeeded()
+        }
+    }
+
+    private func mountHost(in canvas: UIView) {
+        canvas.isUserInteractionEnabled = true
+        canvas.insetsLayoutMarginsFromSafeArea = false
+        canvas.backgroundColor = .clear
+        canvas.clipsToBounds = true
+
+        let needsChildAttach = host.parent == nil
+        if needsChildAttach {
+            addChild(host)
+        }
+
+        NSLayoutConstraint.deactivate(hostConstraints)
+        hostConstraints.removeAll()
+        host.view.removeFromSuperview()
+
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        canvas.addSubview(host.view)
+
+        hostConstraints = [
+            host.view.leadingAnchor.constraint(equalTo: canvas.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: canvas.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: canvas.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: canvas.bottomAnchor)
+        ]
+        NSLayoutConstraint.activate(hostConstraints)
+
+        if needsChildAttach {
+            host.didMove(toParent: self)
+        }
     }
 
     private func scheduleRetry() {
@@ -275,18 +339,94 @@ private final class GRUProtectedChatHostController<Content: View>: UIViewControl
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.retryWorkItem = nil
-            self.applyProtectionIfNeeded()
+            self.installSecureCanvasIfNeeded()
         }
 
         retryWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + 0.05,
+            execute: work
+        )
     }
 
-    func disableProtection() {
-        guard protectionApplied else { return }
-        _ = GRUSecureLayerBridge.setProtected(protectedContainer.layer, enabled: false)
-        protectionApplied = false
+    /// Restrict matching to known UITextField layout-canvas families. A generic
+    /// "Canvas" match is unsafe because unrelated UIKit/SwiftUI views can carry
+    /// that token and are not screenshot-protected.
+    private static func findSecureCanvas(in field: UITextField) -> UIView? {
+        let descendants = allDescendants(of: field)
+
+        let exactNames = [
+            "_UITextLayoutCanvasView",
+            "UITextLayoutCanvasView",
+            "_UITextFieldCanvasView",
+            "UITextFieldCanvasView"
+        ]
+
+        for name in exactNames {
+            if let match = descendants.first(where: {
+                NSStringFromClass(type(of: $0)) == name
+            }) {
+                return match
+            }
+        }
+
+        let strictTokens = [
+            "TextLayoutCanvasView",
+            "TextFieldCanvasView"
+        ]
+
+        for token in strictTokens {
+            if let match = descendants.first(where: { candidate in
+                let className = NSStringFromClass(type(of: candidate))
+                return className.localizedCaseInsensitiveContains(token)
+            }) {
+                return match
+            }
+        }
+
+        return nil
     }
+
+    private static func allDescendants(of root: UIView) -> [UIView] {
+        var result: [UIView] = []
+        var queue = root.subviews
+
+        while !queue.isEmpty {
+            let candidate = queue.removeFirst()
+            result.append(candidate)
+            queue.append(contentsOf: candidate.subviews)
+        }
+
+        return result
+    }
+
+    private func logHierarchyOnce(reason: String) {
+        #if DEBUG
+        guard !didLogHierarchy else { return }
+        didLogHierarchy = true
+
+        print("[GRUPrivacy] secure-field hierarchy: \(reason)")
+        Self.logHierarchy(of: secureField, depth: 0)
+        #endif
+    }
+
+    #if DEBUG
+    private static func logHierarchy(of root: UIView, depth: Int) {
+        let indent = String(repeating: "  ", count: depth)
+        let className = NSStringFromClass(type(of: root))
+        let frame = root.frame.integral
+        let bounds = root.bounds.integral
+        print(
+            "[GRUPrivacy] \(indent)\(className) " +
+            "frame=\(frame) bounds=\(bounds) " +
+            "hidden=\(root.isHidden) alpha=\(String(format: \"%.2f\", root.alpha))"
+        )
+
+        for child in root.subviews {
+            logHierarchy(of: child, depth: depth + 1)
+        }
+    }
+    #endif
 }
 
 private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
@@ -296,22 +436,15 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         self.content = content()
     }
 
-    func makeUIViewController(context: Context) -> GRUProtectedChatHostController<Content> {
-        GRUProtectedChatHostController(rootView: content)
+    func makeUIViewController(context: Context) -> GRUChatSecureHostController<Content> {
+        GRUChatSecureHostController(rootView: content)
     }
 
     func updateUIViewController(
-        _ uiViewController: GRUProtectedChatHostController<Content>,
+        _ uiViewController: GRUChatSecureHostController<Content>,
         context: Context
     ) {
         uiViewController.update(rootView: content)
-    }
-
-    static func dismantleUIViewController(
-        _ uiViewController: GRUProtectedChatHostController<Content>,
-        coordinator: ()
-    ) {
-        uiViewController.disableProtection()
     }
 }
 
