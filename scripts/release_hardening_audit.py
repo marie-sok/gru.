@@ -40,6 +40,7 @@ SCHEME = "swiftui/GRU/gru..xcodeproj/xcshareddata/xcschemes/gru.xcscheme"
 PROJECT = "swiftui/GRU/gru..xcodeproj/project.pbxproj"
 APP = "swiftui/GRU/gru./Apps/gru_App.swift"
 ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
+CHAT_VIEW = "swiftui/GRU/gru./Views/ChatView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
@@ -93,22 +94,41 @@ forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
 forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
-# Screen privacy: recording/mirroring and app-switcher snapshots are protected
-# with public lifecycle/capture signals. A root secure-text compositor is
-# forbidden because it caused keyboard/black-screen/Face ID loops on physical
-# iPhones. Still screenshots are detected after the fact because iOS exposes no
-# public API to cancel a single system screenshot before capture.
-forbid(SCREEN, "isSecureTextEntry",
-       "secure-text screenshot compositor returned")
-forbid(SCREEN, "GRUNonResponderSecureField",
-       "secure UITextField screenshot host returned")
-forbid(SCREEN, "UITextField(",
-       "UITextField screenshot host returned")
+# Screen privacy.
+#
+# Root protection uses only public recording/lifecycle signals. Still-screenshot
+# replacement is allowed exclusively inside the authenticated ChatView surface:
+# the chat is rendered in a non-responder secure compositor while the normal
+# GRU privacy scene sits behind it. RootView/auth must never be secure-hosted.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
+require(SCREEN, "GRUChatNonResponderSecureField",
+        "chat-scoped secure screenshot host is missing")
+require(SCREEN, "GRUChatSecureCaptureContainer",
+        "chat-scoped secure compositor is missing")
+require(SCREEN, "secureField.isSecureTextEntry = true",
+        "chat secure compositor is not enabled")
+require(SCREEN, "GRUPrivacyCaptureScene",
+        "GRU privacy replacement scene is missing")
+require(CHAT_VIEW, "GRUChatCaptureProtection",
+        "ChatView is not wrapped by chat-scoped screenshot protection")
+forbid(ROOT_VIEW, "GRUChatCaptureProtection",
+       "chat screenshot compositor leaked into RootView/auth lifecycle")
+forbid(APP, "GRUChatCaptureProtection",
+       "chat screenshot compositor leaked into app root")
+forbid(SCREEN, "GRUSecureCaptureContainer",
+       "legacy root-level secure capture container returned")
+forbid(SCREEN, "GRUNonResponderSecureField",
+       "legacy root-level secure field returned")
+
+screen_text = read(SCREEN)
+if "struct GRUScreenProtectionView" in screen_text:
+    root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
+    if "GRUChatSecureCaptureContainer" in root_section:
+        failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
 
 # Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
