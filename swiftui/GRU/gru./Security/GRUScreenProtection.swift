@@ -350,7 +350,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     }
 
     /// Restrict matching to known UITextField layout-canvas families. A generic
-    /// "Canvas" match is unsafe because unrelated UIKit/SwiftUI views can carry
+    /// Canvas match is unsafe because unrelated UIKit/SwiftUI views can carry
     /// that token and are not screenshot-protected.
     private static func findSecureCanvas(in field: UITextField) -> UIView? {
         let descendants = allDescendants(of: field)
@@ -419,7 +419,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         print(
             "[GRUPrivacy] \(indent)\(className) " +
             "frame=\(frame) bounds=\(bounds) " +
-            "hidden=\(root.isHidden) alpha=\(String(format: \"%.2f\", root.alpha))"
+            "hidden=\(root.isHidden) alpha=\(root.alpha)"
         )
 
         for child in root.subviews {
