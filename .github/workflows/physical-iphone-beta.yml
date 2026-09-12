@@ -1,0 +1,104 @@
+name: Physical iPhone beta gate
+
+on:
+  push:
+    branches:
+      - release/physical-iphone-beta-0.9.2-full
+  pull_request:
+    branches:
+      - release/physical-iphone-beta-0.9.2-full
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Release hardening audit
+        run: python3 scripts/release_hardening_audit.py
+      - name: Runtime localization audit
+        run: python3 scripts/localization_audit.py
+
+  edge-proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Build deterministic lockfile
+        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Install proxy dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate edge proxy
+        run: npm run check
+
+  backend-critical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Generate ephemeral CI JWT secret
+        shell: bash
+        run: echo "GRU_JWT_SECRET=$(openssl rand -hex 64)" >> "$GITHUB_ENV"
+      - name: Run backend beta-critical tests
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=AuthServiceTest,JwtServiceTest,HealthControllerTest,RateLimitFilterTest,EdgeProxyEnforcementFilterTest,JwtChannelInterceptorTest,MessageControllerSecurityTest,MediaControllerTest,E2EECryptoVerifierTest,E2EEMessageServiceTwoClientTest
+          test
+
+  ios-build:
+    runs-on: macos-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Dual-client E2EE crypto smoke
+        run: xcrun swift .github/scripts/e2ee_v2_dual_client_smoke.swift
+      - name: Build Debug simulator
+        run: |
+          xcodebuild \
+            -project swiftui/GRU/gru..xcodeproj \
+            -scheme gru \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/GRUDebugDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+      - name: Build Release iPhone architecture
+        run: |
+          xcodebuild \
+            -project swiftui/GRU/gru..xcodeproj \
+            -scheme gru \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/GRUReleaseDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+      - name: Verify generated Release production endpoints
+        shell: bash
+        run: |
+          APP="$RUNNER_TEMP/GRUReleaseDerivedData/Build/Products/Release-iphoneos/gru.app"
+          test -d "$APP"
+          HTTP_VALUE="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionHTTPBaseURL' "$APP/Info.plist")"
+          WSS_VALUE="$(/usr/libexec/PlistBuddy -c 'Print :GRUProductionWebSocketURL' "$APP/Info.plist")"
+          test "$HTTP_VALUE" = 'https://gru-edge-v2.onrender.com'
+          test "$WSS_VALUE" = 'wss://gru-edge-v2.onrender.com/ws'
