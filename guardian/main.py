@@ -19,7 +19,11 @@ repair = RepairEngine()
 
 
 def is_admin(message: Message) -> bool:
-    return bool(message.chat and message.chat.id == settings.telegram_admin_chat_id)
+    return bool(
+        settings.telegram_admin_chat_id is not None
+        and message.chat
+        and message.chat.id == settings.telegram_admin_chat_id
+    )
 
 
 def render_snapshot(results) -> str:
@@ -35,6 +39,13 @@ def render_snapshot(results) -> str:
 
 @dp.message(Command("start"))
 async def start(message: Message) -> None:
+    if settings.telegram_admin_chat_id is None:
+        await message.answer(
+            "gru.guardian bootstrap mode.\n"
+            f"This chat ID is: {message.chat.id}\n"
+            "Add it to GRU_GUARDIAN_TELEGRAM_ADMIN_CHAT_ID in Render, then redeploy."
+        )
+        return
     if not is_admin(message):
         return
     await message.answer(
@@ -99,20 +110,22 @@ async def watcher() -> None:
         results = await monitor.snapshot()
         for result in results:
             failures = monitor.register(result)
-            if result.ok:
+            if result.ok or failures != settings.failure_threshold:
                 continue
-            if failures == settings.failure_threshold:
+            if settings.telegram_admin_chat_id is None:
+                continue
+
+            await bot.send_message(
+                settings.telegram_admin_chat_id,
+                f"🚨 GRU incident: {result.target} failed "
+                f"{failures} checks in a row.\n{render_snapshot(results)}"
+            )
+            if settings.can_repair:
+                ok, detail = await repair.safe_repair(result.target)
                 await bot.send_message(
                     settings.telegram_admin_chat_id,
-                    f"🚨 GRU incident: {result.target} failed "
-                    f"{failures} checks in a row.\n{render_snapshot(results)}"
+                    ("🛠 Repair: " if ok else "⚠️ Repair skipped: ") + detail,
                 )
-                if settings.can_repair:
-                    ok, detail = await repair.safe_repair(result.target)
-                    await bot.send_message(
-                        settings.telegram_admin_chat_id,
-                        ("🛠 Repair: " if ok else "⚠️ Repair skipped: ") + detail,
-                    )
         await asyncio.sleep(settings.poll_seconds)
 
 
