@@ -25,6 +25,9 @@ management:
 gru:
   security:
     jwt-secret: ${GRU_JWT_SECRET:}
+    edge:
+      required: ${GRU_EDGE_REQUIRED:false}
+      shared-secret: ${GRU_EDGE_SHARED_SECRET:}
     rate-limit:
       enabled: ${GRU_RATE_LIMIT_ENABLED:true}
       auth:
