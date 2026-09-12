@@ -1,6 +1,5 @@
 package gru.app.security;
 
-import jakarta.servlet.ServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -36,11 +35,11 @@ class EdgeProxyEnforcementFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<String> seenRemote = new AtomicReference<>();
 
-        MockFilterChain chain = new MockFilterChain((servletRequest, servletResponse) -> {
-            seenRemote.set(servletRequest.getRemoteAddr());
-        });
-
-        filter.doFilter(request, response, chain);
+        filter.doFilter(
+                request,
+                response,
+                (servletRequest, servletResponse) -> seenRemote.set(servletRequest.getRemoteAddr())
+        );
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(seenRemote.get()).isEqualTo("203.0.113.77");
@@ -55,11 +54,11 @@ class EdgeProxyEnforcementFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<String> seenRemote = new AtomicReference<>();
 
-        MockFilterChain chain = new MockFilterChain((servletRequest, servletResponse) -> {
-            seenRemote.set(servletRequest.getRemoteAddr());
-        });
-
-        filter.doFilter(request, response, chain);
+        filter.doFilter(
+                request,
+                response,
+                (servletRequest, servletResponse) -> seenRemote.set(servletRequest.getRemoteAddr())
+        );
 
         assertThat(seenRemote.get()).isEqualTo("198.51.100.10");
     }
