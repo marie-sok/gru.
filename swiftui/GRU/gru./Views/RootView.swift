@@ -18,9 +18,8 @@ struct RootView: View {
     @AppStorage("gru.release.onboarding.v11") private var didFinishOnboarding = false
     @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
 
-    @State private var isBiometricLocked = false
-    @State private var isBiometricPromptInFlight = false
-    @State private var ignoreBackgroundRelockUntil = Date.distantPast
+    @State private var isSystemUnlockInFlight = false
+    @State private var needsUnlockAfterBackground = false
 
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
@@ -53,15 +52,7 @@ struct RootView: View {
                     }
                 }
             } else if isAuthenticated {
-                ZStack {
-                    MainView()
-                        .allowsHitTesting(!(isBiometricLocked && biometricsEnabled))
-
-                    if isBiometricLocked && biometricsEnabled {
-                        biometricLockOverlay
-                            .zIndex(100)
-                    }
-                }
+                MainView()
             } else {
                 LoginView(
                     onLogin: {
@@ -82,24 +73,42 @@ struct RootView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
+            switch newPhase {
+            case .active:
                 if resetBadgeOnOpen {
                     NotificationService.shared.clearBadge()
                 }
 
-                // Intentionally no automatic LocalAuthentication call here.
-                // Face ID can itself drive inactive/active scene transitions;
-                // tying biometric presentation to scene activation creates a
-                // re-entrant prompt loop on physical devices.
-            } else if newPhase == .background {
-                guard biometricsEnabled,
+                // Only a real background transition arms the next unlock.
+                // The LocalAuthentication sheet itself may move the app through
+                // inactive/active, so consuming this flag before authentication
+                // prevents a re-entrant Face ID loop on physical iPhones.
+                guard needsUnlockAfterBackground,
+                      biometricsEnabled,
                       isAuthenticated,
-                      !isBiometricPromptInFlight,
-                      Date() >= ignoreBackgroundRelockUntil else {
+                      !isSystemUnlockInFlight else {
                     return
                 }
 
-                isBiometricLocked = true
+                needsUnlockAfterBackground = false
+                isCheckingSession = true
+
+                Task {
+                    let unlocked = await authenticateForAppAccess()
+                    guard unlocked else {
+                        returnToLoginAfterUnlockFailure()
+                        return
+                    }
+
+                    isCheckingSession = false
+                }
+
+            case .background:
+                guard biometricsEnabled, isAuthenticated else { return }
+                needsUnlockAfterBackground = true
+
+            default:
+                break
             }
         }
         .onReceive(
@@ -148,10 +157,17 @@ private extension RootView {
             return
         }
 
+        if biometricsEnabled {
+            let unlocked = await authenticateForAppAccess()
+            guard unlocked else {
+                returnToLoginAfterUnlockFailure()
+                return
+            }
+        }
+
         activateAuthenticatedSession(
             token: token,
-            userID: userID,
-            requireBiometricUnlock: true
+            userID: userID
         )
 
         isCheckingSession = false
@@ -201,8 +217,7 @@ private extension RootView {
 
         activateAuthenticatedSession(
             token: token,
-            userID: userID,
-            requireBiometricUnlock: false
+            userID: userID
         )
 
         isCheckingSession = false
@@ -216,8 +231,7 @@ private extension RootView {
 
     func activateAuthenticatedSession(
         token: String,
-        userID: String,
-        requireBiometricUnlock: Bool
+        userID: String
     ) {
         guard TokenStorage.shared.token == token,
               TokenStorage.shared.userID == userID else {
@@ -229,18 +243,53 @@ private extension RootView {
         ChatService.shared.restoreSession()
         applyLocalProfile()
         isAuthenticated = true
+        needsUnlockAfterBackground = false
 
         DispatchQueue.main.async {
             dismissAnyKeyboard()
         }
+    }
 
-        // A persisted authenticated session can start locked, but biometric
-        // presentation is deliberately user-initiated only. This guarantees
-        // that LocalAuthentication cannot recursively trigger itself through
-        // scenePhase transitions.
-        isBiometricLocked = biometricsEnabled && requireBiometricUnlock
-        isBiometricPromptInFlight = false
-        ignoreBackgroundRelockUntil = .distantPast
+    // MARK: - System unlock
+
+    func authenticateForAppAccess() async -> Bool {
+        guard biometricsEnabled else { return true }
+        guard !isSystemUnlockInFlight else { return false }
+
+        isSystemUnlockInFlight = true
+        defer { isSystemUnlockInFlight = false }
+
+        let context = LAContext()
+        context.interactionNotAllowed = false
+
+        var authError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) else {
+            print("⚠️ Device-owner authentication unavailable: \(authError?.localizedDescription ?? "unknown")")
+            return false
+        }
+
+        let reason = GRUL10n.text("Подтвердите личность для входа в GRU")
+
+        return await withCheckedContinuation { continuation in
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: reason
+            ) { success, error in
+                if let error {
+                    print("🔐 GRU unlock result: \(error.localizedDescription)")
+                }
+                continuation.resume(returning: success)
+            }
+        }
+    }
+
+    func returnToLoginAfterUnlockFailure() {
+        // No custom lock screen and no retry loop. A cancelled/failed system
+        // authentication returns to the normal sign-in surface.
+        clearLocalSession()
+        isAuthenticated = false
+        isCheckingSession = false
+        needsUnlockAfterBackground = false
     }
 
     // MARK: - Hard migration / clear
@@ -269,9 +318,8 @@ private extension RootView {
         ChatService.shared.clearAuthenticatedUser()
         NotificationService.shared.removeAllNotifications()
         NotificationService.shared.clearBadge()
-        isBiometricLocked = false
-        isBiometricPromptInFlight = false
-        ignoreBackgroundRelockUntil = .distantPast
+        isSystemUnlockInFlight = false
+        needsUnlockAfterBackground = false
     }
 
     func handleSessionInvalidated() {
@@ -358,94 +406,4 @@ private struct GRUReleaseOnboardingView: View {
 
 #Preview {
     RootView()
-}
-
-private extension RootView {
-    var biometricLockOverlay: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            VStack(spacing: 24) {
-                Image(systemName: "faceid")
-                    .font(.system(size: 64, weight: .light))
-                    .foregroundStyle(GRUColors.accent)
-
-                VStack(spacing: 8) {
-                    Text(GRUL10n.text("gru. заблокирован"))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(GRUColors.text)
-
-                    Text(GRUL10n.text("Для доступа требуется подтверждение личности"))
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                Button {
-                    authenticateWithBiometrics()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lock.open.fill")
-                        Text(GRUL10n.text("Разблокировать"))
-                    }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .background(
-                        Capsule().fill(GRUColors.accent)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isBiometricPromptInFlight)
-                .padding(.top, 12)
-            }
-            .padding(32)
-        }
-    }
-
-    func authenticateWithBiometrics() {
-        guard biometricsEnabled && isAuthenticated else { return }
-        guard !isBiometricPromptInFlight else { return }
-
-        isBiometricPromptInFlight = true
-
-        let context = LAContext()
-        context.interactionNotAllowed = false
-
-        var authError: NSError?
-        let reason = GRUL10n.text("Разблокируйте доступ к приложению gru.")
-
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) else {
-            isBiometricPromptInFlight = false
-            isBiometricLocked = false
-            return
-        }
-
-        context.evaluatePolicy(
-            .deviceOwnerAuthentication,
-            localizedReason: reason
-        ) { success, _ in
-            DispatchQueue.main.async {
-                isBiometricPromptInFlight = false
-
-                if success {
-                    // Ignore any transient background callback caused by the
-                    // LocalAuthentication system UI immediately after success.
-                    ignoreBackgroundRelockUntil = Date().addingTimeInterval(1.5)
-
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        isBiometricLocked = false
-                    }
-                } else {
-                    // Stay on the lock screen. No automatic retry is possible;
-                    // only another explicit tap can invoke Face ID again.
-                    isBiometricLocked = true
-                }
-            }
-        }
-    }
 }
