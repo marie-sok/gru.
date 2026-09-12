@@ -64,6 +64,17 @@ final class GRUVoiceTranscriptCache {
         }
     }
 
+    func clear() {
+        let directory = cacheDirectory(createIfNeeded: false)
+
+        queue.async {
+            guard FileManager.default.fileExists(atPath: directory.path) else {
+                return
+            }
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
     static func fingerprint(
         remoteURL: String?,
         fileName: String,
@@ -97,6 +108,11 @@ final class GRUVoiceTranscriptCache {
     private func fileURL(
         fingerprint: String
     ) -> URL {
+        cacheDirectory(createIfNeeded: true)
+            .appendingPathComponent(fingerprint + ".bin")
+    }
+
+    private func cacheDirectory(createIfNeeded: Bool) -> URL {
         let base = FileManager.default.urls(
             for: .cachesDirectory,
             in: .userDomainMask
@@ -107,13 +123,13 @@ final class GRUVoiceTranscriptCache {
             isDirectory: true
         )
 
-        try? FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true
-        )
+        if createIfNeeded {
+            try? FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        }
 
-        return directory.appendingPathComponent(
-            fingerprint + ".bin"
-        )
+        return directory
     }
 }
