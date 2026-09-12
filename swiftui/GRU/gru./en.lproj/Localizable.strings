@@ -351,6 +351,9 @@
 "Подключение" = "Connection";
 "Защищённое HTTPS-соединение" = "Secure HTTPS connection";
 "Realtime подключение активно после входа" = "Realtime connection activates after sign-in";
+"Транслит" = "Transliteration";
+"Транслит текста сообщений" = "Transliterate message text";
+"Транслит расшифровок голосовых" = "Transliterate voice transcripts";
 
 /* Active theme descriptions */
 "Кото-единороги, мечты и звёздная пыль" = "Cat-unicorns, dreams and stardust";
