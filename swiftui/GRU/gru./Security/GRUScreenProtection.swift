@@ -52,9 +52,6 @@ final class GRUScreenProtectionModel: ObservableObject {
             }
         )
 
-        // iOS creates a snapshot for the app switcher while the app resigns
-        // active. Put the privacy shield up before that snapshot can expose
-        // chats/profile/media.
         observers.append(
             center.addObserver(
                 forName: UIApplication.willResignActiveNotification,
@@ -94,8 +91,6 @@ final class GRUScreenProtectionModel: ObservableObject {
 
     private func refreshCaptureState() {
         isCaptureActive = UIScreen.main.isCaptured
-
-        // Never lower the shield while iOS is actively recording/mirroring.
         if isCaptureActive {
             isPrivacyShieldActive = true
         }
@@ -109,8 +104,6 @@ final class GRUScreenProtectionModel: ObservableObject {
             return
         }
 
-        // Delay by one run-loop turn so the switcher/background snapshot is
-        // already finished before protected content becomes visible again.
         Task { @MainActor [weak self] in
             await Task.yield()
             guard let self, !self.isCaptureActive else { return }
@@ -119,10 +112,6 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 
     private func handleScreenshotDetected() {
-        // UIApplication.userDidTakeScreenshotNotification is delivered after
-        // the system has produced the still image; public iOS APIs do not allow
-        // apps to cancel that screenshot. We immediately cover the app to stop
-        // rapid follow-up captures and surface a clear privacy warning.
         isPrivacyShieldActive = true
         showScreenshotWarning = true
 
@@ -140,14 +129,144 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 }
 
-/// Stable privacy layer for iOS.
+/// UITextField is used only as an iOS secure-rendering host.
+/// It must never enter the responder chain, request focus, or summon a keyboard.
+private final class GRUNonResponderSecureField: UITextField {
+    override var canBecomeFirstResponder: Bool { false }
+
+    override func becomeFirstResponder() -> Bool {
+        false
+    }
+
+    override func canPerformAction(
+        _ action: Selector,
+        withSender sender: Any?
+    ) -> Bool {
+        false
+    }
+}
+
+/// Best-effort still-screenshot redaction for the physical beta.
 ///
-/// We intentionally do not wrap the application in a hidden secure UITextField:
-/// that unsupported compositor trick caused responder-chain keyboard popups and
-/// occasional black screens on physical devices. Public iOS APIs can reliably
-/// redact screen recording/mirroring and app-switcher/background snapshots.
-/// Still screenshots can only be detected after capture, so GRU reacts
-/// immediately but does not falsely claim that iOS cancelled the screenshot.
+/// iOS has no public API that lets a normal app cancel a still screenshot.
+/// This container instead places the rendered SwiftUI hierarchy inside the
+/// secure-text compositor path so captured still images are redacted on iOS
+/// versions where that compositor behaviour is available.
+///
+/// Unlike the previous implementation, the secure field is permanently
+/// non-responder and has no usable input view, preventing it from stealing
+/// focus or raising the keyboard.
+private struct GRUSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(rootView: content)
+    }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let container = UIViewController()
+        container.view.backgroundColor = .clear
+        container.view.insetsLayoutMarginsFromSafeArea = false
+        container.additionalSafeAreaInsets = .zero
+
+        let secureField = GRUNonResponderSecureField(frame: .zero)
+        secureField.isSecureTextEntry = true
+        secureField.text = " "
+        secureField.textColor = .clear
+        secureField.tintColor = .clear
+        secureField.backgroundColor = .clear
+        secureField.borderStyle = .none
+        secureField.autocorrectionType = .no
+        secureField.spellCheckingType = .no
+        secureField.smartDashesType = .no
+        secureField.smartQuotesType = .no
+        secureField.smartInsertDeleteType = .no
+        secureField.accessibilityElementsHidden = true
+        secureField.translatesAutoresizingMaskIntoConstraints = false
+
+        // Even if UIKit asks this internal host for input, there is no keyboard.
+        secureField.inputView = UIView(frame: .zero)
+        secureField.inputAccessoryView = UIView(frame: .zero)
+
+        container.view.addSubview(secureField)
+        NSLayoutConstraint.activate([
+            secureField.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
+            secureField.trailingAnchor.constraint(equalTo: container.view.trailingAnchor),
+            secureField.topAnchor.constraint(equalTo: container.view.topAnchor),
+            secureField.bottomAnchor.constraint(equalTo: container.view.bottomAnchor)
+        ])
+
+        // Secure text entry owns an internal render canvas. Hosting inside that
+        // canvas keeps the visible SwiftUI hierarchy interactive while allowing
+        // the secure compositor to redact still capture on supported iOS builds.
+        let protectedCanvas = secureField.subviews.first ?? secureField
+        protectedCanvas.isUserInteractionEnabled = true
+        protectedCanvas.insetsLayoutMarginsFromSafeArea = false
+        protectedCanvas.backgroundColor = .clear
+
+        let host = context.coordinator.host
+        host.view.backgroundColor = .clear
+        host.view.insetsLayoutMarginsFromSafeArea = false
+        host.additionalSafeAreaInsets = .zero
+
+        container.addChild(host)
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        protectedCanvas.addSubview(host.view)
+
+        NSLayoutConstraint.activate([
+            host.view.leadingAnchor.constraint(equalTo: protectedCanvas.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: protectedCanvas.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: protectedCanvas.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: protectedCanvas.bottomAnchor)
+        ])
+
+        host.didMove(toParent: container)
+
+        context.coordinator.secureField = secureField
+        context.coordinator.protectedCanvas = protectedCanvas
+        return container
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIViewController,
+        context: Context
+    ) {
+        context.coordinator.host.rootView = content
+
+        // Defensive: a secure host must never retain first-responder state.
+        if context.coordinator.secureField?.isFirstResponder == true {
+            context.coordinator.secureField?.resignFirstResponder()
+        }
+    }
+
+    static func dismantleUIViewController(
+        _ uiViewController: UIViewController,
+        coordinator: Coordinator
+    ) {
+        if coordinator.secureField?.isFirstResponder == true {
+            coordinator.secureField?.resignFirstResponder()
+        }
+        coordinator.host.willMove(toParent: nil)
+        coordinator.host.view.removeFromSuperview()
+        coordinator.host.removeFromParent()
+    }
+
+    final class Coordinator {
+        let host: UIHostingController<Content>
+        weak var secureField: GRUNonResponderSecureField?
+        weak var protectedCanvas: UIView?
+
+        init(rootView: Content) {
+            host = UIHostingController(rootView: rootView)
+            host.view.backgroundColor = .clear
+        }
+    }
+}
+
 struct GRUScreenProtectionView<Content: View>: View {
     @StateObject private var model = GRUScreenProtectionModel()
     let content: Content
@@ -158,9 +277,12 @@ struct GRUScreenProtectionView<Content: View>: View {
 
     var body: some View {
         ZStack {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .privacySensitive()
+            GRUSecureCaptureContainer {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .privacySensitive()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if model.shouldRedact {
                 privacyShield
@@ -173,7 +295,7 @@ struct GRUScreenProtectionView<Content: View>: View {
         .alert("Защита gru.", isPresented: $model.showScreenshotWarning) {
             Button("Понятно", role: .cancel) {}
         } message: {
-            Text("Снимок экрана обнаружен. GRU скрывает содержимое при записи, трансляции и в превью переключателя приложений.")
+            Text("Снимок экрана обнаружен. Защищённый интерфейс GRU скрывается от захвата там, где это поддерживает iOS.")
         }
     }
 
