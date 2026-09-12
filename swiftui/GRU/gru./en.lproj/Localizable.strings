@@ -354,6 +354,10 @@
 "Транслит" = "Transliteration";
 "Транслит текста сообщений" = "Transliterate message text";
 "Транслит расшифровок голосовых" = "Transliterate voice transcripts";
+"Приватность" = "Privacy";
+"Отправка" = "Sending";
+"Автозагрузка" = "Auto-download";
+"Контент защищён" = "Content protected";
 
 /* Active theme descriptions */
 "Кото-единороги, мечты и звёздная пыль" = "Cat-unicorns, dreams and stardust";
