@@ -70,10 +70,21 @@ forbid(APP, ".id(languageRaw)", "language switching would recreate RootView")
 forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
 
-# Screen privacy must never depend on a hidden secure text field/responder.
-# Match executable patterns, not comments that explain why the old approach was removed.
-forbid(SCREEN, "UITextField(", "screen protection must not construct a secure UITextField canvas")
-forbid(SCREEN, ".isSecureTextEntry", "secure-text responder hack must not return")
+# Screen privacy: still-screenshot redaction uses one isolated secure compositor
+# host. The secure field must be a non-responder with an empty keyboard host so
+# the old keyboard/black-screen regression cannot silently return.
+require(SCREEN, "private final class GRUNonResponderSecureField: UITextField",
+        "isolated screenshot secure field is missing")
+require(SCREEN, "override var canBecomeFirstResponder: Bool { false }",
+        "secure screenshot host can become first responder")
+require(SCREEN, "override func becomeFirstResponder() -> Bool",
+        "secure screenshot host does not explicitly reject focus")
+require(SCREEN, "secureField.isSecureTextEntry = true",
+        "secure compositor is not enabled for still screenshot redaction")
+require(SCREEN, "secureField.inputView = UIView(frame: .zero)",
+        "secure screenshot host can still request a keyboard")
+forbid(SCREEN, "let secureField = UITextField(",
+       "raw secure UITextField constructor returned; use GRUNonResponderSecureField only")
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
