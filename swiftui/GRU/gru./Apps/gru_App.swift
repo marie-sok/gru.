@@ -31,6 +31,7 @@ struct gru_App: App {
                 appLanguage.locale
             )
             .task {
+                GRURadioHandoffMonitor.shared.start()
                 await publishE2EEIdentityIfAuthenticated()
             }
             .onReceive(
