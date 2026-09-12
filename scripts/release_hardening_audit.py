@@ -43,6 +43,8 @@ ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
 CHAT_VIEW = "swiftui/GRU/gru./Views/ChatView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
+LAYER_GUARD = "swiftui/GRU/gru./Security/GRULayerScreenshotGuard.m"
+LAYER_GUARD_HEADER = "swiftui/GRU/gru./Security/GRULayerScreenshotGuard.h"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
 SETTINGS = "swiftui/GRU/gru./Views/GRUStableSettingsView.swift"
 APP_TAB = "swiftui/GRU/gru./Models/AppTab.swift"
@@ -72,11 +74,7 @@ forbid(APP, ".id(languageRaw)", "language switching would recreate RootView")
 forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
 
-# Authentication UX: no custom lock screen/button. Persisted sessions and real
-# background returns use the system device-owner flow (Face ID/Touch ID/Optic ID
-# with device passcode fallback). Only an actual background transition may arm
-# a foreground re-auth; LocalAuthentication's inactive/active transitions must
-# never retrigger themselves.
+# Authentication UX.
 require(ROOT_VIEW, "func authenticateForAppAccess() async -> Bool",
         "system app-unlock function is missing")
 require(ROOT_VIEW, ".deviceOwnerAuthentication",
@@ -94,28 +92,34 @@ forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
 forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
-# Screen privacy.
-#
-# Root protection uses only public recording/lifecycle signals. Still-screenshot
-# replacement is allowed exclusively inside authenticated ChatView. GRU mirrors
-# Telegram-iOS' layer-level secure-rendering guard: temporarily substitute the
-# protected CALayer into UITextField's TextLayoutCanvasView, toggle secureTextEntry,
-# then restore the original canvas layer. RootView/auth must never use this path.
+# Screen privacy. Root protection remains public-API-only. Still-screenshot
+# protection is scoped to authenticated ChatView and implemented in Objective-C
+# so UIKit layer substitution happens through the Objective-C runtime.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
-require(SCREEN, "GRUTelegramLayerScreenshotGuard",
-        "Telegram-style chat screenshot layer guard is missing")
+require(SCREEN, '@_silgen_name("GRUSetLayerDisableScreenshots")',
+        "Objective-C secure layer symbol bridge is missing")
+require(SCREEN, "GRUSecureLayerBridge",
+        "chat secure layer bridge is missing")
 require(SCREEN, "GRUChatSecureCaptureContainer",
         "chat-scoped secure compositor is missing")
-require(SCREEN, 'secureView.setValue(layer, forKey: "layer")',
-        "Telegram-style protected layer substitution is missing")
-require(SCREEN, "textField.isSecureTextEntry = true",
-        "Telegram-style secureTextEntry toggle is missing")
+require(SCREEN, "protectedContainer.layer",
+        "dedicated protected chat layer is missing")
 require(SCREEN, "GRUPrivacyCaptureScene",
         "GRU privacy replacement scene is missing")
+require(LAYER_GUARD_HEADER, "GRUSetLayerDisableScreenshots",
+        "secure layer Objective-C declaration is missing")
+require(LAYER_GUARD, "TextLayoutCanvasView",
+        "UIKit secure text canvas lookup is missing")
+require(LAYER_GUARD, '[secureView setValue:layer forKey:@"layer"]',
+        "protected CALayer substitution is missing")
+require(LAYER_GUARD, "textField.secureTextEntry = NO;",
+        "secureTextEntry reset is missing")
+require(LAYER_GUARD, "textField.secureTextEntry = YES;",
+        "secureTextEntry enable is missing")
 require(CHAT_VIEW, "GRUChatCaptureProtection",
         "ChatView is not wrapped by chat-scoped screenshot protection")
 forbid(ROOT_VIEW, "GRUChatCaptureProtection",
@@ -132,8 +136,8 @@ if "struct GRUScreenProtectionView" in screen_text:
     root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
     if "GRUChatSecureCaptureContainer" in root_section:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
-    if "GRUTelegramLayerScreenshotGuard" in root_section:
-        failures.append("Telegram-style screenshot guard leaked into root/auth protection")
+    if "GRUSecureLayerBridge" in root_section:
+        failures.append("secure still-screenshot layer bridge leaked into root/auth protection")
 
 # Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
@@ -153,17 +157,12 @@ require(VOICE, "DispatchQueue.global(qos: .userInitiated).async", "voice AVAudio
 require(VIDEO_NOTE, 'label: "gru.video-note.capture-session"', "video-note capture serial queue is missing")
 require(VIDEO_NOTE, "session.startRunning()", "video-note capture start is missing")
 
-# Release config still has a direct-backend source fallback. It is not used while
-# generated Info.plist keys above are present, but keep it visible as debt rather
-# than silently treating it as a passing security property.
 api_text = read(API)
 if "gru-jiqi.onrender.com" in api_text:
     warnings.append(
         "APIClient still contains a direct-backend fallback; Release is currently protected by explicit edge Info.plist keys"
     )
 
-# APNs is intentionally not claimed as complete until provisioning + backend token
-# registration exist. Surface this as a release warning, not a fake green check.
 entitlements_text = read(ENTITLEMENTS)
 if "aps-environment" not in entitlements_text:
     warnings.append(
