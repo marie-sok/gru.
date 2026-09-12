@@ -13,13 +13,12 @@ CALL_RE = re.compile(
     r'GRUL10n\.(?:text|format)\(\s*"((?:\\.|[^"])*)"',
     re.MULTILINE,
 )
+DICT_KEY_RE = re.compile(r'^\s*"((?:\\.|[^"])*)"\s*:', re.MULTILINE)
 CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
 STRING_RE = re.compile(r'"((?:\\.|[^"])*)"')
 
 
 def unescape_strings_key(value: str) -> str:
-    # Localizable.strings keys are UTF-8. Decode only the escapes that can
-    # appear in a quoted key; unicode_escape would corrupt Cyrillic text.
     return value.replace(r'\"', '"').replace(r'\\', '\\')
 
 
@@ -28,9 +27,21 @@ def parse_strings(path: pathlib.Path) -> set[str]:
     return {unescape_strings_key(k) for k in KEY_RE.findall(text)}
 
 
+def english_fallback_keys() -> set[str]:
+    path = APP / "Services" / "GRULanguage.swift"
+    text = path.read_text(encoding="utf-8")
+    marker = "case .english:"
+    start = text.find(marker)
+    if start < 0:
+        return set()
+    english_block = text[start:]
+    return {unescape_strings_key(k) for k in DICT_KEY_RE.findall(english_block)}
+
+
 def main() -> int:
-    english = parse_strings(APP / "en.lproj" / "Localizable.strings")
-    russian = parse_strings(APP / "ru.lproj" / "Localizable.strings")
+    english_catalog = parse_strings(APP / "en.lproj" / "Localizable.strings")
+    russian_catalog = parse_strings(APP / "ru.lproj" / "Localizable.strings")
+    english_runtime_keys = english_catalog | english_fallback_keys()
 
     referenced: dict[str, list[str]] = {}
     for path in APP.rglob("*.swift"):
@@ -40,19 +51,15 @@ def main() -> int:
             referenced.setdefault(key, []).append(str(path.relative_to(ROOT)))
 
     missing: list[str] = []
-
-    # Russian source keys are a valid RU fallback by design. English source
-    # keys are likewise already English. The release blocker is a Cyrillic
-    # runtime key with no explicit English translation.
     for key, locations in sorted(referenced.items()):
-        if CYRILLIC_RE.search(key) and key not in english:
+        if CYRILLIC_RE.search(key) and key not in english_runtime_keys:
             missing.append(
                 f"[en] missing {key!r} used by {', '.join(sorted(set(locations))[:3])}"
             )
 
-    # Settings is release-critical. Catch visible Cyrillic literals even when a
-    # future refactor forgets to wrap one in GRUL10n. Technical/debug-only values
-    # can be exempted explicitly and therefore remain reviewable.
+    # Settings is release-critical. A visible Cyrillic literal must have an
+    # English runtime mapping, whether it lives in Localizable.strings or the
+    # deliberate GRUL10n fallback used by dynamic strings.
     settings = APP / "Views" / "SettingsView.swift"
     settings_text = settings.read_text(encoding="utf-8")
     exemptions = {
@@ -62,7 +69,7 @@ def main() -> int:
     for raw_literal in STRING_RE.findall(settings_text):
         literal = unescape_strings_key(raw_literal)
         if CYRILLIC_RE.search(literal) and literal not in exemptions:
-            if literal not in english:
+            if literal not in english_runtime_keys:
                 uncatalogued_settings.add(literal)
 
     missing.extend(
@@ -78,7 +85,10 @@ def main() -> int:
 
     print(
         "Localization audit OK: "
-        f"{len(referenced)} runtime keys; en={len(english)}; ru={len(russian)}"
+        f"{len(referenced)} runtime keys; "
+        f"en catalog={len(english_catalog)}; "
+        f"en fallback={len(english_fallback_keys())}; "
+        f"ru catalog={len(russian_catalog)}"
     )
     return 0
 
