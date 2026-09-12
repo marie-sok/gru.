@@ -59,107 +59,109 @@ struct ChatView: View {
     }
 
     var body: some View {
-        ZStack {
-            Group {
-                if let theme = GRUAppTheme(rawValue: chatBackgroundRaw), GRUThemePolicy.allowed.contains(theme) {
-                    GRUSignatureWallpaper(theme: theme, intensity: 0.92)
-                } else if backgroundStyle == .obsidian {
-                    GRUSignatureWallpaper(theme: currentTheme, intensity: 0.92)
-                } else {
-                    ChatBackgroundView(style: backgroundStyle)
-                }
-            }
-            .blur(radius: wallpaperBlur ? 7 : 0)
-
-            VStack(spacing: 0) {
-                header
-
-                if !socket.isConnected {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text(GRUL10n.text(socket.isReconnecting ? "Подключаемся…" : "Нет соединения"))
-                            .font(.caption.weight(.semibold))
-                        Spacer()
-                        Text(GRUL10n.text("Сообщения можно повторить после восстановления связи"))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+        GRUChatCaptureProtection {
+            ZStack {
+                Group {
+                    if let theme = GRUAppTheme(rawValue: chatBackgroundRaw), GRUThemePolicy.allowed.contains(theme) {
+                        GRUSignatureWallpaper(theme: theme, intensity: 0.92)
+                    } else if backgroundStyle == .obsidian {
+                        GRUSignatureWallpaper(theme: currentTheme, intensity: 0.92)
+                    } else {
+                        ChatBackgroundView(style: backgroundStyle)
                     }
-                    .padding(.horizontal, 14)
-                    .frame(height: 34)
-                    .background(GRUColors.card.opacity(0.88))
                 }
+                .blur(radius: wallpaperBlur ? 7 : 0)
 
-                if searching {
-                    SearchBar(
-                        text: $vm.searchText,
-                        resultsText: vm.searchCountText,
-                        onSearch: { vm.performSearch() },
-                        onNext: { vm.nextResult() },
-                        onPrevious: { vm.previousResult() },
-                        onClose: {
-                            withAnimation {
-                                searching = false
-                                vm.clearSearch()
+                VStack(spacing: 0) {
+                    header
+
+                    if !socket.isConnected {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text(GRUL10n.text(socket.isReconnecting ? "Подключаемся…" : "Нет соединения"))
+                                .font(.caption.weight(.semibold))
+                            Spacer()
+                            Text(GRUL10n.text("Сообщения можно повторить после восстановления связи"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 34)
+                        .background(GRUColors.card.opacity(0.88))
+                    }
+
+                    if searching {
+                        SearchBar(
+                            text: $vm.searchText,
+                            resultsText: vm.searchCountText,
+                            onSearch: { vm.performSearch() },
+                            onNext: { vm.nextResult() },
+                            onPrevious: { vm.previousResult() },
+                            onClose: {
+                                withAnimation {
+                                    searching = false
+                                    vm.clearSearch()
+                                }
                             }
+                        )
+                    }
+
+                    Divider().opacity(0.08)
+                    messages
+
+                    if let editing = vm.editingMessage {
+                        EditBar(message: editing) { vm.cancelEditing() }
+                    }
+
+                    if let reply = vm.replyMessage {
+                        ReplyBar(message: reply) { vm.cancelReply() }
+                    }
+
+                    ChatInputBar(
+                        text: $vm.messageText,
+                        sendTrigger: $vm.sendTrigger,
+                        onSend: { vm.sendMessage() },
+                        onAttachment: { action in
+                            switch action {
+                            case .photo: showPhotoPicker = true
+                            case .video: showVideoSourceDialog = true
+                            case .document: showDocumentPicker = true
+                            case .contact: showContactPicker = true
+                            }
+                        },
+                        onAudioRecorded: { recording in
+                            Task {
+                                await vm.sendAudio(
+                                    url: recording.url,
+                                    duration: recording.duration,
+                                    waveform: recording.waveform
+                                )
+                                try? FileManager.default.removeItem(at: recording.url)
+                            }
+                        },
+                        onVideoNoteStarted: {
+                            videoNoteHolding = true
+                            videoNoteLocked = false
+                            withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
+                                showVideoNoteRecorder = true
+                            }
+                        },
+                        onVideoNoteReleased: { videoNoteHolding = false },
+                        onVideoNoteCancelled: {
+                            videoNoteHolding = false
+                            videoNoteLocked = false
+                            videoNoteCancelSerial &+= 1
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                showVideoNoteRecorder = false
+                            }
+                        },
+                        onVideoNoteLocked: {
+                            videoNoteLocked = true
+                            videoNoteHolding = false
                         }
                     )
                 }
-
-                Divider().opacity(0.08)
-                messages
-
-                if let editing = vm.editingMessage {
-                    EditBar(message: editing) { vm.cancelEditing() }
-                }
-
-                if let reply = vm.replyMessage {
-                    ReplyBar(message: reply) { vm.cancelReply() }
-                }
-
-                ChatInputBar(
-                    text: $vm.messageText,
-                    sendTrigger: $vm.sendTrigger,
-                    onSend: { vm.sendMessage() },
-                    onAttachment: { action in
-                        switch action {
-                        case .photo: showPhotoPicker = true
-                        case .video: showVideoSourceDialog = true
-                        case .document: showDocumentPicker = true
-                        case .contact: showContactPicker = true
-                        }
-                    },
-                    onAudioRecorded: { recording in
-                        Task {
-                            await vm.sendAudio(
-                                url: recording.url,
-                                duration: recording.duration,
-                                waveform: recording.waveform
-                            )
-                            try? FileManager.default.removeItem(at: recording.url)
-                        }
-                    },
-                    onVideoNoteStarted: {
-                        videoNoteHolding = true
-                        videoNoteLocked = false
-                        withAnimation(.spring(response: 0.30, dampingFraction: 0.82)) {
-                            showVideoNoteRecorder = true
-                        }
-                    },
-                    onVideoNoteReleased: { videoNoteHolding = false },
-                    onVideoNoteCancelled: {
-                        videoNoteHolding = false
-                        videoNoteLocked = false
-                        videoNoteCancelSerial &+= 1
-                        withAnimation(.easeOut(duration: 0.16)) {
-                            showVideoNoteRecorder = false
-                        }
-                    },
-                    onVideoNoteLocked: {
-                        videoNoteLocked = true
-                        videoNoteHolding = false
-                    }
-                )
             }
         }
         .navigationBarBackButtonHidden(true)
