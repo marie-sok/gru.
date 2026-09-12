@@ -1,22 +1,27 @@
 'use strict';
 
 const http = require('http');
+const net = require('net');
 const { URL } = require('url');
 const httpProxy = require('http-proxy');
 
 const port = Number(process.env.PORT || 10000);
 const upstreamRaw = process.env.GRU_UPSTREAM_URL || 'https://gru-jiqi.onrender.com';
+const edgeSecret = (process.env.GRU_EDGE_SHARED_SECRET || '').trim();
 const upstream = new URL(upstreamRaw);
 
 if (upstream.protocol !== 'https:') {
   throw new Error('GRU_UPSTREAM_URL must use https');
+}
+if (edgeSecret.length < 32) {
+  throw new Error('GRU_EDGE_SHARED_SECRET must contain at least 32 characters');
 }
 
 const proxy = httpProxy.createProxyServer({
   target: upstream.origin,
   changeOrigin: true,
   ws: true,
-  xfwd: true,
+  xfwd: false,
   secure: true,
   proxyTimeout: 30_000,
   timeout: 30_000
@@ -26,7 +31,9 @@ const allowedMethods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE',
 const blockedHopHeaders = [
   'proxy-authorization',
   'proxy-authenticate',
-  'forwarded'
+  'forwarded',
+  'x-gru-edge-secret',
+  'x-gru-client-ip'
 ];
 
 function setSecurityHeaders(res) {
@@ -54,13 +61,38 @@ function validPath(rawUrl) {
   }
 }
 
+function normalizedIP(value) {
+  if (!value) return null;
+  const candidate = String(value).trim().replace(/^::ffff:/, '');
+  return net.isIP(candidate) ? candidate : null;
+}
+
+function clientIP(req) {
+  // Render's public router appends the network peer to X-Forwarded-For.
+  // Prefer the rightmost valid address; a caller-supplied leftmost value must
+  // never become the trusted backend rate-limit bucket.
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const values = String(forwarded).split(',').map((part) => part.trim()).filter(Boolean);
+    for (let index = values.length - 1; index >= 0; index -= 1) {
+      const valid = normalizedIP(values[index]);
+      if (valid) return valid;
+    }
+  }
+  return normalizedIP(req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
 function sanitizeRequest(req) {
+  const ip = clientIP(req);
   for (const header of blockedHopHeaders) {
     delete req.headers[header];
   }
   delete req.headers['x-forwarded-host'];
   delete req.headers['x-forwarded-proto'];
+
   req.headers['x-gru-edge'] = 'render-proxy-v1';
+  req.headers['x-gru-edge-secret'] = edgeSecret;
+  req.headers['x-gru-client-ip'] = ip;
 }
 
 const server = http.createServer((req, res) => {
@@ -74,7 +106,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Never print Authorization, cookies, request bodies, E2EE envelopes,
-  // recovery backups or media metadata. Keep edge logs deliberately sparse.
+  // recovery backups, edge secrets, client IPs or media metadata.
   console.log(JSON.stringify({
     event: 'edge_request',
     method: req.method,
