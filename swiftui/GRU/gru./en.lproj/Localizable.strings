@@ -335,3 +335,30 @@
 "Удалить аккаунт навсегда?" = "Delete account permanently?";
 "Удалить аккаунт" = "Delete account";
 "Профиль, переписки и медиа будут удалены с backend GRU." = "Your profile, chats and media will be deleted from the GRU backend.";
+
+/* Active 0.9.2 settings surface */
+"Online, прочтение и индикатор набора" = "Online status, read receipts and typing indicator";
+"Face ID, код устройства и защита превью" = "Face ID, device passcode and preview protection";
+"Уведомления, звук, текст и badge" = "Notifications, sound, message preview and badge";
+"Жесты, отправка, реакции и медиа" = "Gestures, sending, reactions and media";
+"Движение, контраст и тактильная отдача" = "Motion, contrast and haptics";
+"Русский и English" = "Russian and English";
+"Автозагрузка, мобильный трафик и кэш" = "Auto-download, mobile data and cache";
+"Камера, микрофон, фото, контакты и уведомления" = "Camera, microphone, photos, contacts and notifications";
+"Версия приложения и среда подключения" = "App version and connection environment";
+"Открыть настройки уведомлений iOS" = "Open iOS notification settings";
+"Код устройства" = "Device passcode";
+"Подключение" = "Connection";
+"Защищённое HTTPS-соединение" = "Secure HTTPS connection";
+"Realtime подключение активно после входа" = "Realtime connection activates after sign-in";
+
+/* Active theme descriptions */
+"Кото-единороги, мечты и звёздная пыль" = "Cat-unicorns, dreams and stardust";
+"Коты-принцессы, нежность и блеск" = "Princess cats, softness and sparkle";
+"Коты-ведьмы, лес и таинственные травы" = "Witch cats, forest and mysterious herbs";
+"Кибер-коты, город и технологии" = "Cyber cats, city and technology";
+"Лунные коты, мистика и золотой космос" = "Moon cats, mysticism and golden space";
+"Коты-рыцари, честь и сталь" = "Knight cats, honor and steel";
+"Вислоухие котодраконы, огонь и тёмная магия" = "Fold-eared cat-dragons, fire and dark magic";
+"Котомонстры, кислота и безумие" = "Cat monsters, acid and chaos";
+"Коты-демоны, неон и хаос" = "Demon cats, neon and chaos";
