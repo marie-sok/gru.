@@ -46,82 +46,11 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 }
 
-/// Best-effort still-capture redaction using the secure compositor path used
-/// by secure text entry. Recording/mirroring is also detected and blocked.
-struct GRUSecureContent<Content: View>: UIViewControllerRepresentable {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(rootView: content)
-    }
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        let container = UIViewController()
-        container.view.backgroundColor = .clear
-        container.view.insetsLayoutMarginsFromSafeArea = false
-        container.additionalSafeAreaInsets = .zero
-
-        let secureField = UITextField(frame: .zero)
-        secureField.isSecureTextEntry = true
-        secureField.text = " "
-        secureField.textColor = .clear
-        secureField.tintColor = .clear
-        secureField.backgroundColor = .clear
-        secureField.translatesAutoresizingMaskIntoConstraints = false
-        secureField.accessibilityElementsHidden = true
-        container.view.addSubview(secureField)
-
-        NSLayoutConstraint.activate([
-            secureField.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
-            secureField.trailingAnchor.constraint(equalTo: container.view.trailingAnchor),
-            secureField.topAnchor.constraint(equalTo: container.view.topAnchor),
-            secureField.bottomAnchor.constraint(equalTo: container.view.bottomAnchor)
-        ])
-
-        let protectedCanvas = secureField.subviews.first ?? secureField
-        protectedCanvas.isUserInteractionEnabled = true
-        protectedCanvas.insetsLayoutMarginsFromSafeArea = false
-
-        let host = context.coordinator.host
-        host.view.backgroundColor = .clear
-        host.view.insetsLayoutMarginsFromSafeArea = false
-        host.additionalSafeAreaInsets = .zero
-
-        container.addChild(host)
-        host.view.translatesAutoresizingMaskIntoConstraints = false
-        protectedCanvas.addSubview(host.view)
-
-        NSLayoutConstraint.activate([
-            host.view.leadingAnchor.constraint(equalTo: protectedCanvas.leadingAnchor),
-            host.view.trailingAnchor.constraint(equalTo: protectedCanvas.trailingAnchor),
-            host.view.topAnchor.constraint(equalTo: protectedCanvas.topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: protectedCanvas.bottomAnchor)
-        ])
-
-        host.didMove(toParent: container)
-        return container
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        context.coordinator.host.rootView = content
-        uiViewController.view.setNeedsLayout()
-        uiViewController.view.layoutIfNeeded()
-    }
-
-    final class Coordinator {
-        let host: UIHostingController<Content>
-
-        init(rootView: Content) {
-            host = UIHostingController(rootView: rootView)
-            host.view.backgroundColor = .clear
-        }
-    }
-}
-
+/// Screen protection must never participate in the responder chain.
+/// The previous implementation wrapped the entire app inside a hidden secure
+/// UITextField canvas. On physical devices that could surface the keyboard or
+/// leave the hosted SwiftUI tree black during hierarchy rebuilds. We now render
+/// SwiftUI normally and redact the UI only while screen capture/mirroring is active.
 struct GRUScreenProtectionView<Content: View>: View {
     @StateObject private var model = GRUScreenProtectionModel()
     let content: Content
@@ -132,11 +61,8 @@ struct GRUScreenProtectionView<Content: View>: View {
 
     var body: some View {
         ZStack {
-            GRUSecureContent {
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .ignoresSafeArea(.container, edges: .all)
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if model.isCaptureActive {
                 ZStack {
@@ -162,11 +88,10 @@ struct GRUScreenProtectionView<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea(.container, edges: .all)
         .alert("Защита gru.", isPresented: $model.showScreenshotWarning) {
             Button("Понятно", role: .cancel) {}
         } message: {
-            Text("Снимки экрана ограничены. Защищённый контент gru. скрывается от захвата, а запись и трансляция блокируются.")
+            Text("Снимок экрана обнаружен. При записи экрана и трансляции защищённый интерфейс gru. скрывается.")
         }
     }
 }
