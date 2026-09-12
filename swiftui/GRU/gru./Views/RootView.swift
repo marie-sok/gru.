@@ -14,7 +14,6 @@ import UIKit
 struct RootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("gru.settings.security.hideSwitcherPreview") private var hideSwitcherPreview = true
     @AppStorage("gru.settings.notifications.resetOnOpen") private var resetBadgeOnOpen = true
     @AppStorage("gru.release.onboarding.v11") private var didFinishOnboarding = false
     @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
@@ -43,47 +42,31 @@ struct RootView: View {
     }
 
     var body: some View {
-        ZStack {
-            Group {
-                if isCheckingSession {
-                    loadingView
-                } else if !didFinishOnboarding {
-                    GRUReleaseOnboardingView {
-                        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                            didFinishOnboarding = true
-                        }
+        Group {
+            if isCheckingSession {
+                loadingView
+            } else if !didFinishOnboarding {
+                GRUReleaseOnboardingView {
+                    withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                        didFinishOnboarding = true
                     }
-                } else if isAuthenticated {
-                    MainView()
-                        .blur(radius: (isBiometricLocked && biometricsEnabled) ? 18 : 0)
-                        .disabled(isBiometricLocked && biometricsEnabled)
-                        .overlay {
-                            if isBiometricLocked && biometricsEnabled {
-                                biometricLockOverlay
-                            }
-                        }
-                } else {
-                    LoginView(
-                        onLogin: {
-                            handleSuccessfulLogin()
-                        }
-                    )
                 }
-            }
-
-            if hideSwitcherPreview && scenePhase != .active {
+            } else if isAuthenticated {
                 ZStack {
-                    GRUAppBackdrop()
-                    VStack(spacing: 12) {
-                        Image(systemName: "eye.slash.fill")
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundStyle(GRUColors.accent)
-                        Text("gru.")
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                    MainView()
+                        .allowsHitTesting(!(isBiometricLocked && biometricsEnabled))
+
+                    if isBiometricLocked && biometricsEnabled {
+                        biometricLockOverlay
+                            .zIndex(100)
                     }
                 }
-                .transition(.opacity)
-                .zIndex(100)
+            } else {
+                LoginView(
+                    onLogin: {
+                        handleSuccessfulLogin()
+                    }
+                )
             }
         }
         .task {
@@ -103,9 +86,9 @@ struct RootView: View {
                     NotificationService.shared.clearBadge()
                 }
 
-                // LocalAuthentication can temporarily move the app through
-                // inactive/active while its system sheet is presented. Never
-                // treat that transition as a fresh unlock opportunity.
+                // LocalAuthentication may temporarily move the scene through
+                // inactive/active while the system sheet is visible. Never
+                // interpret that transition as a new unlock request.
                 if biometricsEnabled &&
                     isAuthenticated &&
                     didFinishOnboarding &&
@@ -115,9 +98,7 @@ struct RootView: View {
                     authenticateWithBiometrics(userInitiated: false)
                 }
             } else if newPhase == .background {
-                // A real app background should relock GRU. A background-like
-                // transition caused by an in-flight Face ID sheet must not
-                // restart the lock cycle.
+                // Only a real background transition re-arms biometric lock.
                 if biometricsEnabled &&
                     isAuthenticated &&
                     !isBiometricPromptInFlight {
@@ -167,8 +148,6 @@ private extension RootView {
                 print("⚠️ GRU session not admitted: \(probe.message)")
             }
 
-            // Hard beta policy: never enter authenticated UI unless the current
-            // backend has actually accepted the persisted JWT in this launch.
             isAuthenticated = false
             isCheckingSession = false
             return
@@ -214,8 +193,6 @@ private extension RootView {
             return
         }
 
-        // Second server confirmation closes the gap between LoginViewModel and
-        // MainView. MainView cannot start chat/WebSocket work until this passes.
         let probe = await APIClient.shared.probeServer(token: token)
 
         guard let statusCode = probe.statusCode,
@@ -258,8 +235,6 @@ private extension RootView {
         applyLocalProfile()
         isAuthenticated = true
 
-        // UIKit can preserve the responder for one run-loop turn while the
-        // LoginView tree is being removed. Resign again after MainView mounts.
         DispatchQueue.main.async {
             dismissAnyKeyboard()
         }
@@ -267,7 +242,17 @@ private extension RootView {
         if biometricsEnabled && requireBiometricUnlock {
             isBiometricLocked = true
             suppressAutomaticBiometricRetry = false
-            authenticateWithBiometrics(userInitiated: false)
+
+            // Let the authenticated SwiftUI hierarchy settle before asking
+            // LocalAuthentication to present its system sheet. This avoids a
+            // visible hitch when the secure screenshot canvas is also mounting.
+            Task { @MainActor in
+                await Task.yield()
+                guard isAuthenticated,
+                      biometricsEnabled,
+                      isBiometricLocked else { return }
+                authenticateWithBiometrics(userInitiated: false)
+            }
         } else {
             isBiometricLocked = false
             isBiometricPromptInFlight = false
@@ -395,7 +380,8 @@ private struct GRUReleaseOnboardingView: View {
 private extension RootView {
     var biometricLockOverlay: some View {
         ZStack {
-            GRUAppBackdrop()
+            Color.black
+                .ignoresSafeArea()
 
             VStack(spacing: 24) {
                 Image(systemName: "faceid")
@@ -435,7 +421,6 @@ private extension RootView {
             }
             .padding(32)
         }
-        .transition(.opacity)
     }
 
     func authenticateWithBiometrics(userInitiated: Bool) {
@@ -446,6 +431,8 @@ private extension RootView {
         isBiometricPromptInFlight = true
 
         let context = LAContext()
+        context.interactionNotAllowed = false
+
         var authError: NSError?
         let reason = GRUL10n.text("Разблокируйте доступ к приложению gru.")
 
@@ -465,13 +452,15 @@ private extension RootView {
 
                 if success {
                     suppressAutomaticBiometricRetry = false
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    // Avoid animating the entire secure-hosted hierarchy after
+                    // Face ID. Removing the lightweight lock overlay in one
+                    // transaction is visibly smoother on physical devices.
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
                         isBiometricLocked = false
                     }
                 } else {
-                    // Do not immediately call Face ID again when the system
-                    // sheet returns the app to active. The user can explicitly
-                    // retry from the lock overlay.
                     isBiometricLocked = true
                     suppressAutomaticBiometricRetry = true
                 }
