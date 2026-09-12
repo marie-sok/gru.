@@ -51,28 +51,24 @@ VOICE = "swiftui/GRU/gru./Components/VoiceAudioRecorderView.swift"
 VIDEO_NOTE = "swiftui/GRU/gru./Components/VideoNoteRecorderView.swift"
 ENTITLEMENTS = "swiftui/GRU/gru./gru_.entitlements"
 
-# Normal Xcode Run on a physical iPhone must use Release transport.
 check_regex(
     SCHEME,
     r'<LaunchAction\s+buildConfiguration\s*=\s*"Release"',
     "shared Xcode scheme LaunchAction is not Release",
 )
 
-# Release must be explicitly pinned to the public GRU edge.
 require(PROJECT, 'INFOPLIST_KEY_GRUProductionHTTPBaseURL = "https://gru-edge-v2.onrender.com";',
         "Release HTTP endpoint is not pinned to gru-edge-v2")
 require(PROJECT, 'INFOPLIST_KEY_GRUProductionWebSocketURL = "wss://gru-edge-v2.onrender.com/ws";',
         "Release WebSocket endpoint is not pinned to gru-edge-v2")
 require(PROJECT, "MARKETING_VERSION = 0.9.2;", "expected beta marketing version 0.9.2 is missing")
 
-# Runtime language changes must not recreate the navigation root.
 require(APP, "RootView()")
 require(APP, ".environment(\n                \\.locale,", "runtime locale environment is missing")
 forbid(APP, ".id(languageRaw)", "language switching would recreate RootView")
 forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
 
-# Authentication UX.
 require(ROOT_VIEW, "func authenticateForAppAccess() async -> Bool",
         "system app-unlock function is missing")
 require(ROOT_VIEW, ".deviceOwnerAuthentication",
@@ -90,17 +86,21 @@ forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
 forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
-# Screen privacy. Root protection remains public-API-only. Still-screenshot
-# protection is scoped to authenticated ChatView. The conversation must be
-# mounted inside UIKit's verified secure-text canvas, never into a generic
-# UIView fallback or a loosely matched unrelated "Canvas" view.
+# Chat privacy. Root protection remains public-API-only. The entire authenticated
+# chat is mounted inside a plain system UITextField secure canvas. Editing is
+# blocked via delegate instead of subclassing UITextField, and capture protection
+# is applied to controller, field, canvas and SwiftUI-host layers.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
-require(SCREEN, "GRUChatNonResponderSecureField",
-        "chat-only secure UITextField is missing")
+require(SCREEN, "private let secureField = UITextField(frame: .zero)",
+        "plain system secure UITextField is missing")
+require(SCREEN, "GRUSecureTextFieldDelegate",
+        "secure UITextField delegate is missing")
+require(SCREEN, "textFieldShouldBeginEditing",
+        "secure UITextField editing guard is missing")
 require(SCREEN, "secureField.isSecureTextEntry = true",
         "secure text rendering is not enabled")
 require(SCREEN, "GRUChatSecureCaptureContainer",
@@ -108,17 +108,29 @@ require(SCREEN, "GRUChatSecureCaptureContainer",
 require(SCREEN, "findSecureCanvas(in: secureField)",
         "verified secure text canvas lookup is missing")
 require(SCREEN, "TextLayoutCanvasView",
-        "strict UIKit secure text canvas matching is missing")
-require(SCREEN, "host.view.superview === protectedCanvas",
-        "chat host is not verified as mounted in the secure canvas")
+        "UIKit secure text canvas matching is missing")
+require(SCREEN, "TextEffectsView",
+        "iOS secure text effects fallback is missing")
+require(SCREEN, "host.view.superview === canvas",
+        "chat host is not verified inside the current secure canvas")
 require(SCREEN, "canvas.addSubview(host.view)",
         "chat content is not mounted inside the secure text canvas")
+require(SCREEN, "view.layer,",
+        "whole chat controller layer is not capture-protected")
+require(SCREEN, "secureField.layer,",
+        "secure field layer is not capture-protected")
+require(SCREEN, "canvas.layer,",
+        "secure canvas layer is not capture-protected")
+require(SCREEN, "host.view.layer",
+        "SwiftUI host layer is not capture-protected")
 require(SCREEN, "GRUPrivacyCaptureScene",
         "GRU privacy replacement scene is missing")
 require(SCREEN, "secure-field hierarchy:",
         "DEBUG secure-field hierarchy diagnostics are missing")
 require(CHAT_VIEW, "GRUChatCaptureProtection",
         "ChatView is not wrapped by chat-scoped screenshot protection")
+forbid(SCREEN, "GRUChatNonResponderSecureField",
+       "custom UITextField subclass returned")
 forbid(ROOT_VIEW, "GRUChatCaptureProtection",
        "chat screenshot compositor leaked into RootView/auth lifecycle")
 forbid(APP, "GRUChatCaptureProtection",
@@ -128,31 +140,22 @@ forbid(SCREEN, "GRUSecureCaptureContainer",
 forbid(SCREEN, "GRUNonResponderSecureField",
        "legacy root-level secure field returned")
 
-screen_text = read(SCREEN)
-if '"Canvas"' in screen_text:
-    failures.append("generic Canvas secure-view matching returned; selector must stay strict")
-
-if "struct GRUScreenProtectionView" in screen_text:
-    root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
+if "struct GRUScreenProtectionView" in read(SCREEN):
+    root_section = read(SCREEN).split("struct GRUScreenProtectionView", 1)[1]
     if "GRUChatSecureCaptureContainer" in root_section:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
-    if "GRUChatNonResponderSecureField" in root_section:
-        failures.append("secure still-screenshot field leaked into root/auth protection")
 
-# Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
 forbid(MAIN, "GRUE2EESecurityCenterView", "user-facing E2EE overlay/button returned")
 forbid(SETTINGS, "Центр управления", "legacy control-center section returned")
 forbid(SETTINGS, "GRUE2EESecurityCenterView", "E2EE center should remain internal")
 forbid(APP_TAB, "case music", "Music tab returned")
 
-# Cellular/Wi-Fi recovery must remain wired to production realtime.
 require(APP, "GRURadioHandoffMonitor.shared.start()", "radio handoff monitor is not started")
 require(APP, "GRUConnectivityCenter.shared.reconnectRealtime()", "foreground realtime recovery is missing")
 require(RADIO, "path.usesInterfaceType(.cellular)", "cellular handoff detection is missing")
 require(RADIO, "GRUConnectivityCenter.shared.reconnectRealtime()", "radio handoff does not reconnect realtime")
 
-# Audio/video capture must keep blocking session work off the main queue.
 require(VOICE, "DispatchQueue.global(qos: .userInitiated).async", "voice AVAudioSession activation is not off-main")
 require(VIDEO_NOTE, 'label: "gru.video-note.capture-session"', "video-note capture serial queue is missing")
 require(VIDEO_NOTE, "session.startRunning()", "video-note capture start is missing")
