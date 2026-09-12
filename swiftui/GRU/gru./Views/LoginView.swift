@@ -224,13 +224,17 @@ struct LoginView: View {
                         .foregroundStyle(.white)
 
                     VStack(spacing: 8) {
-                        Text("Восстановление E2EE")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                        Text(loginLocalized(
+                            ru: "Восстановление E2EE",
+                            en: "E2EE Recovery"
+                        ))
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
 
-                        Text(
-                            "На сервере уже закреплена криптографическая личность этого аккаунта. gru. не создаст новый ключ поверх неё. Восстанови прежний ключ из iCloud Keychain или recovery code."
-                        )
+                        Text(loginLocalized(
+                            ru: "На сервере уже закреплена криптографическая личность этого аккаунта. gru. не создаст новый ключ поверх неё. Восстанови прежний ключ из iCloud Keychain или recovery code.",
+                            en: "This account already has a cryptographic identity on the server. gru. will not replace it with a new key. Restore the existing key from iCloud Keychain or your recovery code."
+                        ))
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.62))
                         .multilineTextAlignment(.center)
@@ -244,7 +248,10 @@ struct LoginView: View {
                             }
                         } label: {
                             recoveryButtonLabel(
-                                title: "Восстановить из iCloud Keychain",
+                                title: loginLocalized(
+                                    ru: "Восстановить из iCloud Keychain",
+                                    en: "Restore from iCloud Keychain"
+                                ),
                                 icon: "icloud.and.arrow.down.fill",
                                 prominent: true
                             )
@@ -273,7 +280,10 @@ struct LoginView: View {
                             }
                         } label: {
                             recoveryButtonLabel(
-                                title: "Восстановить по коду",
+                                title: loginLocalized(
+                                    ru: "Восстановить по коду",
+                                    en: "Restore with recovery code"
+                                ),
                                 icon: "key.fill",
                                 prominent: false
                             )
@@ -291,8 +301,13 @@ struct LoginView: View {
                         errorCard(recoveryError)
                     }
 
-                    Button("Выйти из аккаунта") {
+                    Button {
                         viewModel.cancelE2EERecovery()
+                    } label: {
+                        Text(loginLocalized(
+                            ru: "Выйти из аккаунта",
+                            en: "Log out"
+                        ))
                     }
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.58))
@@ -324,13 +339,17 @@ struct LoginView: View {
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(.green)
 
-                    Text("Сохрани recovery code")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                    Text(loginLocalized(
+                        ru: "Сохрани recovery code",
+                        en: "Save your recovery code"
+                    ))
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
 
-                    Text(
-                        "Это запасной способ вернуть ту же E2EE-личность после смены iPhone или переустановки. Сервер gru. этот код не знает. Сохрани его вне приложения."
-                    )
+                    Text(loginLocalized(
+                        ru: "Это запасной способ вернуть ту же E2EE-личность после смены iPhone или переустановки. Сервер gru. этот код не знает. Сохрани его вне приложения.",
+                        en: "This is your backup way to restore the same E2EE identity after changing iPhone or reinstalling the app. The gru. server never knows this code. Store it outside the app."
+                    ))
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.62))
                     .multilineTextAlignment(.center)
@@ -355,7 +374,10 @@ struct LoginView: View {
                         }
                     } label: {
                         Label(
-                            copiedRecoveryCode ? "Скопировано" : "Скопировать код",
+                            loginLocalized(
+                                ru: copiedRecoveryCode ? "Скопировано" : "Скопировать код",
+                                en: copiedRecoveryCode ? "Copied" : "Copy code"
+                            ),
                             systemImage: copiedRecoveryCode ? "checkmark" : "doc.on.doc"
                         )
                         .frame(maxWidth: .infinity)
@@ -372,15 +394,18 @@ struct LoginView: View {
                         viewModel.acknowledgeRecoveryCode()
                         onLogin()
                     } label: {
-                        Text("Я сохранила код — продолжить")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                Color.white,
-                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            )
+                        Text(loginLocalized(
+                            ru: "Я сохранила код — продолжить",
+                            en: "I saved the code — continue"
+                        ))
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(
+                            Color.white,
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -413,6 +438,10 @@ struct LoginView: View {
                 prominent ? Color.white : Color.white.opacity(0.09),
                 in: RoundedRectangle(cornerRadius: 15, style: .continuous)
             )
+    }
+
+    private func loginLocalized(ru: String, en: String) -> String {
+        languageRaw == GRUAppLanguage.english.rawValue ? en : ru
     }
 
     private func errorCard(_ text: String) -> some View {

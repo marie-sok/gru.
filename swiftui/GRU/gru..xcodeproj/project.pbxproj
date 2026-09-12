@@ -328,8 +328,8 @@
 				DEVELOPMENT_TEAM = M3LJSC49RD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "gru.";
-				INFOPLIST_KEY_GRUProductionHTTPBaseURL = "https://gru-jiqi.onrender.com";
-				INFOPLIST_KEY_GRUProductionWebSocketURL = "wss://gru-jiqi.onrender.com/ws";
+				INFOPLIST_KEY_GRUProductionHTTPBaseURL = "https://gru-edge-v2.onrender.com";
+				INFOPLIST_KEY_GRUProductionWebSocketURL = "wss://gru-edge-v2.onrender.com/ws";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "gru. uses the camera for avatars, videos and video notes.";

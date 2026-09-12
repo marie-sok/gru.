@@ -49,9 +49,30 @@ fingerprint() {
 
 sign_ed25519() {
   local private_key="$1" payload="$2"
-  printf '%s' "$payload" \
-    | openssl pkeyutl -sign -rawin -inkey "$private_key" 2>/dev/null \
-    | base64 -w0
+  local nonce payload_file signature_file signature_bytes
+
+  nonce="${RANDOM}-$$-$(date +%s%N)"
+  payload_file="$TMP/sign-payload-$nonce.bin"
+  signature_file="$TMP/signature-$nonce.bin"
+
+  # Ed25519 is a one-shot signature algorithm in OpenSSL. Feeding pkeyutl from
+  # a pipe can fail with "unable to determine file size for oneshot operation".
+  # Use a real file so CI exercises the same 64-byte signature contract as iOS.
+  printf '%s' "$payload" > "$payload_file"
+  openssl pkeyutl \
+    -sign \
+    -rawin \
+    -inkey "$private_key" \
+    -in "$payload_file" \
+    -out "$signature_file"
+
+  signature_bytes="$(wc -c < "$signature_file" | tr -d '[:space:]')"
+  if [[ "$signature_bytes" != "64" ]]; then
+    echo "Ed25519 signing produced $signature_bytes bytes; expected 64" >&2
+    return 1
+  fi
+
+  base64 -w0 < "$signature_file"
 }
 
 make_identity() {
@@ -88,7 +109,7 @@ publish_identity() {
 
 send_v2() {
   local name="$1" sender_id="$2" receiver_id="$3" token="$4" chat_id="$5" marker="$6"
-  local client_id recipient_ephemeral recovery_ephemeral recipient_cipher recovery_cipher signing_pub fp canonical sig body
+  local client_id recipient_ephemeral recovery_ephemeral recipient_cipher recovery_cipher signing_pub fp canonical sig body sig_bytes
 
   client_id="$(cat /proc/sys/kernel/random/uuid)"
   recipient_ephemeral="$(openssl rand 32 | base64 -w0)"
@@ -100,6 +121,11 @@ send_v2() {
 
   canonical="gru-e2ee-v2|${chat_id}|${sender_id}|${receiver_id}|${client_id}|${recipient_ephemeral}|${recipient_cipher}|${recovery_ephemeral}|${recovery_cipher}|${fp}"
   sig="$(sign_ed25519 "$TMP/${name}-ed25519.pem" "$canonical")"
+  sig_bytes="$(printf '%s' "$sig" | base64 -d | wc -c | tr -d '[:space:]')"
+  if [[ -z "$sig" || "$sig_bytes" != "64" ]]; then
+    echo "Invalid Ed25519 signature generated for $marker" >&2
+    return 1
+  fi
 
   body="$(jq -nc \
     --arg chatId "$chat_id" \

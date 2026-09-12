@@ -1,0 +1,69 @@
+name: Beta RC gates
+
+on:
+  push:
+    branches:
+      - "release/beta-*"
+  pull_request:
+    paths:
+      - "swiftui/GRU/**"
+      - "src/**"
+      - "proxy/**"
+      - "scripts/localization_audit.py"
+      - ".github/workflows/beta-rc-gates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  localization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Require complete RU and EN runtime catalogs
+        run: python3 scripts/localization_audit.py
+
+  edge-proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: npm install --package-lock-only
+      - run: npm ci
+      - run: npm run check
+
+  backend-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Generate ephemeral CI JWT secret
+        shell: bash
+        run: echo "GRU_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - name: Run beta-critical backend tests
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=E2EEMessageServiceTwoClientTest,E2EECryptoVerifierTest,MessageControllerSecurityTest,MediaControllerTest,JwtChannelInterceptorTest
+          test
+      - name: Assert E2EE v2 server contract
+        shell: bash
+        run: |
+          grep -F 'gru-e2ee-v2' src/main/java/gru/app/service/E2EEMessageService.java
+          grep -F 'senderRecoveryEncryptedPayload' src/main/java/gru/app/dto/E2EEMessageRequest.java
+          grep -F 'senderRecoveryEphemeralPublicKey' src/main/java/gru/app/dto/E2EEMessageRequest.java

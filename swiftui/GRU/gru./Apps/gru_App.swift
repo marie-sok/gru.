@@ -22,11 +22,16 @@ struct gru_App: App {
             GRUScreenProtectionView {
                 RootView()
             }
+            // GRUL10n is intentionally runtime-switchable. Rebuilding the root
+            // prevents already-pushed Settings screens from retaining strings
+            // evaluated with the previous language.
+            .id(languageRaw)
             .environment(
                 \.locale,
                 appLanguage.locale
             )
             .task {
+                GRURadioHandoffMonitor.shared.start()
                 await publishE2EEIdentityIfAuthenticated()
             }
             .onReceive(
