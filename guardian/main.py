@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
-from aiogram import Bot, Dispatcher, F
+from aiohttp import web
+from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -76,6 +78,22 @@ async def repair_edge(message: Message) -> None:
     await message.answer(("🟢 " if ok else "🟠 ") + detail)
 
 
+async def guardian_health(_: web.Request) -> web.Response:
+    return web.json_response({"status": "ok", "service": "gru.guardian", "mode": settings.mode})
+
+
+async def start_health_server() -> web.AppRunner:
+    app = web.Application()
+    app.router.add_get("/health", guardian_health)
+    app.router.add_get("/", guardian_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    return runner
+
+
 async def watcher() -> None:
     while True:
         results = await monitor.snapshot()
@@ -100,11 +118,13 @@ async def watcher() -> None:
 
 async def main() -> None:
     await bot.delete_webhook(drop_pending_updates=False)
+    health_runner = await start_health_server()
     watcher_task = asyncio.create_task(watcher())
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         watcher_task.cancel()
+        await health_runner.cleanup()
         await bot.session.close()
 
 
