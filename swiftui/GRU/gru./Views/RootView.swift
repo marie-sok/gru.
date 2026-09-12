@@ -17,9 +17,10 @@ struct RootView: View {
     @AppStorage("gru.settings.notifications.resetOnOpen") private var resetBadgeOnOpen = true
     @AppStorage("gru.release.onboarding.v11") private var didFinishOnboarding = false
     @AppStorage("gru.settings.security.biometricsEnabled") private var biometricsEnabled = false
+
     @State private var isBiometricLocked = false
     @State private var isBiometricPromptInFlight = false
-    @State private var suppressAutomaticBiometricRetry = false
+    @State private var ignoreBackgroundRelockUntil = Date.distantPast
 
     @AppStorage(GRUTheme.selectionKey)
     private var themeRawValue = GRUAppTheme.blackMoonCat.rawValue
@@ -86,25 +87,19 @@ struct RootView: View {
                     NotificationService.shared.clearBadge()
                 }
 
-                // LocalAuthentication may temporarily move the scene through
-                // inactive/active while the system sheet is visible. Never
-                // interpret that transition as a new unlock request.
-                if biometricsEnabled &&
-                    isAuthenticated &&
-                    didFinishOnboarding &&
-                    isBiometricLocked &&
-                    !isBiometricPromptInFlight &&
-                    !suppressAutomaticBiometricRetry {
-                    authenticateWithBiometrics(userInitiated: false)
-                }
+                // Intentionally no automatic LocalAuthentication call here.
+                // Face ID can itself drive inactive/active scene transitions;
+                // tying biometric presentation to scene activation creates a
+                // re-entrant prompt loop on physical devices.
             } else if newPhase == .background {
-                // Only a real background transition re-arms biometric lock.
-                if biometricsEnabled &&
-                    isAuthenticated &&
-                    !isBiometricPromptInFlight {
-                    isBiometricLocked = true
-                    suppressAutomaticBiometricRetry = false
+                guard biometricsEnabled,
+                      isAuthenticated,
+                      !isBiometricPromptInFlight,
+                      Date() >= ignoreBackgroundRelockUntil else {
+                    return
                 }
+
+                isBiometricLocked = true
             }
         }
         .onReceive(
@@ -239,25 +234,13 @@ private extension RootView {
             dismissAnyKeyboard()
         }
 
-        if biometricsEnabled && requireBiometricUnlock {
-            isBiometricLocked = true
-            suppressAutomaticBiometricRetry = false
-
-            // Let the authenticated SwiftUI hierarchy settle before asking
-            // LocalAuthentication to present its system sheet. This avoids a
-            // visible hitch when the secure screenshot canvas is also mounting.
-            Task { @MainActor in
-                await Task.yield()
-                guard isAuthenticated,
-                      biometricsEnabled,
-                      isBiometricLocked else { return }
-                authenticateWithBiometrics(userInitiated: false)
-            }
-        } else {
-            isBiometricLocked = false
-            isBiometricPromptInFlight = false
-            suppressAutomaticBiometricRetry = false
-        }
+        // A persisted authenticated session can start locked, but biometric
+        // presentation is deliberately user-initiated only. This guarantees
+        // that LocalAuthentication cannot recursively trigger itself through
+        // scenePhase transitions.
+        isBiometricLocked = biometricsEnabled && requireBiometricUnlock
+        isBiometricPromptInFlight = false
+        ignoreBackgroundRelockUntil = .distantPast
     }
 
     // MARK: - Hard migration / clear
@@ -288,7 +271,7 @@ private extension RootView {
         NotificationService.shared.clearBadge()
         isBiometricLocked = false
         isBiometricPromptInFlight = false
-        suppressAutomaticBiometricRetry = false
+        ignoreBackgroundRelockUntil = .distantPast
     }
 
     func handleSessionInvalidated() {
@@ -400,8 +383,7 @@ private extension RootView {
                 }
 
                 Button {
-                    suppressAutomaticBiometricRetry = false
-                    authenticateWithBiometrics(userInitiated: true)
+                    authenticateWithBiometrics()
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "lock.open.fill")
@@ -423,10 +405,9 @@ private extension RootView {
         }
     }
 
-    func authenticateWithBiometrics(userInitiated: Bool) {
+    func authenticateWithBiometrics() {
         guard biometricsEnabled && isAuthenticated else { return }
         guard !isBiometricPromptInFlight else { return }
-        guard userInitiated || !suppressAutomaticBiometricRetry else { return }
 
         isBiometricPromptInFlight = true
 
@@ -439,7 +420,6 @@ private extension RootView {
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) else {
             isBiometricPromptInFlight = false
             isBiometricLocked = false
-            suppressAutomaticBiometricRetry = false
             return
         }
 
@@ -451,18 +431,19 @@ private extension RootView {
                 isBiometricPromptInFlight = false
 
                 if success {
-                    suppressAutomaticBiometricRetry = false
-                    // Avoid animating the entire secure-hosted hierarchy after
-                    // Face ID. Removing the lightweight lock overlay in one
-                    // transaction is visibly smoother on physical devices.
+                    // Ignore any transient background callback caused by the
+                    // LocalAuthentication system UI immediately after success.
+                    ignoreBackgroundRelockUntil = Date().addingTimeInterval(1.5)
+
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
                         isBiometricLocked = false
                     }
                 } else {
+                    // Stay on the lock screen. No automatic retry is possible;
+                    // only another explicit tap can invoke Face ID again.
                     isBiometricLocked = true
-                    suppressAutomaticBiometricRetry = true
                 }
             }
         }
