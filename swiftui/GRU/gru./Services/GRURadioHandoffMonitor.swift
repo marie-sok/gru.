@@ -1,10 +1,11 @@
 import Foundation
 import Network
 
-/// Detects live radio changes that do not pass through an offline NWPath state.
+/// Detects live radio changes and offline -> online recovery.
 /// A Wi-Fi -> cellular handoff can remain `.satisfied`, while the existing
-/// URLSessionWebSocketTask is bound to the old route. In that case GRU creates
-/// a fresh authenticated STOMP session and refreshes backend readiness.
+/// URLSessionWebSocketTask is bound to the old route. Likewise, restoring the
+/// same radio after Airplane Mode may not change interface type. In both cases
+/// GRU refreshes backend readiness and creates a fresh authenticated STOMP session.
 final class GRURadioHandoffMonitor: @unchecked Sendable {
     static let shared = GRURadioHandoffMonitor()
 
@@ -20,6 +21,7 @@ final class GRURadioHandoffMonitor: @unchecked Sendable {
     private let lock = NSLock()
     private var started = false
     private var previousInterface: Interface?
+    private var previousWasReachable: Bool?
 
     private init() {}
 
@@ -39,35 +41,51 @@ final class GRURadioHandoffMonitor: @unchecked Sendable {
     }
 
     private func consume(_ path: NWPath) {
-        guard path.status == .satisfied else { return }
+        let reachable = path.status == .satisfied
+        let current: Interface?
 
-        let current: Interface
-        if path.usesInterfaceType(.wifi) {
-            current = .wifi
-        } else if path.usesInterfaceType(.cellular) {
-            current = .cellular
-        } else if path.usesInterfaceType(.wiredEthernet) {
-            current = .wired
+        if reachable {
+            if path.usesInterfaceType(.wifi) {
+                current = .wifi
+            } else if path.usesInterfaceType(.cellular) {
+                current = .cellular
+            } else if path.usesInterfaceType(.wiredEthernet) {
+                current = .wired
+            } else {
+                current = .other
+            }
         } else {
-            current = .other
+            current = nil
         }
 
         lock.lock()
-        let previous = previousInterface
-        previousInterface = current
+        let previousInterface = self.previousInterface
+        let previousWasReachable = self.previousWasReachable
+        self.previousWasReachable = reachable
+        if let current {
+            self.previousInterface = current
+        }
         lock.unlock()
 
-        guard let previous, previous != current else { return }
+        guard reachable else { return }
+
+        let restoredAfterOffline = previousWasReachable == false
+        let changedInterface = previousInterface != nil && previousInterface != current
+
+        // The first satisfied path after app launch does not need a forced
+        // reconnect: normal startup owns the initial REST/WebSocket connection.
+        guard restoredAfterOffline || changedInterface else { return }
 
         Task { @MainActor in
             GRUConnectivityCenter.shared.refresh()
-
-            // Only authenticated sessions own realtime state. The method also
-            // validates token presence before reconnecting.
             GRUConnectivityCenter.shared.reconnectRealtime()
 
             #if DEBUG
-            print("🌐 GRU route handoff: \(previous.rawValue) -> \(current.rawValue)")
+            if restoredAfterOffline {
+                print("🌐 GRU network restored on \(current?.rawValue ?? "unknown")")
+            } else if let previousInterface, let current {
+                print("🌐 GRU route handoff: \(previousInterface.rawValue) -> \(current.rawValue)")
+            }
             #endif
         }
     }
