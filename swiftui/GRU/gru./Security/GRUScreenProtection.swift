@@ -139,124 +139,57 @@ final class GRUScreenProtectionModel: ObservableObject {
 
 // MARK: - Telegram-style chat-layer screenshot protection
 
-/// This field is never inserted into the GRU view hierarchy and can never become
-/// first responder. It exists only as a UIKit secure-rendering marker, matching
-/// Telegram-iOS' layer-level screenshot protection technique.
-private final class GRUChatNonResponderSecureField: UITextField {
-    override var canBecomeFirstResponder: Bool { false }
-
-    override func becomeFirstResponder() -> Bool {
-        false
-    }
-
-    override func canPerformAction(
-        _ action: Selector,
-        withSender sender: Any?
-    ) -> Bool {
-        false
-    }
-}
-
-/// Marks an arbitrary CALayer as secure without moving the rendered chat into a
-/// UITextField. This mirrors Telegram-iOS' setLayerDisableScreenshots approach:
-/// temporarily substitute the target layer for the secure text canvas layer,
-/// toggle secureTextEntry, then restore the canvas' original layer.
+/// Mirrors Telegram-iOS' UIKitRuntimeUtils implementation as closely as possible:
+/// one plain UITextField, its TextLayoutCanvasView, temporary layer substitution,
+/// then secureTextEntry false -> true.
 @MainActor
 private enum GRUTelegramLayerScreenshotGuard {
-    private static let secureField: GRUChatNonResponderSecureField = {
-        let field = GRUChatNonResponderSecureField(
-            frame: CGRect(x: 0, y: 0, width: 120, height: 44)
-        )
-        field.text = " "
-        field.textColor = .clear
-        field.tintColor = .clear
-        field.backgroundColor = .clear
-        field.borderStyle = .none
-        field.autocorrectionType = .no
-        field.spellCheckingType = .no
-        field.smartDashesType = .no
-        field.smartQuotesType = .no
-        field.smartInsertDeleteType = .no
-        field.textContentType = nil
-        field.isUserInteractionEnabled = false
-        field.isAccessibilityElement = false
-        field.accessibilityElementsHidden = true
-        field.inputView = UIView(frame: .zero)
-        field.inputAccessoryView = UIView(frame: .zero)
-        field.isSecureTextEntry = false
-        field.setNeedsLayout()
-        field.layoutIfNeeded()
-        return field
+    private static let textField = UITextField()
+
+    private static let secureView: UIView? = {
+        for subview in textField.subviews {
+            if NSStringFromClass(type(of: subview)).contains("TextLayoutCanvasView") {
+                return subview
+            }
+        }
+
+        // Compatibility only: current Telegram uses the direct-child path above.
+        var queue = textField.subviews
+        while !queue.isEmpty {
+            let candidate = queue.removeFirst()
+            let name = NSStringFromClass(type(of: candidate))
+            if name.contains("TextLayoutCanvasView") || name.contains("LayoutCanvasView") {
+                return candidate
+            }
+            queue.append(contentsOf: candidate.subviews)
+        }
+
+        return nil
     }()
 
     @discardableResult
-    static func setProtected(_ targetLayer: CALayer, enabled: Bool) -> Bool {
-        let secureField = self.secureField
-
-        secureField.setNeedsLayout()
-        secureField.layoutIfNeeded()
-
-        if findSecureCanvas(in: secureField) == nil {
-            // Force UIKit to materialize the private secure-text canvas. The
-            // field still never joins the app view/responder hierarchy.
-            secureField.isSecureTextEntry = true
-            secureField.setNeedsLayout()
-            secureField.layoutIfNeeded()
-        }
-
-        guard let secureView = findSecureCanvas(in: secureField) else {
-            return false
-        }
+    static func setProtected(_ layer: CALayer, enabled: Bool) -> Bool {
+        guard let secureView else { return false }
 
         let previousLayer = secureView.layer
-
-        // Telegram-iOS uses the same KVC layer substitution before toggling
-        // secureTextEntry. No private selector or class is instantiated here.
-        secureView.setValue(targetLayer, forKey: "layer")
+        secureView.setValue(layer, forKey: "layer")
 
         if enabled {
-            secureField.isSecureTextEntry = false
-            secureField.isSecureTextEntry = true
+            textField.isSecureTextEntry = false
+            textField.isSecureTextEntry = true
         } else {
-            secureField.isSecureTextEntry = true
-            secureField.isSecureTextEntry = false
+            textField.isSecureTextEntry = true
+            textField.isSecureTextEntry = false
         }
 
         secureView.setValue(previousLayer, forKey: "layer")
         return true
     }
-
-    private static func findSecureCanvas(in field: UITextField) -> UIView? {
-        // Telegram currently looks for TextLayoutCanvasView among direct
-        // UITextField children. Keep that path first and add a recursive
-        // compatibility search for UIKit hierarchy changes.
-        if let direct = field.subviews.first(where: { view in
-            NSStringFromClass(type(of: view))
-                .localizedCaseInsensitiveContains("TextLayoutCanvasView")
-        }) {
-            return direct
-        }
-
-        var queue = field.subviews
-        while !queue.isEmpty {
-            let view = queue.removeFirst()
-            let className = NSStringFromClass(type(of: view))
-
-            if className.localizedCaseInsensitiveContains("TextLayoutCanvasView") ||
-                className.localizedCaseInsensitiveContains("LayoutCanvasView") {
-                return view
-            }
-
-            queue.append(contentsOf: view.subviews)
-        }
-
-        return nil
-    }
 }
 
-/// Normal UIKit host for the visible chat. Unlike the previous implementation,
-/// the chat is not embedded inside a secure UITextField canvas. Its own CALayer
-/// is tagged using the same layer-level secure-rendering trick Telegram uses.
+/// Hosts the complete ChatView and protects the representable controller's root
+/// layer. The approved cyberpunk cat is rendered as a sibling underneath it.
+/// No secure UITextField enters the responder or view hierarchy.
 @MainActor
 private final class GRUTelegramProtectedChatHostController<Content: View>: UIViewController {
     private let host: UIHostingController<Content>
@@ -289,8 +222,8 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
         view.insetsLayoutMarginsFromSafeArea = false
         additionalSafeAreaInsets = .zero
 
-        // Fail closed. The privacy cat beneath this controller stays visible
-        // until the chat layer itself has been successfully marked protected.
+        // Fail closed: until the exact Telegram-style marker is applied, the
+        // real chat remains hidden and the cyberpunk privacy scene underneath is visible.
         host.view.isHidden = true
 
         addChild(host)
@@ -331,6 +264,8 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
 
         guard isViewLoaded,
               view.window != nil,
+              view.bounds.width > 1,
+              view.bounds.height > 1,
               host.view.bounds.width > 1,
               host.view.bounds.height > 1 else {
             scheduleRetry()
@@ -339,13 +274,21 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        let protected = GRUTelegramLayerScreenshotGuard.setProtected(
+
+        // Telegram protects a container layer. Protect our outer chat container
+        // and the SwiftUI host root as a belt-and-suspenders measure.
+        let outerProtected = GRUTelegramLayerScreenshotGuard.setProtected(
+            view.layer,
+            enabled: true
+        )
+        let hostProtected = GRUTelegramLayerScreenshotGuard.setProtected(
             host.view.layer,
             enabled: true
         )
+
         CATransaction.commit()
 
-        guard protected else {
+        guard outerProtected && hostProtected else {
             host.view.isHidden = true
             scheduleRetry()
             return
@@ -358,7 +301,7 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
     }
 
     private func scheduleRetry() {
-        guard retryWorkItem == nil, retryCount < 80 else { return }
+        guard retryWorkItem == nil, retryCount < 100 else { return }
 
         retryCount += 1
         let work = DispatchWorkItem { [weak self] in
@@ -372,8 +315,6 @@ private final class GRUTelegramProtectedChatHostController<Content: View>: UIVie
     }
 }
 
-/// Kept under the established GRU type name so the release gate can enforce that
-/// screenshot protection remains scoped to authenticated ChatView content only.
 private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
     let content: Content
 
@@ -393,9 +334,8 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
     }
 }
 
-/// Apply only to ChatView. The approved GRU privacy artwork is always rendered
-/// underneath the Telegram-style protected chat layer. If the layer cannot be
-/// protected, fail closed and leave the privacy artwork visible.
+/// Applied only by ChatView. The real chat is a protected sibling above the
+/// approved privacy artwork; if protection cannot be established, fail closed.
 struct GRUChatCaptureProtection<Content: View>: View {
     let content: Content
 
@@ -439,9 +379,8 @@ struct GRUPrivacyCaptureScene: View {
 
 // MARK: - Root recording / switcher protection
 
-/// Root protection deliberately remains public-API-only. The Telegram-style
-/// screenshot layer marker is restricted to authenticated ChatView content so it
-/// cannot interfere with LocalAuthentication, login, or the app responder chain.
+/// Root protection remains public-API-only. Still-screenshot layer marking stays
+/// inside authenticated ChatView so LocalAuthentication and login are untouched.
 struct GRUScreenProtectionView<Content: View>: View {
     @StateObject private var model = GRUScreenProtectionModel()
     let content: Content
