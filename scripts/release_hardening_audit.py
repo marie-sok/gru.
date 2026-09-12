@@ -71,9 +71,14 @@ forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
 
 # Screen privacy must never depend on a hidden secure text field/responder.
-forbid(SCREEN, "UITextField", "screen protection must not wrap the app in UITextField")
-forbid(SCREEN, "isSecureTextEntry", "secure-text responder hack must not return")
-require(SCREEN, "UIScreen.main.isCaptured", "screen-capture redaction is missing")
+# Match executable patterns, not comments that explain why the old approach was removed.
+forbid(SCREEN, "UITextField(", "screen protection must not construct a secure UITextField canvas")
+forbid(SCREEN, ".isSecureTextEntry", "secure-text responder hack must not return")
+require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
+require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
+require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
+require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
+require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
 
 # Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
