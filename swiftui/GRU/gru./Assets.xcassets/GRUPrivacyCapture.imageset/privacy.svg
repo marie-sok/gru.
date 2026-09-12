@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1170" height="2532" viewBox="0 0 390 844">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#030606"/>
+      <stop offset="0.55" stop-color="#08100E"/>
+      <stop offset="1" stop-color="#030404"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="390" height="844" fill="url(#bg)"/>
+
+  <g fill="none" stroke="#7CFFD0" stroke-width="1.2" opacity="0.11">
+    <path d="M28 142h45l12 10-12 10H28z"/>
+    <path d="M303 158c0-13 19-14 19 0 0-14 19-13 19 0 0 13-19 25-19 25s-19-12-19-25z"/>
+    <circle cx="44" cy="630" r="9"/><circle cx="62" cy="622" r="5"/><circle cx="30" cy="622" r="5"/>
+    <path d="M300 588h50v31h-27l-12 10v-10h-11z"/>
+    <path d="M55 350l12-8 12 8-5 14H60z"/>
+  </g>
+
+  <text x="28" y="62" fill="#F7FAF9" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="27" font-weight="800">gru.</text>
+  <circle cx="88" cy="54" r="3.5" fill="#7CFFD0"/>
+  <path d="M343 42h13v12h-13z M346 42v-5c0-8 9-8 9 0v5" fill="none" stroke="#7CFFD0" stroke-width="2" stroke-linecap="round"/>
+
+  <g transform="translate(195 304)" filter="url(#glow)">
+    <path d="M-72-64 L-56-116 L-18-78 M72-64 L56-116 L18-78" fill="#07100E" stroke="#7CFFD0" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="0" cy="-42" rx="84" ry="68" fill="#07100E" stroke="#7CFFD0" stroke-width="3"/>
+    <path d="M-78 22 Q-92 66-82 114 Q0 148 82 114 Q92 66 78 22 Q0 48-78 22z" fill="#07100E" stroke="#7CFFD0" stroke-width="3"/>
+
+    <path d="M-68 39 C-105 45-122 64-134 83" fill="none" stroke="#7CFFD0" stroke-width="13" stroke-linecap="round"/>
+    <path d="M68 39 C105 45 122 64 134 83" fill="none" stroke="#7CFFD0" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="-139" cy="87" r="21" fill="#07100E" stroke="#B99CFF" stroke-width="3"/>
+    <circle cx="139" cy="87" r="21" fill="#07100E" stroke="#B99CFF" stroke-width="3"/>
+    <g fill="#B99CFF">
+      <circle cx="-139" cy="89" r="7"/><circle cx="-149" cy="78" r="4"/><circle cx="-130" cy="77" r="4"/>
+      <circle cx="139" cy="89" r="7"/><circle cx="129" cy="78" r="4"/><circle cx="148" cy="77" r="4"/>
+    </g>
+
+    <ellipse cx="-32" cy="-48" rx="12" ry="16" fill="#7CFFD0"/>
+    <ellipse cx="-32" cy="-48" rx="5" ry="9" fill="#06100D"/>
+    <path d="M25-50 Q39-58 51-48" fill="none" stroke="#7CFFD0" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-4-18 l8 0 l-4 5z" fill="#B99CFF"/>
+    <path d="M0-12 v9 M0-3 Q-9 8-18 1 M0-3 Q9 8 18 1" fill="none" stroke="#B99CFF" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-48-12h-45 M-46 2h-51 M48-12h45 M46 2h51" stroke="#7CFFD0" stroke-width="2" stroke-linecap="round"/>
+
+    <rect x="-42" y="70" width="84" height="34" rx="17" fill="#0C1714" stroke="#7CFFD0" stroke-width="1.5"/>
+    <text x="0" y="93" text-anchor="middle" fill="#F7FAF9" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="17" font-weight="800" letter-spacing="1">ШТОШ</text>
+  </g>
+
+  <g transform="rotate(-4 300 205)">
+    <text x="286" y="192" fill="#7CFFD0" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="27" font-weight="800">Упс…</text>
+    <text x="248" y="214" fill="#B7C2BE" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600">this stays between us</text>
+  </g>
+
+  <text x="195" y="514" text-anchor="middle" fill="#F8FAFA" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="27" font-weight="800">Частная жизнь</text>
+  <text x="195" y="546" text-anchor="middle" fill="#F8FAFA" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="27" font-weight="800">имеет значение</text>
+
+  <text x="195" y="584" text-anchor="middle" fill="#A9B4B0" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" font-weight="500">
+    <tspan x="195" dy="0">gru. уважает ценность частной жизни.</tspan>
+    <tspan x="195" dy="21">Разговор между двумя людьми</tspan>
+    <tspan x="195" dy="21">должен оставаться между ними.</tspan>
+  </text>
+
+  <rect x="30" y="674" width="330" height="76" rx="24" fill="#0A1210" stroke="#7CFFD0" stroke-opacity="0.20"/>
+  <circle cx="67" cy="712" r="22" fill="#7CFFD0" fill-opacity="0.09"/>
+  <path d="M55 713 Q67 698 79 713 Q67 728 55 713z M58 702 L77 723" fill="none" stroke="#7CFFD0" stroke-width="2.4" stroke-linecap="round"/>
+  <text x="101" y="703" fill="#D8DFDC" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600">
+    <tspan x="101" dy="0">Запись экрана, трансляция</tspan>
+    <tspan x="101" dy="17">и превью скрываются, чтобы</tspan>
+    <tspan x="101" dy="17">личный разговор оставался личным.</tspan>
+  </text>
+
+  <rect x="30" y="774" width="330" height="52" rx="20" fill="#07100E" stroke="#7CFFD0" stroke-width="1.5"/>
+  <text x="195" y="806" text-anchor="middle" fill="#7CFFD0" font-family="-apple-system,BlinkMacSystemFont,'Arial Rounded MT Bold',sans-serif" font-size="16" font-weight="700">Понятно</text>
+</svg>
