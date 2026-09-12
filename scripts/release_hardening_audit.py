@@ -71,34 +71,39 @@ forbid(APP, ".id(languageRaw)", "language switching would recreate RootView")
 forbid(APP, "releaseTransportGate", "obsolete startup transport gate returned")
 forbid(APP, "Не удалось открыть безопасное подключение GRU", "obsolete false-safe startup screen returned")
 
-# Biometric authentication is deliberately user-initiated only. Face ID system
-# sheets can move the app inactive/active; automatic prompts tied to scenePhase
-# caused a re-entrant loop on physical iPhones.
-root_view_text = read(ROOT_VIEW)
-if root_view_text.count("authenticateWithBiometrics()") != 2:
-    failures.append(
-        "RootView biometric prompt count changed; expected exactly one explicit button call plus the function declaration"
-    )
-forbid(ROOT_VIEW, "authenticateWithBiometrics(userInitiated:",
-       "automatic/userInitiated biometric prompt API returned")
-require(ROOT_VIEW, "Intentionally no automatic LocalAuthentication call here.",
-        "scenePhase biometric loop guard is missing")
+# Authentication UX: no custom lock screen/button. Persisted sessions and real
+# background returns use the system device-owner flow (Face ID/Touch ID/Optic ID
+# with device passcode fallback). Only an actual background transition may arm
+# a foreground re-auth; LocalAuthentication's inactive/active transitions must
+# never retrigger themselves.
+require(ROOT_VIEW, "func authenticateForAppAccess() async -> Bool",
+        "system app-unlock function is missing")
+require(ROOT_VIEW, ".deviceOwnerAuthentication",
+        "system authentication must allow biometrics or device passcode")
+require(ROOT_VIEW, "needsUnlockAfterBackground = true",
+        "real background transition does not arm re-authentication")
+require(ROOT_VIEW, "needsUnlockAfterBackground = false",
+        "foreground authentication flag is not consumed/reset")
+require(ROOT_VIEW, "returnToLoginAfterUnlockFailure()",
+        "failed/cancelled system authentication does not return to login")
+forbid(ROOT_VIEW, "biometricLockOverlay",
+       "custom biometric lock overlay returned")
+forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
+       "custom unlock button returned")
+forbid(ROOT_VIEW, "isBiometricLocked",
+       "legacy biometric lock-state machine returned")
 
-# Screen privacy: still-screenshot redaction uses one isolated secure compositor
-# host. The secure field must be a non-responder with an empty keyboard host so
-# the old keyboard/black-screen regression cannot silently return.
-require(SCREEN, "private final class GRUNonResponderSecureField: UITextField",
-        "isolated screenshot secure field is missing")
-require(SCREEN, "override var canBecomeFirstResponder: Bool { false }",
-        "secure screenshot host can become first responder")
-require(SCREEN, "override func becomeFirstResponder() -> Bool",
-        "secure screenshot host does not explicitly reject focus")
-require(SCREEN, "secureField.isSecureTextEntry = true",
-        "secure compositor is not enabled for still screenshot redaction")
-require(SCREEN, "secureField.inputView = UIView(frame: .zero)",
-        "secure screenshot host can still request a keyboard")
-forbid(SCREEN, "let secureField = UITextField(",
-       "raw secure UITextField constructor returned; use GRUNonResponderSecureField only")
+# Screen privacy: recording/mirroring and app-switcher snapshots are protected
+# with public lifecycle/capture signals. A root secure-text compositor is
+# forbidden because it caused keyboard/black-screen/Face ID loops on physical
+# iPhones. Still screenshots are detected after the fact because iOS exposes no
+# public API to cancel a single system screenshot before capture.
+forbid(SCREEN, "isSecureTextEntry",
+       "secure-text screenshot compositor returned")
+forbid(SCREEN, "GRUNonResponderSecureField",
+       "secure UITextField screenshot host returned")
+forbid(SCREEN, "UITextField(",
+       "UITextField screenshot host returned")
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
