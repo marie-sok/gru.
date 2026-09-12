@@ -359,7 +359,6 @@ private struct GRUStableAppearanceSettingsView: View {
     @AppStorage(GRUTheme.selectionKey) private var themeRaw = GRUAppTheme.blackMoonCat.rawValue
     @AppStorage("gru.settings.appearance.neonGlow") private var neon = true
     @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
-    @AppStorage("gru.settings.appearance.dynamicBackground") private var dynamicBackground = true
 
     var body: some View {
         Form {
@@ -398,7 +397,6 @@ private struct GRUStableAppearanceSettingsView: View {
             Section(GRUL10n.text("Эффекты")) {
                 Toggle(GRUL10n.text("Неоновое свечение"), isOn: $neon)
                 Toggle(GRUL10n.text("Градиентные сообщения"), isOn: $gradientBubbles)
-                Toggle(GRUL10n.text("Живой фон"), isOn: $dynamicBackground)
             }
         }
         .scrollContentBackground(.hidden)
@@ -434,6 +432,8 @@ private struct GRUStableAccessibilitySettingsView: View {
 @MainActor
 private struct GRUStableLanguageSettingsView: View {
     @AppStorage(GRUAppLanguage.storageKey) private var languageRaw = GRUAppLanguage.defaultLanguage.rawValue
+    @AppStorage("gru.settings.language.transliterateMessages") private var transliterateMessages = false
+    @AppStorage("gru.settings.language.transliterateVoiceTranscripts") private var transliterateVoiceTranscripts = false
 
     var body: some View {
         Form {
@@ -445,6 +445,17 @@ private struct GRUStableLanguageSettingsView: View {
                     }
                 }
                 .pickerStyle(.inline)
+            }
+
+            Section(GRUL10n.text("Транслит")) {
+                Toggle(
+                    GRUL10n.text("Транслит текста сообщений"),
+                    isOn: $transliterateMessages
+                )
+                Toggle(
+                    GRUL10n.text("Транслит расшифровок голосовых"),
+                    isOn: $transliterateVoiceTranscripts
+                )
             }
         }
         .scrollContentBackground(.hidden)
