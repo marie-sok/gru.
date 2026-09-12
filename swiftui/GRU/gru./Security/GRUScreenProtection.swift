@@ -26,7 +26,6 @@ final class GRUScreenProtectionModel: ObservableObject {
     @Published private(set) var showScreenshotWarning = false
 
     private var observers: [NSObjectProtocol] = []
-    private var screenshotShieldTask: Task<Void, Never>?
 
     init() {
         refreshCaptureState()
@@ -34,7 +33,6 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 
     deinit {
-        screenshotShieldTask?.cancel()
         observers.forEach(NotificationCenter.default.removeObserver)
     }
 
@@ -64,7 +62,8 @@ final class GRUScreenProtectionModel: ObservableObject {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.handleScreenshotDetected()
+                    self?.showScreenshotWarning = true
+                    self?.isPrivacyShieldActive = true
                 }
             }
         )
@@ -121,24 +120,8 @@ final class GRUScreenProtectionModel: ObservableObject {
             return
         }
 
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self, !self.isCaptureActive else { return }
-            if !self.showScreenshotWarning {
-                self.isPrivacyShieldActive = false
-            }
-        }
-    }
-
-    private func handleScreenshotDetected() {
-        showScreenshotWarning = true
-        isPrivacyShieldActive = true
-
-        screenshotShieldTask?.cancel()
-        screenshotShieldTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(3.2))
-            guard let self, !Task.isCancelled else { return }
-            self.dismissScreenshotNotice()
+        if !showScreenshotWarning {
+            isPrivacyShieldActive = false
         }
     }
 
@@ -151,6 +134,36 @@ final class GRUScreenProtectionModel: ObservableObject {
         }
 
         isPrivacyShieldActive = false
+    }
+}
+
+@MainActor
+private final class GRUChatScreenshotLatchModel: ObservableObject {
+    @Published private(set) var isLatched = false
+
+    private var observer: NSObjectProtocol?
+
+    init() {
+        observer = NotificationCenter.default.addObserver(
+            forName: UIApplication.userDidTakeScreenshotNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.isLatched = true
+            }
+        }
+    }
+
+    deinit {
+        if let observer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    func unlock() {
+        guard !UIScreen.main.isCaptured else { return }
+        isLatched = false
     }
 }
 
@@ -173,14 +186,10 @@ private final class GRUChatNonResponderSecureField: UITextField {
     }
 }
 
-/// Hosts the conversation inside UIKit's actual secure-text rendering canvas.
-/// The privacy artwork is rendered behind this controller, so a compositor that
-/// omits secure text content reveals the GRU privacy scene instead of messages.
-///
-/// In addition to living inside the secure canvas, the root layer of the chat
-/// is marked through the same secure UITextField layer substitution used by
-/// Telegram-iOS. Both conditions must succeed before conversation content is
-/// revealed. There is deliberately no ordinary UIView fallback.
+/// Hosts the complete conversation inside UIKit's secure-text rendering tree.
+/// There is deliberately no ordinary UIView fallback: if the protected canvas
+/// cannot be proven current, the conversation remains hidden and the GRU
+/// privacy artwork underneath is the only visible surface.
 @MainActor
 private final class GRUChatSecureHostController<Content: View>: UIViewController {
     private let secureField = GRUChatNonResponderSecureField(frame: .zero)
@@ -193,6 +202,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     private var didPrimeSecureField = false
     private var didLogHierarchy = false
     private var layerProtectionApplied = false
+    private var didArmAfterMount = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -235,6 +245,8 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         secureField.accessibilityElementsHidden = false
         secureField.clipsToBounds = true
         secureField.isUserInteractionEnabled = true
+        secureField.isHidden = false
+        secureField.alpha = 1
         secureField.translatesAutoresizingMaskIntoConstraints = false
         secureField.inputView = UIView(frame: .zero)
         secureField.inputAccessoryView = UIView(frame: .zero)
@@ -279,6 +291,7 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
             layerProtectionApplied = false
         }
 
+        didArmAfterMount = false
         host.view.isHidden = true
     }
 
@@ -287,42 +300,59 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
               view.window != nil,
               view.bounds.width > 1,
               view.bounds.height > 1 else {
-            host.view.isHidden = true
-            scheduleRetry()
+            failClosedAndRetry()
             return
         }
 
-        if let protectedCanvas,
-           protectedCanvas.isDescendant(of: secureField),
-           host.view.superview === protectedCanvas {
-            guard ensureHostLayerProtection() else {
-                host.view.isHidden = true
-                scheduleRetry()
+        primeSecureFieldIfNeeded()
+
+        guard let currentCanvas = Self.findSecureCanvas(in: secureField) else {
+            logHierarchyOnce(reason: "secure canvas not found")
+            failClosedAndRetry()
+            return
+        }
+
+        if protectedCanvas !== currentCanvas || host.view.superview !== currentCanvas {
+            host.view.isHidden = true
+            mountHost(in: currentCanvas)
+            protectedCanvas = currentCanvas
+            layerProtectionApplied = false
+            didArmAfterMount = false
+        }
+
+        guard host.view.superview === protectedCanvas else {
+            failClosedAndRetry()
+            return
+        }
+
+        if !didArmAfterMount {
+            guard let armedCanvas = rearmSecureRenderingAfterMount() else {
+                logHierarchyOnce(reason: "secure canvas changed during rearm")
+                failClosedAndRetry()
                 return
             }
 
-            host.view.isHidden = false
-            retryWorkItem?.cancel()
-            retryWorkItem = nil
-            return
+            if protectedCanvas !== armedCanvas || host.view.superview !== armedCanvas {
+                host.view.isHidden = true
+                mountHost(in: armedCanvas)
+                protectedCanvas = armedCanvas
+                layerProtectionApplied = false
+            }
+
+            didArmAfterMount = true
         }
 
-        host.view.isHidden = true
-        primeSecureFieldIfNeeded()
-
-        guard let canvas = Self.findSecureCanvas(in: secureField) else {
-            logHierarchyOnce(reason: "secure canvas not found")
-            scheduleRetry()
+        guard let protectedCanvas,
+              protectedCanvas.isDescendant(of: secureField),
+              host.view.superview === protectedCanvas,
+              secureField.isSecureTextEntry else {
+            failClosedAndRetry()
             return
         }
-
-        mountHost(in: canvas)
-        protectedCanvas = canvas
 
         guard ensureHostLayerProtection() else {
             logHierarchyOnce(reason: "secure layer guard not applied")
-            host.view.isHidden = true
-            scheduleRetry()
+            failClosedAndRetry()
             return
         }
 
@@ -331,9 +361,31 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         retryWorkItem = nil
 
         #if DEBUG
-        print("[GRUPrivacy] secure canvas mounted: \(NSStringFromClass(type(of: canvas)))")
-        print("[GRUPrivacy] secure host layer protected")
+        print("[GRUPrivacy] secure canvas mounted: \(NSStringFromClass(type(of: protectedCanvas)))")
+        print("[GRUPrivacy] secure host layer protected and rearmed")
         #endif
+    }
+
+    /// UIKit may rebuild its internal secure-text canvas when secureTextEntry is
+    /// toggled. Rearm only after the SwiftUI host is mounted, then resolve the
+    /// current canvas again. This prevents the chat remaining in a stale,
+    /// non-secure canvas that used to leak into saved screenshots.
+    private func rearmSecureRenderingAfterMount() -> UIView? {
+        host.view.isHidden = true
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        secureField.isSecureTextEntry = false
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+        secureField.isSecureTextEntry = true
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+        CATransaction.commit()
+
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        return Self.findSecureCanvas(in: secureField)
     }
 
     private func ensureHostLayerProtection() -> Bool {
@@ -354,19 +406,19 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     }
 
     private func primeSecureFieldIfNeeded() {
-        if !didPrimeSecureField {
-            // The field must already be attached to a real window before this
-            // toggle so UIKit creates its secure rendering subtree for this OS.
-            secureField.isSecureTextEntry = false
-            secureField.layoutIfNeeded()
-            secureField.isSecureTextEntry = true
+        guard !didPrimeSecureField else {
             secureField.setNeedsLayout()
             secureField.layoutIfNeeded()
-            didPrimeSecureField = true
-        } else {
-            secureField.setNeedsLayout()
-            secureField.layoutIfNeeded()
+            return
         }
+
+        secureField.isSecureTextEntry = false
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+        secureField.isSecureTextEntry = true
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+        didPrimeSecureField = true
     }
 
     private func mountHost(in canvas: UIView) {
@@ -384,8 +436,8 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         hostConstraints.removeAll()
         host.view.removeFromSuperview()
         host.view.isHidden = true
-
         host.view.translatesAutoresizingMaskIntoConstraints = false
+
         canvas.addSubview(host.view)
 
         hostConstraints = [
@@ -396,13 +448,21 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         ]
         NSLayoutConstraint.activate(hostConstraints)
 
+        canvas.setNeedsLayout()
+        canvas.layoutIfNeeded()
+
         if needsChildAttach {
             host.didMove(toParent: self)
         }
     }
 
+    private func failClosedAndRetry() {
+        host.view.isHidden = true
+        scheduleRetry()
+    }
+
     private func scheduleRetry() {
-        guard retryWorkItem == nil, retryCount < 120 else { return }
+        guard retryWorkItem == nil, retryCount < 240 else { return }
 
         retryCount += 1
         let work = DispatchWorkItem { [weak self] in
@@ -446,8 +506,8 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
 
         for token in strictTokens {
             if let match = descendants.first(where: { candidate in
-                let className = NSStringFromClass(type(of: candidate))
-                return className.localizedCaseInsensitiveContains(token)
+                NSStringFromClass(type(of: candidate))
+                    .localizedCaseInsensitiveContains(token)
             }) {
                 return match
             }
@@ -483,11 +543,9 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
     private static func logHierarchy(of root: UIView, depth: Int) {
         let indent = String(repeating: "  ", count: depth)
         let className = NSStringFromClass(type(of: root))
-        let frame = root.frame.integral
-        let bounds = root.bounds.integral
         print(
             "[GRUPrivacy] \(indent)\(className) " +
-            "frame=\(frame) bounds=\(bounds) " +
+            "frame=\(root.frame.integral) bounds=\(root.bounds.integral) " +
             "hidden=\(root.isHidden) alpha=\(root.alpha)"
         )
 
@@ -525,6 +583,7 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
 }
 
 struct GRUChatCaptureProtection<Content: View>: View {
+    @StateObject private var screenshotLatch = GRUChatScreenshotLatchModel()
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -532,23 +591,30 @@ struct GRUChatCaptureProtection<Content: View>: View {
     }
 
     var body: some View {
-        if GRUPrivacyFeatures.chatScreenshotShieldEnabled {
-            ZStack {
-                GRUPrivacyCaptureScene(showButton: false, onDismiss: nil)
+        ZStack {
+            GRUPrivacyCaptureScene(
+                showButton: screenshotLatch.isLatched,
+                onDismiss: screenshotLatch.isLatched ? {
+                    screenshotLatch.unlock()
+                } : nil
+            )
 
+            if GRUPrivacyFeatures.chatScreenshotShieldEnabled,
+               !screenshotLatch.isLatched {
                 GRUChatSecureCaptureContainer {
                     content
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .privacySensitive()
                 }
+            } else if !GRUPrivacyFeatures.chatScreenshotShieldEnabled,
+                      !screenshotLatch.isLatched {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .privacySensitive()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
-        } else {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .privacySensitive()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black)
     }
 }
 
