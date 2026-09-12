@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="GRU_GUARDIAN_", case_sensitive=False)
 
     telegram_bot_token: str
-    telegram_admin_chat_id: int
+    telegram_admin_chat_id: int | None = None
 
     backend_url: str = "https://gru-jiqi.onrender.com"
     edge_url: str = "https://gru-edge-v2.onrender.com"
