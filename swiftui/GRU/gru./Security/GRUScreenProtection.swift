@@ -137,10 +137,11 @@ final class GRUScreenProtectionModel: ObservableObject {
     }
 }
 
-// MARK: - Chat-only still screenshot protection
+// MARK: - Telegram-style chat-layer screenshot protection
 
-/// Exists only inside an authenticated ChatView. It must never wrap RootView,
-/// LoginView or the LocalAuthentication lifecycle.
+/// This field is never inserted into the GRU view hierarchy and can never become
+/// first responder. It exists only as a UIKit secure-rendering marker, matching
+/// Telegram-iOS' layer-level screenshot protection technique.
 private final class GRUChatNonResponderSecureField: UITextField {
     override var canBecomeFirstResponder: Bool { false }
 
@@ -156,18 +157,112 @@ private final class GRUChatNonResponderSecureField: UITextField {
     }
 }
 
-/// Owns the chat-only secure compositor. The conversation is never mounted into
-/// an ordinary UIView fallback: until UIKit exposes a verified secure text
-/// canvas, the SwiftUI privacy artwork behind this controller remains visible.
-private final class GRUChatSecureHostController<Content: View>: UIViewController {
-    private let secureField = GRUChatNonResponderSecureField(frame: .zero)
-    private let host: UIHostingController<Content>
+/// Marks an arbitrary CALayer as secure without moving the rendered chat into a
+/// UITextField. This mirrors Telegram-iOS' setLayerDisableScreenshots approach:
+/// temporarily substitute the target layer for the secure text canvas layer,
+/// toggle secureTextEntry, then restore the canvas' original layer.
+@MainActor
+private enum GRUTelegramLayerScreenshotGuard {
+    private static let secureField: GRUChatNonResponderSecureField = {
+        let field = GRUChatNonResponderSecureField(
+            frame: CGRect(x: 0, y: 0, width: 120, height: 44)
+        )
+        field.text = " "
+        field.textColor = .clear
+        field.tintColor = .clear
+        field.backgroundColor = .clear
+        field.borderStyle = .none
+        field.autocorrectionType = .no
+        field.spellCheckingType = .no
+        field.smartDashesType = .no
+        field.smartQuotesType = .no
+        field.smartInsertDeleteType = .no
+        field.textContentType = nil
+        field.isUserInteractionEnabled = false
+        field.isAccessibilityElement = false
+        field.accessibilityElementsHidden = true
+        field.inputView = UIView(frame: .zero)
+        field.inputAccessoryView = UIView(frame: .zero)
+        field.isSecureTextEntry = false
+        field.setNeedsLayout()
+        field.layoutIfNeeded()
+        return field
+    }()
 
-    private weak var protectedCanvas: UIView?
-    private var hostConstraints: [NSLayoutConstraint] = []
+    @discardableResult
+    static func setProtected(_ targetLayer: CALayer, enabled: Bool) -> Bool {
+        let secureField = self.secureField
+
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+
+        if findSecureCanvas(in: secureField) == nil {
+            // Force UIKit to materialize the private secure-text canvas. The
+            // field still never joins the app view/responder hierarchy.
+            secureField.isSecureTextEntry = true
+            secureField.setNeedsLayout()
+            secureField.layoutIfNeeded()
+        }
+
+        guard let secureView = findSecureCanvas(in: secureField) else {
+            return false
+        }
+
+        let previousLayer = secureView.layer
+
+        // Telegram-iOS uses the same KVC layer substitution before toggling
+        // secureTextEntry. No private selector or class is instantiated here.
+        secureView.setValue(targetLayer, forKey: "layer")
+
+        if enabled {
+            secureField.isSecureTextEntry = false
+            secureField.isSecureTextEntry = true
+        } else {
+            secureField.isSecureTextEntry = true
+            secureField.isSecureTextEntry = false
+        }
+
+        secureView.setValue(previousLayer, forKey: "layer")
+        return true
+    }
+
+    private static func findSecureCanvas(in field: UITextField) -> UIView? {
+        // Telegram currently looks for TextLayoutCanvasView among direct
+        // UITextField children. Keep that path first and add a recursive
+        // compatibility search for UIKit hierarchy changes.
+        if let direct = field.subviews.first(where: { view in
+            NSStringFromClass(type(of: view))
+                .localizedCaseInsensitiveContains("TextLayoutCanvasView")
+        }) {
+            return direct
+        }
+
+        var queue = field.subviews
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            let className = NSStringFromClass(type(of: view))
+
+            if className.localizedCaseInsensitiveContains("TextLayoutCanvasView") ||
+                className.localizedCaseInsensitiveContains("LayoutCanvasView") {
+                return view
+            }
+
+            queue.append(contentsOf: view.subviews)
+        }
+
+        return nil
+    }
+}
+
+/// Normal UIKit host for the visible chat. Unlike the previous implementation,
+/// the chat is not embedded inside a secure UITextField canvas. Its own CALayer
+/// is tagged using the same layer-level secure-rendering trick Telegram uses.
+@MainActor
+private final class GRUTelegramProtectedChatHostController<Content: View>: UIViewController {
+    private let host: UIHostingController<Content>
+    private var screenshotProtectionApplied = false
     private var retryWorkItem: DispatchWorkItem?
     private var retryCount = 0
-    private var didPrimeSecureField = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -194,179 +289,91 @@ private final class GRUChatSecureHostController<Content: View>: UIViewController
         view.insetsLayoutMarginsFromSafeArea = false
         additionalSafeAreaInsets = .zero
 
-        secureField.text = " "
-        secureField.textColor = .clear
-        secureField.tintColor = .clear
-        secureField.backgroundColor = .clear
-        secureField.borderStyle = .none
-        secureField.autocorrectionType = .no
-        secureField.spellCheckingType = .no
-        secureField.smartDashesType = .no
-        secureField.smartQuotesType = .no
-        secureField.smartInsertDeleteType = .no
-        secureField.textContentType = nil
-        secureField.isAccessibilityElement = false
-        secureField.accessibilityElementsHidden = false
-        secureField.clipsToBounds = true
-        secureField.translatesAutoresizingMaskIntoConstraints = false
-        secureField.inputView = UIView(frame: .zero)
-        secureField.inputAccessoryView = UIView(frame: .zero)
-        secureField.isSecureTextEntry = true
+        // Fail closed. The privacy cat beneath this controller stays visible
+        // until the chat layer itself has been successfully marked protected.
+        host.view.isHidden = true
 
-        view.addSubview(secureField)
+        addChild(host)
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(host.view)
+
         NSLayoutConstraint.activate([
-            secureField.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            secureField.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            secureField.topAnchor.constraint(equalTo: view.topAnchor),
-            secureField.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: view.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
+        host.didMove(toParent: self)
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        installSecureCanvasIfNeeded()
+        applyProtectionIfNeeded()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         retryCount = 0
-        installSecureCanvasIfNeeded()
+        applyProtectionIfNeeded()
     }
 
     func update(rootView: Content) {
         host.rootView = rootView
-
-        if secureField.isFirstResponder {
-            secureField.resignFirstResponder()
-        }
-
-        installSecureCanvasIfNeeded()
+        applyProtectionIfNeeded()
     }
 
-    private func installSecureCanvasIfNeeded() {
+    private func applyProtectionIfNeeded() {
+        guard !screenshotProtectionApplied else {
+            host.view.isHidden = false
+            return
+        }
+
         guard isViewLoaded,
               view.window != nil,
-              view.bounds.width > 1,
-              view.bounds.height > 1 else {
+              host.view.bounds.width > 1,
+              host.view.bounds.height > 1 else {
             scheduleRetry()
             return
         }
 
-        if let protectedCanvas,
-           protectedCanvas.isDescendant(of: secureField),
-           host.view.superview === protectedCanvas {
-            retryWorkItem?.cancel()
-            retryWorkItem = nil
-            return
-        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let protected = GRUTelegramLayerScreenshotGuard.setProtected(
+            host.view.layer,
+            enabled: true
+        )
+        CATransaction.commit()
 
-        if !didPrimeSecureField {
-            secureField.isSecureTextEntry = false
-            secureField.layoutIfNeeded()
-            secureField.isSecureTextEntry = true
-            secureField.setNeedsLayout()
-            secureField.layoutIfNeeded()
-            didPrimeSecureField = true
-        } else {
-            secureField.setNeedsLayout()
-            secureField.layoutIfNeeded()
-        }
-
-        guard let canvas = Self.findSecureCanvas(in: secureField) else {
-            // Fail closed. Never expose the chat through an ordinary UIView.
+        guard protected else {
+            host.view.isHidden = true
             scheduleRetry()
             return
         }
 
-        mountHost(in: canvas)
-        protectedCanvas = canvas
+        screenshotProtectionApplied = true
+        host.view.isHidden = false
         retryWorkItem?.cancel()
         retryWorkItem = nil
     }
 
-    private func mountHost(in canvas: UIView) {
-        canvas.isUserInteractionEnabled = true
-        canvas.insetsLayoutMarginsFromSafeArea = false
-        canvas.backgroundColor = .clear
-
-        let needsChildAttach = host.parent == nil
-        if needsChildAttach {
-            addChild(host)
-        }
-
-        NSLayoutConstraint.deactivate(hostConstraints)
-        hostConstraints.removeAll()
-        host.view.removeFromSuperview()
-
-        host.view.translatesAutoresizingMaskIntoConstraints = false
-        canvas.addSubview(host.view)
-
-        hostConstraints = [
-            host.view.leadingAnchor.constraint(equalTo: canvas.leadingAnchor),
-            host.view.trailingAnchor.constraint(equalTo: canvas.trailingAnchor),
-            host.view.topAnchor.constraint(equalTo: canvas.topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: canvas.bottomAnchor)
-        ]
-        NSLayoutConstraint.activate(hostConstraints)
-
-        if needsChildAttach {
-            host.didMove(toParent: self)
-        }
-    }
-
     private func scheduleRetry() {
-        guard retryWorkItem == nil, retryCount < 60 else { return }
+        guard retryWorkItem == nil, retryCount < 80 else { return }
 
         retryCount += 1
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.retryWorkItem = nil
-            self.installSecureCanvasIfNeeded()
+            self.applyProtectionIfNeeded()
         }
 
         retryWorkItem = work
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + 0.05,
-            execute: work
-        )
-    }
-
-    private static func findSecureCanvas(in field: UITextField) -> UIView? {
-        let descendants = allDescendants(of: field)
-        let priorities = [
-            "LayoutCanvasView",
-            "CanvasView",
-            "Canvas"
-        ]
-
-        for token in priorities {
-            if let match = descendants.first(where: { view in
-                NSStringFromClass(type(of: view))
-                    .localizedCaseInsensitiveContains(token)
-            }) {
-                return match
-            }
-        }
-
-        return nil
-    }
-
-    private static func allDescendants(of root: UIView) -> [UIView] {
-        var result: [UIView] = []
-        var queue = root.subviews
-
-        while !queue.isEmpty {
-            let view = queue.removeFirst()
-            result.append(view)
-            queue.append(contentsOf: view.subviews)
-        }
-
-        return result
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
     }
 }
 
-/// Best-effort still-capture compositor scoped to ChatView only. The content is
-/// fail-closed: no verified secure text canvas means no conversation rendering.
+/// Kept under the established GRU type name so the release gate can enforce that
+/// screenshot protection remains scoped to authenticated ChatView content only.
 private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
     let content: Content
 
@@ -374,20 +381,21 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         self.content = content()
     }
 
-    func makeUIViewController(context: Context) -> GRUChatSecureHostController<Content> {
-        GRUChatSecureHostController(rootView: content)
+    func makeUIViewController(context: Context) -> GRUTelegramProtectedChatHostController<Content> {
+        GRUTelegramProtectedChatHostController(rootView: content)
     }
 
     func updateUIViewController(
-        _ uiViewController: GRUChatSecureHostController<Content>,
+        _ uiViewController: GRUTelegramProtectedChatHostController<Content>,
         context: Context
     ) {
         uiViewController.update(rootView: content)
     }
 }
 
-/// Apply only to ChatView. The approved image is always pre-rendered behind the
-/// secure chat, mirroring the old black-screen approach without touching auth.
+/// Apply only to ChatView. The approved GRU privacy artwork is always rendered
+/// underneath the Telegram-style protected chat layer. If the layer cannot be
+/// protected, fail closed and leave the privacy artwork visible.
 struct GRUChatCaptureProtection<Content: View>: View {
     let content: Content
 
@@ -416,10 +424,8 @@ struct GRUChatCaptureProtection<Content: View>: View {
     }
 }
 
-// MARK: - Approved GRU privacy artwork
+// MARK: - GRU privacy artwork
 
-/// Kept under the historic type name because the release audit verifies that
-/// the replacement scene remains wired into both capture paths.
 struct GRUPrivacyCaptureScene: View {
     var showButton = false
     var onDismiss: (() -> Void)?
@@ -433,9 +439,9 @@ struct GRUPrivacyCaptureScene: View {
 
 // MARK: - Root recording / switcher protection
 
-/// Public-API privacy layer for recording/mirroring and app-switcher snapshots.
-/// It deliberately does not use the secure UITextField compositor; only the
-/// authenticated ChatView is allowed to use that best-effort still-capture path.
+/// Root protection deliberately remains public-API-only. The Telegram-style
+/// screenshot layer marker is restricted to authenticated ChatView content so it
+/// cannot interfere with LocalAuthentication, login, or the app responder chain.
 struct GRUScreenProtectionView<Content: View>: View {
     @StateObject private var model = GRUScreenProtectionModel()
     let content: Content
