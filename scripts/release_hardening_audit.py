@@ -43,8 +43,6 @@ ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
 CHAT_VIEW = "swiftui/GRU/gru./Views/ChatView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
-LAYER_GUARD = "swiftui/GRU/gru./Security/GRULayerScreenshotGuard.m"
-LAYER_GUARD_HEADER = "swiftui/GRU/gru./Security/GRULayerScreenshotGuard.h"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
 SETTINGS = "swiftui/GRU/gru./Views/GRUStableSettingsView.swift"
 APP_TAB = "swiftui/GRU/gru./Models/AppTab.swift"
@@ -93,33 +91,32 @@ forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
 # Screen privacy. Root protection remains public-API-only. Still-screenshot
-# protection is scoped to authenticated ChatView and implemented in Objective-C
-# so UIKit layer substitution happens through the Objective-C runtime.
+# protection is scoped to authenticated ChatView. The conversation must be
+# mounted inside UIKit's verified secure-text canvas, never into a generic
+# UIView fallback or a loosely matched unrelated "Canvas" view.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
-require(SCREEN, '@_silgen_name("GRUSetLayerDisableScreenshots")',
-        "Objective-C secure layer symbol bridge is missing")
-require(SCREEN, "GRUSecureLayerBridge",
-        "chat secure layer bridge is missing")
+require(SCREEN, "GRUChatNonResponderSecureField",
+        "chat-only secure UITextField is missing")
+require(SCREEN, "secureField.isSecureTextEntry = true",
+        "secure text rendering is not enabled")
 require(SCREEN, "GRUChatSecureCaptureContainer",
         "chat-scoped secure compositor is missing")
-require(SCREEN, "protectedContainer.layer",
-        "dedicated protected chat layer is missing")
+require(SCREEN, "findSecureCanvas(in: secureField)",
+        "verified secure text canvas lookup is missing")
+require(SCREEN, "TextLayoutCanvasView",
+        "strict UIKit secure text canvas matching is missing")
+require(SCREEN, "host.view.superview === protectedCanvas",
+        "chat host is not verified as mounted in the secure canvas")
+require(SCREEN, "canvas.addSubview(host.view)",
+        "chat content is not mounted inside the secure text canvas")
 require(SCREEN, "GRUPrivacyCaptureScene",
         "GRU privacy replacement scene is missing")
-require(LAYER_GUARD_HEADER, "GRUSetLayerDisableScreenshots",
-        "secure layer Objective-C declaration is missing")
-require(LAYER_GUARD, "TextLayoutCanvasView",
-        "UIKit secure text canvas lookup is missing")
-require(LAYER_GUARD, '[secureView setValue:layer forKey:@"layer"]',
-        "protected CALayer substitution is missing")
-require(LAYER_GUARD, "textField.secureTextEntry = NO;",
-        "secureTextEntry reset is missing")
-require(LAYER_GUARD, "textField.secureTextEntry = YES;",
-        "secureTextEntry enable is missing")
+require(SCREEN, "secure-field hierarchy:",
+        "DEBUG secure-field hierarchy diagnostics are missing")
 require(CHAT_VIEW, "GRUChatCaptureProtection",
         "ChatView is not wrapped by chat-scoped screenshot protection")
 forbid(ROOT_VIEW, "GRUChatCaptureProtection",
@@ -132,12 +129,15 @@ forbid(SCREEN, "GRUNonResponderSecureField",
        "legacy root-level secure field returned")
 
 screen_text = read(SCREEN)
+if '"Canvas"' in screen_text:
+    failures.append("generic Canvas secure-view matching returned; selector must stay strict")
+
 if "struct GRUScreenProtectionView" in screen_text:
     root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
     if "GRUChatSecureCaptureContainer" in root_section:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
-    if "GRUSecureLayerBridge" in root_section:
-        failures.append("secure still-screenshot layer bridge leaked into root/auth protection")
+    if "GRUChatNonResponderSecureField" in root_section:
+        failures.append("secure still-screenshot field leaked into root/auth protection")
 
 # Settings structure and tab surface.
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
