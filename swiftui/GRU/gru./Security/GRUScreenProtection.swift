@@ -228,7 +228,7 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         guard let protectedCanvas = Self.findSecureCanvas(in: secureField) else {
             // If Apple changes the internal hierarchy, preserve a usable chat
             // instead of producing a broken/black interface.
-            mount(host: host, in: container.view, parent: container)
+            Self.mount(host: host, in: container.view, parent: container)
             context.coordinator.secureField = secureField
             context.coordinator.didFindSecureCanvas = false
             return container
@@ -238,7 +238,7 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         protectedCanvas.insetsLayoutMarginsFromSafeArea = false
         protectedCanvas.backgroundColor = .clear
 
-        mount(host: host, in: protectedCanvas, parent: container)
+        Self.mount(host: host, in: protectedCanvas, parent: container)
 
         context.coordinator.secureField = secureField
         context.coordinator.protectedCanvas = protectedCanvas
