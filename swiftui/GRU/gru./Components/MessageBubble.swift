@@ -10,6 +10,7 @@ struct MessageBubble: View {
     @State private var pendingDeleteScope: MessageDeleteScope?
     @State private var dragOffset: CGFloat = 0
     @State private var hasTriggeredReplyHaptic = false
+    @State private var showTranslation = false
 
     @AppStorage("gru.settings.chats.swipeReply") private var swipeReplyEnabled = true
     @AppStorage("gru.settings.chats.quickReactions") private var quickReactions = true
@@ -40,7 +41,11 @@ struct MessageBubble: View {
                 }
 
                 if !message.text.isEmpty {
-                    BubbleText(text: message.text, currentUser: isCurrentUser)
+                    BubbleText(
+                        text: message.text,
+                        currentUser: isCurrentUser,
+                        showTranslation: $showTranslation
+                    )
                 }
 
                 if let reaction = message.reaction {
@@ -186,6 +191,19 @@ struct MessageBubble: View {
         }
 
         if !message.text.isEmpty {
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    showTranslation.toggle()
+                }
+            } label: {
+                Label(
+                    GRUAppLanguage.selected == .english
+                        ? (showTranslation ? "Hide translation" : "Translate")
+                        : (showTranslation ? "Скрыть перевод" : "Перевести"),
+                    systemImage: "character.book.closed"
+                )
+            }
+
             Button { UIPasteboard.general.string = message.text } label: {
                 Label(GRUL10n.text("Копировать"), systemImage: "doc.on.doc")
             }
@@ -280,47 +298,53 @@ struct MessageBubble: View {
 private struct BubbleText: View {
     let text: String
     let currentUser: Bool
+    @Binding var showTranslation: Bool
 
     @AppStorage("gru.settings.chats.textScale") private var textScale = 1.0
     @AppStorage("gru.settings.appearance.gradientBubbles") private var gradientBubbles = true
-    @AppStorage("gru.settings.language.transliterateMessages") private var transliterateMessages = false
 
     var body: some View {
-        Text(GRUTransliterator.display(text, enabled: transliterateMessages))
-            .font(.system(size: 16.5 * textScale))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                currentUser
-                    ? (gradientBubbles ? GRUColors.outgoingBubble : GRUColors.card)
-                    : GRUColors.incomingBubble
+        VStack(alignment: .leading, spacing: 7) {
+            Text(text)
+                .font(.system(size: 16.5 * textScale))
+                .foregroundStyle(GRUColors.text)
+                .textSelection(.enabled)
+
+            GRUInlineTranslation(
+                text: text,
+                isPresented: $showTranslation
             )
-            .foregroundStyle(GRUColors.text)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(
-                        currentUser && gradientBubbles
-                            ? GRUColors.neonGradient
-                            : LinearGradient(
-                                colors: [GRUColors.accent.opacity(0.18), Color.white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                        lineWidth: currentUser ? 1.15 : 0.75
-                    )
-            }
-            .shadow(
-                color: currentUser ? GRUColors.accent.opacity(0.18) : .clear,
-                radius: 8
-            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            currentUser
+                ? (gradientBubbles ? GRUColors.outgoingBubble : GRUColors.card)
+                : GRUColors.incomingBubble
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(
+                    currentUser && gradientBubbles
+                        ? GRUColors.neonGradient
+                        : LinearGradient(
+                            colors: [GRUColors.accent.opacity(0.18), Color.white.opacity(0.04)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                    lineWidth: currentUser ? 1.15 : 0.75
+                )
+        }
+        .shadow(
+            color: currentUser ? GRUColors.accent.opacity(0.18) : .clear,
+            radius: 8
+        )
     }
 }
 
 private struct ReplyPreview: View {
     let message: Message
-
-    @AppStorage("gru.settings.language.transliterateMessages") private var transliterateMessages = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -331,7 +355,7 @@ private struct ReplyPreview: View {
             if let attachment = message.attachment {
                 AttachmentContent(attachment: attachment)
             } else {
-                Text(GRUTransliterator.display(message.text, enabled: transliterateMessages))
+                Text(message.text)
                     .font(.caption)
                     .lineLimit(1)
             }
