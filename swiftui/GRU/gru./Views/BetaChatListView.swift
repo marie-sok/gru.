@@ -12,6 +12,7 @@ struct BetaChatListView: View {
     @State private var pendingDeleteChat: Chat?
     @State private var deletingChatServerID: String?
     @State private var realtimeListeners: [String: UUID] = [:]
+    @FocusState private var isSearchFocused: Bool
 
     init(onChatPresentationChanged: @escaping (Bool) -> Void = { _ in }) {
         self.onChatPresentationChanged = onChatPresentationChanged
@@ -19,7 +20,7 @@ struct BetaChatListView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
                 GRUAppBackdrop()
 
                 VStack(spacing: 6) {
@@ -34,7 +35,12 @@ struct BetaChatListView: View {
 
                     content
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            // Do not let iOS keyboard avoidance recenter the whole chat-list
+            // hierarchy. The keyboard may cover the lower list, while the
+            // search control remains pinned below the navigation bar.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
@@ -85,6 +91,7 @@ struct BetaChatListView: View {
             connectWebSocket()
         }
         .onDisappear {
+            isSearchFocused = false
             removeRealtimeSubscriptions()
         }
         .confirmationDialog(
@@ -229,6 +236,10 @@ struct BetaChatListView: View {
 
             TextField(GRUL10n.text("Поиск"), text: $searchText)
                 .textFieldStyle(.plain)
+                .focused($isSearchFocused)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
 
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
@@ -240,9 +251,10 @@ struct BetaChatListView: View {
             }
         }
         .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
         .frame(height: 40)
-        .background(GRUColors.card.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.05), lineWidth: 1) }
+        .background(GRUColors.card.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1) }
     }
 
     private var compactConnectionNotice: some View {
@@ -276,7 +288,7 @@ struct BetaChatListView: View {
                 .font(.headline)
             Spacer()
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var showsTestChat: Bool {
