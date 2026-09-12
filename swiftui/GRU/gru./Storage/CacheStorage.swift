@@ -193,6 +193,13 @@ final class CacheStorage {
     func clearCurrentUser() {
         let userID = TokenStorage.shared.userID
 
+        // Prevent a delayed save that was queued before logout/cache reset from
+        // recreating sensitive files after the user explicitly cleared them.
+        ioQueue.sync {
+            pendingSaveWorkItem?.cancel()
+            pendingSaveWorkItem = nil
+        }
+
         memoryLock.lock()
         inMemoryChats = nil
         memoryLock.unlock()
@@ -206,6 +213,12 @@ final class CacheStorage {
 
         removeFiles(withPrefix: "messages-", suffix: ".json")
         UserDefaults.standard.removeObject(forKey: syncDateKey(userID: userID))
+
+        // These caches are also protected, but "clear cache" and logout must be
+        // complete from the user's point of view rather than leaving sidecars.
+        MediaCacheService.shared.clear()
+        GRUVoiceTranscriptCache.shared.clear()
+        LocalMessageDeletionStore.shared.clearCurrentUser()
     }
 
     func clear() {
