@@ -5,7 +5,7 @@ RUN mvn -q -DskipTests dependency:go-offline
 COPY src ./src
 RUN mvn -q clean package
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /workspace/target/gru-1.0.0.jar /app/gru.jar
 ENV PORT=8081
