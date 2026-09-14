@@ -682,7 +682,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   IconButton(
                     tooltip: 'Выйти',
-                    onPressed: widget.onLogout,
+                    onPressed: () { widget.onLogout(); },
                     icon: const Icon(Icons.logout_rounded),
                   ),
                 ],
@@ -697,7 +697,7 @@ class _HomePageState extends State<HomePage> {
                         'Чаты',
                         style: TextStyle(
                           fontSize: 32,
-                          fontWeight: FontWeight.w750,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -829,7 +829,7 @@ class _ChatTile extends StatelessWidget {
                 radius: 27,
                 backgroundColor: _magenta.withOpacity(.18),
                 child: Text(
-                  title.isEmpty ? '?' : title.characters.first.toUpperCase(),
+                  title.isEmpty ? '?' : title.substring(0, 1).toUpperCase(),
                   style: const TextStyle(
                     color: _magenta,
                     fontSize: 21,
@@ -843,7 +843,7 @@ class _ChatTile extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.w650,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -965,7 +965,7 @@ class _ChatPageState extends State<ChatPage> {
               radius: 17,
               backgroundColor: _magenta.withOpacity(.18),
               child: Text(
-                title.isEmpty ? '?' : title.characters.first.toUpperCase(),
+                title.isEmpty ? '?' : title.substring(0, 1).toUpperCase(),
                 style: const TextStyle(color: _magenta, fontSize: 14),
               ),
             ),

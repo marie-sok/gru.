@@ -5,7 +5,7 @@
         android:label="gru."
         android:icon="@drawable/ic_gru_icon"
         android:roundIcon="@drawable/ic_gru_icon"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:allowBackup="false"
         android:supportsRtl="true">
         <activity
