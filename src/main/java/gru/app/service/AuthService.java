@@ -6,12 +6,16 @@ import gru.app.dto.RegisterRequest;
 import gru.app.model.User;
 import gru.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final String INVALID_CREDENTIALS = "Invalid phone or password";
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
@@ -20,7 +24,10 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
 
         if (userRepository.findByPhone(request.getPhone()).isPresent()) {
-            throw new RuntimeException("User already exists");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "User already exists"
+            );
         }
 
         User user = new User();
@@ -50,14 +57,20 @@ public class AuthService {
                         request.getPhone()
                 )
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new ResponseStatusException(
+                                HttpStatus.UNAUTHORIZED,
+                                INVALID_CREDENTIALS
+                        )
                 );
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword()
         )) {
-            throw new RuntimeException("Wrong password");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    INVALID_CREDENTIALS
+            );
         }
 
         String token =
