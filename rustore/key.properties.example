@@ -1,0 +1,6 @@
+# Copy this file to android/key.properties and fill in your private release key.
+# Never commit android/key.properties or the keystore.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=gru-release
+storeFile=/absolute/path/to/gru-release.jks
