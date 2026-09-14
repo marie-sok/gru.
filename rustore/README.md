@@ -1,20 +1,50 @@
-# GRU Android beta
+# GRU Android beta · current transfer
 
-This is the fast RuStore adaptation of GRU. It is intentionally isolated from
-the SwiftUI iOS project in the parent repository.
+This Flutter client is the Android/RuStore transfer of the current GRU
+SwiftUI release. The branch is rebased on the latest iOS release commit and
+keeps the same authenticated REST contracts.
 
-The app uses the same `/auth/login`, `/auth/register`, `/chats` and
-`/chats/{id}/messages` REST routes as the current backend. The base URL is
-configurable at build time:
+## Included in this transfer
 
-```text
-GRU_API_BASE_URL=https://gru-jiqi.onrender.com
+- phone/password login and registration;
+- secure auth, theme, profile and avatar-path storage in Android Keystore;
+- Chats, People and Settings navigation with neon circular icons;
+- GRU.bot chat through `POST /bot/chat` (including the backend fallback);
+- GRU user search through `GET /users/search` and chat creation through
+  `POST /chats`;
+- message history through `GET /chats/{id}/messages`;
+- delete for me and delete for everyone through the existing protected routes;
+- nine GRU-only animated wallpaper presets with many small minimal
+  fold-ear cat/dragon/unicorn doodles;
+- avatar selection from the Android photo library or camera;
+- no audio/video calls, Pulse, Radar or Music/Purr Library.
+
+## Security boundary
+
+The backend rejects legacy plaintext message writes with HTTP 426. The Android
+preview therefore keeps the composer visibly read-only until the native GRU
+E2EE envelope is ported. It never sends plaintext as a fallback. Release
+builds use HTTPS only (`usesCleartextTraffic=false`).
+
+## Run from Android Studio
+
+```bash
+cd rustore
+flutter pub get
+flutter run --dart-define=GRU_API_BASE_URL=https://gru-jiqi.onrender.com
 ```
 
-The release target is `com.marie.sok.gru`, target SDK 35, min SDK 24.
-Only INTERNET permission is declared. Calls and unused media permissions are
-not requested.
+For a local backend use a reachable HTTPS tunnel in a release build. Debug
+builds can use a LAN URL when `--dart-define=GRU_API_BASE_URL=...` is supplied.
 
-This is a read-only Android preview while the backend's required E2EE v2
-message envelope is ported. A plaintext fallback is deliberately not
-implemented.
+## RuStore bundle
+
+Create `android/key.properties` from `key.properties.example` locally, keep it
+out of Git, then run:
+
+```bash
+flutter build appbundle --release \
+  --dart-define=GRU_API_BASE_URL=https://gru-jiqi.onrender.com
+```
+
+The output is `build/app/outputs/bundle/release/app-release.aab`.

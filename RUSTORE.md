@@ -1,63 +1,39 @@
-# GRU Android / RuStore adapter
+# GRU Android / RuStore transfer
 
-This branch adds a separate Flutter Android preview under `rustore/`. The
-canonical iOS SwiftUI beta and Spring backend remain unchanged.
+`rustore/` is now based on the current `release/physical-iphone-beta-0.9.2-full`
+backend/iOS tree (latest auth fixes included). The Android shell mirrors the
+current product direction without copying unsupported iOS capabilities.
 
-Current preview scope:
+## Product surface
 
-- phone/password login and registration;
-- secure token storage using Android Keystore-backed `flutter_secure_storage`;
-- chat list and message history over the current REST API;
-- production HTTPS endpoint by default;
-- RuStore-ready Android package ID: `com.marie.sok.gru`;
-- no audio/video calls, Pulse, Radar or Music/Purr Library;
-- no cleartext HTTP in release builds.
+- three bottom tabs: Chats, People and Settings;
+- GRU.bot entry point and `/bot/chat` transport;
+- People search and protected chat creation;
+- nine custom GRU themes: Black Moon Cat, Neon Demon Cat, Ultraviolet
+  Unicorn, Blood Dragon, Forest Witch, Cyber Midnight, Powder Princess,
+  Green Acid Monster and Iron Knight;
+- a full-screen animated painter with many small minimal fold-ear
+  cat/dragon/unicorn drawings and light decorative motion;
+- profile nickname/bio and avatar picker (library or camera), stored locally
+  in Keystore until the profile endpoint is added to the backend;
+- long-press message actions for delete-for-me and delete-for-everyone;
+- no calls, Pulse, Radar or Music/Purr Library.
 
-The current backend deliberately rejects plaintext message writes with HTTP 426
-and requires the GRU E2EE envelope. Therefore this first Android preview is
-read-only for message history until the E2EE v2 transport is ported. It must not
-silently downgrade to plaintext.
+## Deliberate E2EE gate
 
-Build locally on macOS:
+The current backend exposes encrypted message history and rejects plaintext
+`POST /messages`. The Android composer is intentionally read-only and points
+at the E2EE transport work still required for sending text, audio, video and
+video-notes. This is a safety boundary, not a hidden downgrade.
+
+## Local commands
 
 ```bash
 cd rustore
 flutter pub get
+flutter analyze
+flutter test
 flutter run --dart-define=GRU_API_BASE_URL=https://gru-jiqi.onrender.com
 ```
 
-For a local backend in a debug build, use an HTTPS tunnel or set a reachable
-HTTPS URL. Release builds reject cleartext traffic by design.
-
-Create a private signing key once:
-
-```bash
-keytool -genkeypair -v -keystore ~/gru-release.jks \
-  -alias gru-release -keyalg RSA -keysize 2048 -validity 10000
-cp key.properties.example android/key.properties
-```
-
-Fill `android/key.properties` locally (never commit it), then build the
-bundle:
-
-```bash
-flutter build appbundle --release \
-  --dart-define=GRU_API_BASE_URL=https://gru-jiqi.onrender.com
-```
-
-The output is `build/app/outputs/bundle/release/app-release.aab`. For a
-quick device smoke test, use `flutter build apk --debug` or
-`flutter run`.
-
-If Flutter reports that the Gradle wrapper is missing, run this once from the
-`rustore` directory; it generates the official wrapper without changing the
-Dart UI:
-
-```bash
-flutter create --platforms=android --org com.marie.sok .
-```
-
-Before uploading to RuStore, replace the example signing values with the
-private release key and test the signed AAB on a physical Android device. Do
-not reuse an iOS bundle identifier or an already-published Android package
-unless its signing certificate is intentionally preserved.
+Release builds require a local `android/key.properties` and an HTTPS backend.
