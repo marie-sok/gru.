@@ -6,7 +6,9 @@ import gru.app.dto.RegisterRequest;
 import gru.app.model.User;
 import gru.app.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -15,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AuthServiceTest {
@@ -49,7 +52,31 @@ class AuthServiceTest {
     }
 
     @Test
-    void loginRejectsWrongPassword() {
+    void registerExistingPhoneReturnsConflict() {
+        UserRepository repository = mock(UserRepository.class);
+        JwtService jwtService = mock(JwtService.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        AuthService service = new AuthService(repository, jwtService, encoder);
+
+        RegisterRequest request = new RegisterRequest();
+        request.setPhone("+79990000001");
+        request.setPassword("plain-password");
+        request.setNickname("marie");
+
+        when(repository.findByPhone(request.getPhone())).thenReturn(Optional.of(new User()));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.register(request)
+        );
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        assertEquals("User already exists", error.getReason());
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void loginRejectsWrongPasswordAsUnauthorized() {
         UserRepository repository = mock(UserRepository.class);
         JwtService jwtService = mock(JwtService.class);
         PasswordEncoder encoder = mock(PasswordEncoder.class);
@@ -67,11 +94,36 @@ class AuthServiceTest {
         when(repository.findByPhone(existing.getPhone())).thenReturn(Optional.of(existing));
         when(encoder.matches("wrong-password", "encoded-password")).thenReturn(false);
 
-        RuntimeException error = assertThrows(
-                RuntimeException.class,
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
                 () -> service.login(request)
         );
 
-        assertEquals("Wrong password", error.getMessage());
+        assertEquals(HttpStatus.UNAUTHORIZED, error.getStatusCode());
+        assertEquals("Invalid phone or password", error.getReason());
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void loginUnknownPhoneUsesSameUnauthorizedResponse() {
+        UserRepository repository = mock(UserRepository.class);
+        JwtService jwtService = mock(JwtService.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        AuthService service = new AuthService(repository, jwtService, encoder);
+
+        LoginRequest request = new LoginRequest();
+        request.setPhone("+79990000002");
+        request.setPassword("plain-password");
+
+        when(repository.findByPhone(request.getPhone())).thenReturn(Optional.empty());
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.login(request)
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, error.getStatusCode());
+        assertEquals("Invalid phone or password", error.getReason());
+        verifyNoInteractions(encoder, jwtService);
     }
 }
