@@ -56,21 +56,30 @@ public class AuthService {
         User user = userRepository.findByPhone(
                         request.getPhone()
                 )
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.UNAUTHORIZED,
-                                INVALID_CREDENTIALS
-                        )
-                );
+                .orElseThrow(() -> unauthorizedCredentials());
 
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPassword()
-        )) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    INVALID_CREDENTIALS
-            );
+        String encodedPassword = user.getPassword();
+        boolean usesLegacyPasswordField =
+                encodedPassword == null || encodedPassword.isBlank();
+
+        if (usesLegacyPasswordField) {
+            encodedPassword = user.getLegacyPasswordHash();
+        }
+
+        if (encodedPassword == null || encodedPassword.isBlank() ||
+                !passwordEncoder.matches(
+                        request.getPassword(),
+                        encodedPassword
+                )) {
+            throw unauthorizedCredentials();
+        }
+
+        // Accounts created by the original backend stored their bcrypt hash in
+        // Mongo field "passwordHash". Copy that same hash into the current field
+        // only after a successful password proof; no password is reset or exposed.
+        if (usesLegacyPasswordField) {
+            user.setPassword(encodedPassword);
+            userRepository.save(user);
         }
 
         String token =
@@ -79,6 +88,13 @@ public class AuthService {
         return new AuthResponse(
                 token,
                 user.getId()
+        );
+    }
+
+    private ResponseStatusException unauthorizedCredentials() {
+        return new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                INVALID_CREDENTIALS
         );
     }
 }
