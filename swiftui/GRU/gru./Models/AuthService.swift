@@ -22,11 +22,19 @@ final class AuthService {
             request
         )
 
-        let data = try await APIClient.shared.request(
-            path: "/auth/login",
-            method: "POST",
-            body: body
-        )
+        let data: Data
+        do {
+            data = try await APIClient.shared.request(
+                path: "/auth/login",
+                method: "POST",
+                body: body
+            )
+        } catch APIError.unauthorized {
+            // /auth/login has no established session to expire. A 401 here is
+            // strictly a credential failure and must not be presented as a JWT
+            // session-expiration error.
+            throw GRUAuthServiceError.invalidCredentials
+        }
 
         return try JSONCoding.decoder.decode(
             AuthResponse.self,
@@ -62,5 +70,16 @@ final class AuthService {
             AuthResponse.self,
             from: data
         )
+    }
+}
+
+private enum GRUAuthServiceError: LocalizedError {
+    case invalidCredentials
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidCredentials:
+            return GRUL10n.text("Incorrect phone number or password.")
+        }
     }
 }
