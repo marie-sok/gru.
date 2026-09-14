@@ -134,7 +134,7 @@ class ApiClient {
 }
 
 class SecureSession {
-  static const _storage = FlutterSecureStorage();
+  static final _storage = FlutterSecureStorage();
 
   Future<void> save(AuthResult result) => _storage.write(
         key: 'gru.auth',
