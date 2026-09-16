@@ -43,8 +43,6 @@ ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
 CHAT_VIEW = "swiftui/GRU/gru./Views/ChatView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
-LAYER_SHIELD_H = "swiftui/GRU/gru./Security/GRULayerScreenshotShield.h"
-LAYER_SHIELD_M = "swiftui/GRU/gru./Security/GRULayerScreenshotShield.m"
 BRIDGING = "swiftui/GRU/gru./gru-Bridging-Header.h"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
 SETTINGS = "swiftui/GRU/gru./Views/GRUStableSettingsView.swift"
@@ -89,31 +87,34 @@ forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
 forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
-# Chat privacy is scoped only to authenticated ChatView content. The chat is
-# mounted into a dedicated UIView, kept hidden by default, and becomes visible
-# only after the native shield marks that exact CALayer as capture-protected.
-# RootView/auth stays completely outside this mechanism.
+# Chat privacy is scoped only to authenticated ChatView content. A persistent
+# secure UITextField stays mounted for the lifetime of the chat surface and the
+# actual UIHostingController view is physically attached to UIKit's exact
+# TextLayoutCanvasView. RootView/auth stays completely outside this mechanism.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
-require(SCREEN, "GRUScreenshotShield", "chat layer shield resolver is missing")
-require(SCREEN, 'NSClassFromString("GRULayerScreenshotShield")',
-        "native chat layer shield is not resolved")
+require(SCREEN, "GRUSecureCanvasTextField", "persistent secure UITextField is missing")
+require(SCREEN, "GRUSecureChatSurfaceView", "chat secure-surface UIView is missing")
+require(SCREEN, "secureField.isSecureTextEntry = true",
+        "secureTextEntry is not kept enabled on the persistent chat field")
+require(SCREEN, 'contains("TextLayoutCanvasView")',
+        "exact secure UIKit canvas discovery is missing")
+require(SCREEN, "canvas.addSubview(contentView)",
+        "chat hosting view is not physically mounted inside the secure canvas")
+require(SCREEN, "contentView.superview === canvas && canvas.isDescendant(of: secureField)",
+        "secure-canvas ancestry is not verified before revealing chat")
 require(SCREEN, "GRUProtectedChatController",
         "dedicated protected chat controller is missing")
-require(SCREEN, "private let protectedContainer = UIView(frame: .zero)",
-        "dedicated protected UIView is missing")
-require(SCREEN, "protectedContainer.isHidden = true",
-        "protected chat container does not fail closed")
-require(SCREEN, "screenshotShield.protect(protectedContainer.layer)",
-        "exact chat container CALayer is not protected")
-require(SCREEN, "protectedContainer.isHidden = false",
-        "chat is not revealed after protection succeeds")
-require(SCREEN, "scheduleRetry()", "secure layer retry path is missing")
-require(SCREEN, "chat capture layer protected", "successful protected-layer diagnostic is missing")
-require(SCREEN, "secure canvas unavailable; chat remains redacted",
+require(SCREEN, "secureSurface.isHidden = true",
+        "secure chat surface does not fail closed")
+require(SCREEN, "secureSurface.isHidden = false",
+        "chat is not revealed after secure-canvas mounting succeeds")
+require(SCREEN, "scheduleRetry()", "secure canvas retry path is missing")
+require(SCREEN, "secure chat canvas mounted", "successful secure-canvas diagnostic is missing")
+require(SCREEN, "exact secure text canvas unavailable; chat remains redacted",
         "fail-closed exhausted-retry state is missing")
 require(SCREEN, "GRUChatSecureCaptureContainer", "chat-scoped secure compositor is missing")
 require(SCREEN, "GRUChatScreenshotLatchModel", "post-screenshot chat privacy latch is missing")
@@ -121,29 +122,17 @@ require(SCREEN, "GRUPrivacyCaptureScene", "GRU privacy replacement scene is miss
 require(CHAT_VIEW, "GRUChatCaptureProtection",
         "ChatView is not wrapped by chat-scoped screenshot protection")
 
-# Native helper mirrors the secure-text layer transition against the target
-# CALayer. KVC failure is caught and reported as false so Swift keeps the chat
-# hidden rather than falling back to an unprotected surface.
-require(LAYER_SHIELD_H, "GRULayerScreenshotShield", "native layer shield header is missing")
-require(LAYER_SHIELD_M, 'containsString:@"TextLayoutCanvasView"',
-        "secure UIKit canvas discovery is missing")
-require(LAYER_SHIELD_M, '[secureView setValue:layer forKey:@"layer"]',
-        "target CALayer substitution is missing")
-require(LAYER_SHIELD_M, "textField.secureTextEntry = NO;",
-        "secure text transition start is missing")
-require(LAYER_SHIELD_M, "textField.secureTextEntry = YES;",
-        "secure text transition completion is missing")
-require(LAYER_SHIELD_M, "@catch", "native layer shield does not fail safely on KVC errors")
-require(LAYER_SHIELD_M, "return @NO;", "native layer shield lacks an explicit failure result")
-
-# Explicitly reject the physical-iPhone implementation that already leaked:
-# mounting chat content under an assumed `secureField.subviews.first` canvas.
+# Explicitly reject both previously leaking implementations:
+# 1) temporary KVC substitution of arbitrary CALayers;
+# 2) assuming secureField.subviews.first is the secure canvas.
+forbid(SCREEN, "NSClassFromString(\"GRULayerScreenshotShield\")",
+       "failed temporary layer-shield implementation returned")
+forbid(SCREEN, "screenshotShield.protect",
+       "failed temporary CALayer protection path returned")
 forbid(SCREEN, "GRUNonResponderSecureField",
-       "failed secure-field embedding implementation returned")
+       "failed legacy secure-field implementation returned")
 forbid(SCREEN, "secureField.subviews.first",
        "unsafe first-subview secure-canvas assumption returned")
-forbid(SCREEN, "protectedCanvas.addSubview(host.view)",
-       "chat returned to the leaking secure-canvas embedding path")
 forbid(SCREEN, "chatScreenshotShieldEnabled",
        "chat screenshot protection must not be runtime-disableable")
 forbid(BRIDGING, "GRULayerScreenshotGuard.h",
@@ -159,8 +148,8 @@ if "struct GRUScreenProtectionView" in screen_text:
     root_section = screen_text.split("struct GRUScreenProtectionView", 1)[1]
     if "GRUChatSecureCaptureContainer" in root_section:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
-    if "GRUScreenshotShield" in root_section:
-        failures.append("native chat layer shield leaked into root/auth protection")
+    if "GRUSecureChatSurfaceView" in root_section:
+        failures.append("secure chat surface leaked into root/auth protection")
 
 chat_text = read(CHAT_VIEW)
 if chat_text.count("GRUChatCaptureProtection") != 1:
