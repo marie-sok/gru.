@@ -1,74 +1,47 @@
 #import "GRULayerScreenshotShield.h"
 #import <UIKit/UIKit.h>
 
-static UITextField *GRUSharedSecureTextField(void) {
-    static UITextField *textField = nil;
+static UITextField * _Nullable GRUSecureTextField = nil;
+static UIView * _Nullable GRUSecureCanvasView = nil;
+
+static void GRUPrepareSecureCanvas(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        textField = [[UITextField alloc] initWithFrame:CGRectZero];
-        textField.text = @" ";
-        textField.secureTextEntry = YES;
-        textField.userInteractionEnabled = NO;
-        textField.hidden = NO;
-        [textField setNeedsLayout];
-        [textField layoutIfNeeded];
+        // Match UIKit's real secure-text canvas discovery exactly: create a
+        // plain UITextField and inspect only its direct children for the
+        // TextLayoutCanvasView used by secureTextEntry. Do not accept generic
+        // LayoutCanvasView descendants because that can report a false success
+        // while leaving the rendered chat capturable.
+        GRUSecureTextField = [[UITextField alloc] init];
+
+        for (UIView *subview in GRUSecureTextField.subviews) {
+            NSString *className = NSStringFromClass(subview.class);
+            if ([className containsString:@"TextLayoutCanvasView"]) {
+                GRUSecureCanvasView = subview;
+                break;
+            }
+        }
     });
-    return textField;
 }
 
-static BOOL GRUIsSecureCanvasView(UIView *view) {
-    NSString *className = NSStringFromClass(view.class);
-    return [className containsString:@"TextLayoutCanvasView"] ||
-           [className containsString:@"LayoutCanvasView"];
-}
+static BOOL GRUProtectExactLayer(CALayer *layer) {
+    GRUPrepareSecureCanvas();
 
-static UIView * _Nullable GRUFindSecureCanvas(UIView *root) {
-    for (UIView *subview in root.subviews) {
-        if (GRUIsSecureCanvasView(subview)) {
-            return subview;
-        }
+    UITextField *textField = GRUSecureTextField;
+    UIView *secureView = GRUSecureCanvasView;
 
-        UIView *nested = GRUFindSecureCanvas(subview);
-        if (nested != nil) {
-            return nested;
-        }
-    }
-    return nil;
-}
-
-@implementation GRULayerScreenshotShield
-
-- (NSNumber *)protectLayer:(CALayer *)layer {
-    if (layer == nil || !NSThread.isMainThread) {
-        return @NO;
-    }
-
-    UITextField *textField = GRUSharedSecureTextField();
-    UIView *secureView = GRUFindSecureCanvas(textField);
-
-    // UIKit can build the secure canvas lazily. Toggle once and retry discovery
-    // rather than ever exposing the chat through an unprotected fallback.
-    if (secureView == nil) {
-        textField.secureTextEntry = NO;
-        textField.secureTextEntry = YES;
-        [textField setNeedsLayout];
-        [textField layoutIfNeeded];
-        secureView = GRUFindSecureCanvas(textField);
-    }
-
-    if (secureView == nil) {
-        return @NO;
+    if (layer == nil || textField == nil || secureView == nil) {
+        return NO;
     }
 
     CALayer *previousLayer = secureView.layer;
     __block BOOL applied = NO;
 
     @try {
-        // Temporarily substitute the target layer into the secure text canvas.
-        // The secureTextEntry transition marks that exact layer as protected by
-        // the system capture pipeline. Restore the canvas immediately after.
+        // Temporarily substitute the exact rendered layer into UIKit's secure
+        // text canvas, perform the secureTextEntry transition, then restore the
+        // original canvas layer. This is deliberately kept on the main thread.
         [secureView setValue:layer forKey:@"layer"];
-
         textField.secureTextEntry = NO;
         textField.secureTextEntry = YES;
         applied = YES;
@@ -82,7 +55,36 @@ static UIView * _Nullable GRUFindSecureCanvas(UIView *root) {
         }
     }
 
-    return @(applied);
+    return applied;
+}
+
+static BOOL GRUProtectRenderedLayerTree(CALayer *layer) {
+    if (!GRUProtectExactLayer(layer)) {
+        return NO;
+    }
+
+    // SwiftUI/UIHostingController can render content through multiple CALayer
+    // descendants. Protect the tree that already exists at mount time as well
+    // as the dedicated parent layer so text, bubbles and media cannot escape
+    // through a separately composited child layer.
+    NSArray<CALayer *> *children = [layer.sublayers copy] ?: @[];
+    for (CALayer *child in children) {
+        if (!GRUProtectRenderedLayerTree(child)) {
+            return NO;
+        }
+    }
+
+    return YES;
+}
+
+@implementation GRULayerScreenshotShield
+
+- (NSNumber *)protectLayer:(CALayer *)layer {
+    if (layer == nil || !NSThread.isMainThread) {
+        return @NO;
+    }
+
+    return @(GRUProtectRenderedLayerTree(layer));
 }
 
 @end
