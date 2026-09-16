@@ -152,40 +152,48 @@ private final class GRUChatScreenshotLatchModel: ObservableObject {
 
 // MARK: - Chat-only still screenshot protection
 
-/// A non-interactive secure text field supplies iOS' protected rendering
-/// surface. It never becomes first responder and therefore cannot steal focus
-/// from the real chat input or summon a keyboard.
-private final class GRUNonResponderSecureField: UITextField {
-    override var canBecomeFirstResponder: Bool { false }
+/// Resolves the Objective-C layer shield at runtime. Keeping this bridge scoped
+/// to the chat compositor means RootView, Face ID and login focus never touch
+/// the secure-text rendering mechanism.
+@MainActor
+private final class GRUScreenshotShield {
+    private let runtimeObject: NSObject
+    private let selector = NSSelectorFromString("protectLayer:")
 
-    override func becomeFirstResponder() -> Bool {
-        false
+    init?() {
+        guard let runtimeType = NSClassFromString("GRULayerScreenshotShield") as? NSObject.Type else {
+            return nil
+        }
+        runtimeObject = runtimeType.init()
     }
 
-    override func canPerformAction(
-        _ action: Selector,
-        withSender sender: Any?
-    ) -> Bool {
-        false
+    func protect(_ layer: CALayer) -> Bool {
+        guard runtimeObject.responds(to: selector),
+              let unmanagedResult = runtimeObject.perform(selector, with: layer) else {
+            return false
+        }
+
+        let value = unmanagedResult.takeUnretainedValue()
+        return (value as? NSNumber)?.boolValue == true
     }
 }
 
-/// Owns the protected chat hierarchy. The real chat is deliberately left
-/// unattached until UITextField has created its secure internal canvas.
-/// If that canvas never appears, the controller fails closed: the privacy
-/// artwork underneath remains visible and conversation pixels are never mounted
-/// into an unprotected fallback view.
+/// Owns one regular UIView whose CALayer is explicitly marked as protected by
+/// the native shield. Chat pixels remain hidden until that operation succeeds.
+/// There is intentionally no unprotected fallback.
 @MainActor
 private final class GRUProtectedChatController<Content: View>: UIViewController {
-    private let secureField = GRUNonResponderSecureField(frame: .zero)
+    private let protectedContainer = UIView(frame: .zero)
     private let host: UIHostingController<Content>
+    private let screenshotShield = GRUScreenshotShield()
 
-    private var didMountProtectedContent = false
+    private var didInstallHierarchy = false
+    private var isLayerProtected = false
     private var retryScheduled = false
     private var retryCount = 0
     private let maxRetryCount = 120
     private var isDismantled = false
-    private var didLogUnavailableCanvas = false
+    private var didLogUnavailableShield = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -208,39 +216,31 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
         view.insetsLayoutMarginsFromSafeArea = false
         additionalSafeAreaInsets = .zero
 
-        configureSecureField()
-        mountProtectedContentIfReady()
+        installProtectedHierarchyIfNeeded()
+        applyProtectionIfReady()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        mountProtectedContentIfReady()
+        applyProtectionIfReady()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        mountProtectedContentIfReady()
+        applyProtectionIfReady()
     }
 
     func update(rootView: Content) {
         guard !isDismantled else { return }
-
         host.rootView = rootView
-
-        if secureField.isFirstResponder {
-            secureField.resignFirstResponder()
-        }
-
-        mountProtectedContentIfReady()
+        installProtectedHierarchyIfNeeded()
+        applyProtectionIfReady()
     }
 
     func dismantle() {
         isDismantled = true
         retryScheduled = false
-
-        if secureField.isFirstResponder {
-            secureField.resignFirstResponder()
-        }
+        protectedContainer.isHidden = true
 
         if host.parent != nil {
             host.willMove(toParent: nil)
@@ -248,97 +248,91 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
             host.removeFromParent()
         }
 
-        didMountProtectedContent = false
+        protectedContainer.removeFromSuperview()
+        didInstallHierarchy = false
+        isLayerProtected = false
     }
 
-    private func configureSecureField() {
-        secureField.isSecureTextEntry = true
-        secureField.text = " "
-        secureField.textColor = .clear
-        secureField.tintColor = .clear
-        secureField.backgroundColor = .clear
-        secureField.borderStyle = .none
-        secureField.autocorrectionType = .no
-        secureField.spellCheckingType = .no
-        secureField.smartDashesType = .no
-        secureField.smartQuotesType = .no
-        secureField.smartInsertDeleteType = .no
-        secureField.textContentType = nil
-        secureField.isAccessibilityElement = false
-        secureField.accessibilityElementsHidden = true
-        secureField.translatesAutoresizingMaskIntoConstraints = false
-        secureField.inputView = UIView(frame: .zero)
-        secureField.inputAccessoryView = UIView(frame: .zero)
-
-        view.addSubview(secureField)
-        NSLayoutConstraint.activate([
-            secureField.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            secureField.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            secureField.topAnchor.constraint(equalTo: view.topAnchor),
-            secureField.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-
-        // Force the first layout pass before asking UITextField for its secure
-        // rendering child. There is intentionally no unprotected fallback.
-        view.setNeedsLayout()
-        view.layoutIfNeeded()
-        secureField.setNeedsLayout()
-        secureField.layoutIfNeeded()
-    }
-
-    private func mountProtectedContentIfReady() {
-        guard !isDismantled,
-              !didMountProtectedContent else {
+    private func installProtectedHierarchyIfNeeded() {
+        guard !didInstallHierarchy,
+              !isDismantled else {
             return
         }
 
-        secureField.setNeedsLayout()
-        secureField.layoutIfNeeded()
+        // Fail closed: the GRU privacy artwork underneath remains the only
+        // visible surface until the exact container layer is protected.
+        protectedContainer.isHidden = true
+        protectedContainer.backgroundColor = .clear
+        protectedContainer.insetsLayoutMarginsFromSafeArea = false
+        protectedContainer.translatesAutoresizingMaskIntoConstraints = false
+        protectedContainer.isUserInteractionEnabled = true
 
-        guard let protectedCanvas = secureField.subviews.first else {
+        view.addSubview(protectedContainer)
+        NSLayoutConstraint.activate([
+            protectedContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            protectedContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            protectedContainer.topAnchor.constraint(equalTo: view.topAnchor),
+            protectedContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+
+        addChild(host)
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        protectedContainer.addSubview(host.view)
+
+        NSLayoutConstraint.activate([
+            host.view.leadingAnchor.constraint(equalTo: protectedContainer.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: protectedContainer.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: protectedContainer.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: protectedContainer.bottomAnchor)
+        ])
+
+        host.didMove(toParent: self)
+        didInstallHierarchy = true
+
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        protectedContainer.setNeedsLayout()
+        protectedContainer.layoutIfNeeded()
+    }
+
+    private func applyProtectionIfReady() {
+        guard !isDismantled,
+              didInstallHierarchy,
+              !isLayerProtected else {
+            return
+        }
+
+        view.layoutIfNeeded()
+        protectedContainer.layoutIfNeeded()
+
+        guard protectedContainer.bounds.width > 0,
+              protectedContainer.bounds.height > 0,
+              let screenshotShield,
+              screenshotShield.protect(protectedContainer.layer) else {
             scheduleRetry()
             return
         }
 
         retryScheduled = false
-
-        protectedCanvas.isUserInteractionEnabled = true
-        protectedCanvas.insetsLayoutMarginsFromSafeArea = false
-        protectedCanvas.backgroundColor = .clear
-
-        addChild(host)
-        host.view.translatesAutoresizingMaskIntoConstraints = false
-        protectedCanvas.addSubview(host.view)
-
-        NSLayoutConstraint.activate([
-            host.view.leadingAnchor.constraint(equalTo: protectedCanvas.leadingAnchor),
-            host.view.trailingAnchor.constraint(equalTo: protectedCanvas.trailingAnchor),
-            host.view.topAnchor.constraint(equalTo: protectedCanvas.topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: protectedCanvas.bottomAnchor)
-        ])
-
-        host.didMove(toParent: self)
-        didMountProtectedContent = true
+        isLayerProtected = true
+        protectedContainer.isHidden = false
 
         #if DEBUG
-        print(
-            "[GRU Privacy] secure chat compositor ready: " +
-            NSStringFromClass(type(of: protectedCanvas))
-        )
+        print("[GRU Privacy] chat capture layer protected")
         #endif
     }
 
     private func scheduleRetry() {
         guard !isDismantled,
-              !didMountProtectedContent,
+              !isLayerProtected,
               !retryScheduled else {
             return
         }
 
         guard retryCount < maxRetryCount else {
             #if DEBUG
-            if !didLogUnavailableCanvas {
-                didLogUnavailableCanvas = true
+            if !didLogUnavailableShield {
+                didLogUnavailableShield = true
                 print("[GRU Privacy] secure canvas unavailable; chat remains redacted")
             }
             #endif
@@ -356,7 +350,7 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
                 }
 
                 self.retryScheduled = false
-                self.mountProtectedContentIfReady()
+                self.applyProtectionIfReady()
             }
         }
     }
@@ -400,8 +394,8 @@ struct GRUChatCaptureProtection<Content: View>: View {
     var body: some View {
         ZStack {
             // The approved GRU artwork is intentionally outside the protected
-            // compositor. During a still capture, iOS omits the secure chat
-            // surface and this is the remaining visible layer.
+            // chat layer. During a still capture, protected conversation pixels
+            // are omitted and this scene remains visible underneath.
             GRUPrivacyCaptureScene(
                 showButton: screenshotLatch.isLatched,
                 onDismiss: screenshotLatch.isLatched ? {
@@ -439,7 +433,7 @@ struct GRUPrivacyCaptureScene: View {
 // MARK: - Root recording / switcher protection
 
 /// Root protection intentionally stays on public lifecycle/capture APIs only.
-/// It must not use the secure UITextField compositor because doing so previously
+/// It must not use the secure layer compositor because doing so previously
 /// interfered with Face ID, startup focus and keyboard behaviour.
 struct GRUScreenProtectionView<Content: View>: View {
     @StateObject private var model = GRUScreenProtectionModel()
