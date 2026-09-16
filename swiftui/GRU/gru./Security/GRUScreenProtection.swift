@@ -150,11 +150,11 @@ private final class GRUChatScreenshotLatchModel: ObservableObject {
     }
 }
 
-// MARK: - Chat-only still screenshot redaction
+// MARK: - Chat-only still screenshot protection
 
-/// This is the secure compositor implementation that previously redacted the
-/// application on the physical-iPhone beta. The important change is scope:
-/// it now exists only inside ChatView, never around RootView/authentication.
+/// A non-interactive secure text field supplies iOS' protected rendering
+/// surface. It never becomes first responder and therefore cannot steal focus
+/// from the real chat input or summon a keyboard.
 private final class GRUNonResponderSecureField: UITextField {
     override var canBecomeFirstResponder: Bool { false }
 
@@ -170,25 +170,85 @@ private final class GRUNonResponderSecureField: UITextField {
     }
 }
 
+/// Owns the protected chat hierarchy. The real chat is deliberately left
+/// unattached until UITextField has created its secure internal canvas.
+/// If that canvas never appears, the controller fails closed: the privacy
+/// artwork underneath remains visible and conversation pixels are never mounted
+/// into an unprotected fallback view.
 @MainActor
-private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
-    let content: Content
+private final class GRUProtectedChatController<Content: View>: UIViewController {
+    private let secureField = GRUNonResponderSecureField(frame: .zero)
+    private let host: UIHostingController<Content>
 
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
+    private weak var protectedCanvas: UIView?
+    private var didMountProtectedContent = false
+    private var retryScheduled = false
+    private var retryCount = 0
+    private let maxRetryCount = 120
+
+    init(rootView: Content) {
+        host = UIHostingController(rootView: rootView)
+        super.init(nibName: nil, bundle: nil)
+
+        host.view.backgroundColor = .clear
+        host.view.insetsLayoutMarginsFromSafeArea = false
+        host.additionalSafeAreaInsets = .zero
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(rootView: content)
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is unavailable")
     }
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        let container = UIViewController()
-        container.view.backgroundColor = .clear
-        container.view.insetsLayoutMarginsFromSafeArea = false
-        container.additionalSafeAreaInsets = .zero
+    override func viewDidLoad() {
+        super.viewDidLoad()
 
-        let secureField = GRUNonResponderSecureField(frame: .zero)
+        view.backgroundColor = .clear
+        view.insetsLayoutMarginsFromSafeArea = false
+        additionalSafeAreaInsets = .zero
+
+        configureSecureField()
+        mountProtectedContentIfReady()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        mountProtectedContentIfReady()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        mountProtectedContentIfReady()
+    }
+
+    func update(rootView: Content) {
+        host.rootView = rootView
+
+        if secureField.isFirstResponder {
+            secureField.resignFirstResponder()
+        }
+
+        mountProtectedContentIfReady()
+    }
+
+    func dismantle() {
+        retryScheduled = false
+
+        if secureField.isFirstResponder {
+            secureField.resignFirstResponder()
+        }
+
+        if host.parent != nil {
+            host.willMove(toParent: nil)
+            host.view.removeFromSuperview()
+            host.removeFromParent()
+        }
+
+        protectedCanvas = nil
+        didMountProtectedContent = false
+    }
+
+    private func configureSecureField() {
         secureField.isSecureTextEntry = true
         secureField.text = " "
         secureField.textColor = .clear
@@ -207,28 +267,41 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
         secureField.inputView = UIView(frame: .zero)
         secureField.inputAccessoryView = UIView(frame: .zero)
 
-        container.view.addSubview(secureField)
+        view.addSubview(secureField)
         NSLayoutConstraint.activate([
-            secureField.leadingAnchor.constraint(equalTo: container.view.leadingAnchor),
-            secureField.trailingAnchor.constraint(equalTo: container.view.trailingAnchor),
-            secureField.topAnchor.constraint(equalTo: container.view.topAnchor),
-            secureField.bottomAnchor.constraint(equalTo: container.view.bottomAnchor)
+            secureField.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            secureField.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            secureField.topAnchor.constraint(equalTo: view.topAnchor),
+            secureField.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        // Keep this deliberately identical to the earlier compositor that
-        // redacted physical-device captures. Do not replace it with class-name
-        // probing or CALayer substitution: those later variants leaked.
-        let protectedCanvas = secureField.subviews.first ?? secureField
+        // Force the first layout pass before asking UITextField for its secure
+        // rendering child. There is intentionally no `?? secureField` fallback.
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+    }
+
+    private func mountProtectedContentIfReady() {
+        guard !didMountProtectedContent else { return }
+
+        secureField.setNeedsLayout()
+        secureField.layoutIfNeeded()
+
+        guard let protectedCanvas = secureField.subviews.first else {
+            scheduleRetry()
+            return
+        }
+
+        retryScheduled = false
+        self.protectedCanvas = protectedCanvas
+
         protectedCanvas.isUserInteractionEnabled = true
         protectedCanvas.insetsLayoutMarginsFromSafeArea = false
         protectedCanvas.backgroundColor = .clear
 
-        let host = context.coordinator.host
-        host.view.backgroundColor = .clear
-        host.view.insetsLayoutMarginsFromSafeArea = false
-        host.additionalSafeAreaInsets = .zero
-
-        container.addChild(host)
+        addChild(host)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         protectedCanvas.addSubview(host.view)
 
@@ -239,54 +312,66 @@ private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRep
             host.view.bottomAnchor.constraint(equalTo: protectedCanvas.bottomAnchor)
         ])
 
-        host.didMove(toParent: container)
-
-        context.coordinator.secureField = secureField
-        context.coordinator.protectedCanvas = protectedCanvas
+        host.didMove(toParent: self)
+        didMountProtectedContent = true
 
         #if DEBUG
         print(
-            "[GRUPrivacy] proven secure chat compositor mounted: " +
+            "[GRU Privacy] secure chat compositor ready: " +
             NSStringFromClass(type(of: protectedCanvas))
         )
         #endif
+    }
 
-        return container
+    private func scheduleRetry() {
+        guard !didMountProtectedContent,
+              !retryScheduled,
+              retryCount < maxRetryCount else {
+            #if DEBUG
+            if retryCount >= maxRetryCount && !didMountProtectedContent {
+                print("[GRU Privacy] secure canvas unavailable; chat remains redacted")
+            }
+            #endif
+            return
+        }
+
+        retryScheduled = true
+        retryCount += 1
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.retryScheduled = false
+                self.mountProtectedContentIfReady()
+            }
+        }
+    }
+}
+
+@MainActor
+private struct GRUChatSecureCaptureContainer<Content: View>: UIViewControllerRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeUIViewController(context: Context) -> GRUProtectedChatController<Content> {
+        GRUProtectedChatController(rootView: content)
     }
 
     func updateUIViewController(
-        _ uiViewController: UIViewController,
+        _ uiViewController: GRUProtectedChatController<Content>,
         context: Context
     ) {
-        context.coordinator.host.rootView = content
-
-        if context.coordinator.secureField?.isFirstResponder == true {
-            context.coordinator.secureField?.resignFirstResponder()
-        }
+        uiViewController.update(rootView: content)
     }
 
     static func dismantleUIViewController(
-        _ uiViewController: UIViewController,
-        coordinator: Coordinator
+        _ uiViewController: GRUProtectedChatController<Content>,
+        coordinator: ()
     ) {
-        if coordinator.secureField?.isFirstResponder == true {
-            coordinator.secureField?.resignFirstResponder()
-        }
-
-        coordinator.host.willMove(toParent: nil)
-        coordinator.host.view.removeFromSuperview()
-        coordinator.host.removeFromParent()
-    }
-
-    final class Coordinator {
-        let host: UIHostingController<Content>
-        weak var secureField: GRUNonResponderSecureField?
-        weak var protectedCanvas: UIView?
-
-        init(rootView: Content) {
-            host = UIHostingController(rootView: rootView)
-            host.view.backgroundColor = .clear
-        }
+        uiViewController.dismantle()
     }
 }
 
@@ -300,9 +385,9 @@ struct GRUChatCaptureProtection<Content: View>: View {
 
     var body: some View {
         ZStack {
-            // This layer is intentionally outside the secure compositor.
-            // When iOS omits the secure chat surface from capture, the approved
-            // GRU privacy artwork is the only layer left in the saved image.
+            // The approved GRU artwork is intentionally outside the protected
+            // compositor. During a still capture, iOS omits the secure chat
+            // surface and this is the remaining visible layer.
             GRUPrivacyCaptureScene(
                 showButton: screenshotLatch.isLatched,
                 onDismiss: screenshotLatch.isLatched ? {
