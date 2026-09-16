@@ -180,11 +180,12 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
     private let secureField = GRUNonResponderSecureField(frame: .zero)
     private let host: UIHostingController<Content>
 
-    private weak var protectedCanvas: UIView?
     private var didMountProtectedContent = false
     private var retryScheduled = false
     private var retryCount = 0
     private let maxRetryCount = 120
+    private var isDismantled = false
+    private var didLogUnavailableCanvas = false
 
     init(rootView: Content) {
         host = UIHostingController(rootView: rootView)
@@ -222,6 +223,8 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
     }
 
     func update(rootView: Content) {
+        guard !isDismantled else { return }
+
         host.rootView = rootView
 
         if secureField.isFirstResponder {
@@ -232,6 +235,7 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
     }
 
     func dismantle() {
+        isDismantled = true
         retryScheduled = false
 
         if secureField.isFirstResponder {
@@ -244,7 +248,6 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
             host.removeFromParent()
         }
 
-        protectedCanvas = nil
         didMountProtectedContent = false
     }
 
@@ -276,7 +279,7 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
         ])
 
         // Force the first layout pass before asking UITextField for its secure
-        // rendering child. There is intentionally no `?? secureField` fallback.
+        // rendering child. There is intentionally no unprotected fallback.
         view.setNeedsLayout()
         view.layoutIfNeeded()
         secureField.setNeedsLayout()
@@ -284,7 +287,10 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
     }
 
     private func mountProtectedContentIfReady() {
-        guard !didMountProtectedContent else { return }
+        guard !isDismantled,
+              !didMountProtectedContent else {
+            return
+        }
 
         secureField.setNeedsLayout()
         secureField.layoutIfNeeded()
@@ -295,7 +301,6 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
         }
 
         retryScheduled = false
-        self.protectedCanvas = protectedCanvas
 
         protectedCanvas.isUserInteractionEnabled = true
         protectedCanvas.insetsLayoutMarginsFromSafeArea = false
@@ -324,11 +329,16 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
     }
 
     private func scheduleRetry() {
-        guard !didMountProtectedContent,
-              !retryScheduled,
-              retryCount < maxRetryCount else {
+        guard !isDismantled,
+              !didMountProtectedContent,
+              !retryScheduled else {
+            return
+        }
+
+        guard retryCount < maxRetryCount else {
             #if DEBUG
-            if retryCount >= maxRetryCount && !didMountProtectedContent {
+            if !didLogUnavailableCanvas {
+                didLogUnavailableCanvas = true
                 print("[GRU Privacy] secure canvas unavailable; chat remains redacted")
             }
             #endif
@@ -340,7 +350,11 @@ private final class GRUProtectedChatController<Content: View>: UIViewController 
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self,
+                      !self.isDismantled else {
+                    return
+                }
+
                 self.retryScheduled = false
                 self.mountProtectedContentIfReady()
             }
@@ -395,19 +409,13 @@ struct GRUChatCaptureProtection<Content: View>: View {
                 } : nil
             )
 
-            if GRUPrivacyFeatures.chatScreenshotShieldEnabled,
-               !screenshotLatch.isLatched {
+            if !screenshotLatch.isLatched {
                 GRUChatSecureCaptureContainer {
                     content
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .privacySensitive()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !GRUPrivacyFeatures.chatScreenshotShieldEnabled,
-                      !screenshotLatch.isLatched {
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .privacySensitive()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
