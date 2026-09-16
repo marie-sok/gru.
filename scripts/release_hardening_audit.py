@@ -43,6 +43,7 @@ ROOT_VIEW = "swiftui/GRU/gru./Views/RootView.swift"
 CHAT_VIEW = "swiftui/GRU/gru./Views/ChatView.swift"
 API = "swiftui/GRU/gru./Services/APIClient.swift"
 SCREEN = "swiftui/GRU/gru./Security/GRUScreenProtection.swift"
+BRIDGING = "swiftui/GRU/gru./gru-Bridging-Header.h"
 MAIN = "swiftui/GRU/gru./Views/MainView.swift"
 SETTINGS = "swiftui/GRU/gru./Views/GRUStableSettingsView.swift"
 APP_TAB = "swiftui/GRU/gru./Models/AppTab.swift"
@@ -86,22 +87,30 @@ forbid(ROOT_VIEW, 'Text(GRUL10n.text("Разблокировать"))',
 forbid(ROOT_VIEW, "isBiometricLocked",
        "legacy biometric lock-state machine returned")
 
-# Chat privacy. This intentionally restores the secure compositor variant that
-# previously redacted captures on the physical beta, but scopes it ONLY to the
-# authenticated ChatView. RootView/auth must stay outside the secure UITextField.
+# Chat privacy is scoped only to authenticated ChatView content. The real chat
+# must never be mounted into an unprotected fallback while the secure UITextField
+# rendering child is unavailable. RootView/auth stays outside this compositor.
 require(SCREEN, "UIScreen.main.isCaptured", "screen-recording/mirroring redaction is missing")
 require(SCREEN, "UIApplication.willResignActiveNotification", "app-switcher privacy shield is missing")
 require(SCREEN, "UIApplication.didEnterBackgroundNotification", "background privacy shield is missing")
 require(SCREEN, "UIApplication.userDidTakeScreenshotNotification", "screenshot detection is missing")
 require(SCREEN, ".privacySensitive()", "SwiftUI privacySensitive marker is missing")
 require(SCREEN, "GRUNonResponderSecureField",
-        "proven non-responder secure UITextField host is missing")
+        "non-responder secure UITextField host is missing")
 require(SCREEN, "secureField.isSecureTextEntry = true",
         "secure text compositor is not enabled")
-require(SCREEN, "let protectedCanvas = secureField.subviews.first ?? secureField",
-        "proven secure canvas selection changed")
+require(SCREEN, "GRUProtectedChatController",
+        "dedicated protected chat controller is missing")
+require(SCREEN, "guard let protectedCanvas = secureField.subviews.first else",
+        "secure canvas lookup is not fail-closed")
+require(SCREEN, "scheduleRetry()",
+        "secure canvas retry path is missing")
+require(SCREEN, "didMountProtectedContent",
+        "protected chat mount state guard is missing")
 require(SCREEN, "protectedCanvas.addSubview(host.view)",
-        "complete SwiftUI chat is not mounted inside the proven secure canvas")
+        "complete SwiftUI chat is not mounted inside the secure canvas")
+require(SCREEN, "secure canvas unavailable; chat remains redacted",
+        "fail-closed exhausted-retry state is missing")
 require(SCREEN, "GRUChatSecureCaptureContainer",
         "chat-scoped secure compositor is missing")
 require(SCREEN, "GRUChatScreenshotLatchModel",
@@ -111,8 +120,15 @@ require(SCREEN, "GRUPrivacyCaptureScene",
 require(CHAT_VIEW, "GRUChatCaptureProtection",
         "ChatView is not wrapped by chat-scoped screenshot protection")
 
-# Do not re-introduce the later competing runtime/layer paths that were tested
-# on-device and still leaked conversation pixels into saved screenshots.
+forbid(SCREEN, "secureField.subviews.first ?? secureField",
+       "unsafe unprotected secure-field fallback returned")
+forbid(SCREEN, "chatScreenshotShieldEnabled",
+       "chat screenshot protection must not be runtime-disableable")
+forbid(BRIDGING, "GRULayerScreenshotGuard.h",
+       "obsolete screenshot bridge header import returned")
+
+# Do not re-introduce competing runtime/layer paths that leaked conversation
+# pixels during physical-device testing.
 forbid(SCREEN, "GRUSetLayerDisableScreenshots",
        "obsolete Objective-C layer substitution path returned")
 forbid(SCREEN, "findSecureCanvas(in:",
@@ -134,6 +150,10 @@ if "struct GRUScreenProtectionView" in screen_text:
         failures.append("root GRUScreenProtectionView must not use the chat secure compositor")
     if "GRUNonResponderSecureField" in root_section:
         failures.append("secure UITextField compositor leaked into root/auth protection")
+
+chat_text = read(CHAT_VIEW)
+if chat_text.count("GRUChatCaptureProtection") != 1:
+    failures.append("ChatView must contain exactly one GRUChatCaptureProtection wrapper")
 
 require(MAIN, "GRUStableSettingsView()", "MainView is not using stable beta settings")
 forbid(MAIN, "GRUE2EESecurityCenterView", "user-facing E2EE overlay/button returned")
